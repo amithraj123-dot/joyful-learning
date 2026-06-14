@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Joyful Learning Hub - Play & Learn</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Google Fonts for child-friendly typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+</head>
+<body class="light-mode">
+
+  <!-- Main App Container -->
+  <div id="app-container">
+    
+    <!-- Top Navigation Bar -->
+    <header class="app-header">
+      <div class="header-logo" id="btn-home-logo">
+        <svg class="header-logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 12H5V21H19V12H22L12 2Z" fill="currentColor"/>
+          <circle cx="12" cy="13" r="3" fill="#FFE57F"/>
+        </svg>
+        <span>Joyful Learning</span>
+      </div>
+      <div class="header-controls">
+        <button id="btn-back" class="btn btn-secondary hidden">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          Back to Games
+        </button>
+        <button id="btn-mute" class="btn btn-icon-only" title="Toggle Sound">
+          <svg id="icon-sound-on" class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <svg id="icon-sound-off" class="btn-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+          </svg>
+        </button>
+        <button id="btn-settings" class="btn btn-settings">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          Parents Menu
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Dynamic Content Panel -->
+    <main id="main-content">
+      
+      <!-- VIEW: DASHBOARD -->
+      <section id="view-dashboard" class="app-view active">
+        <div class="welcome-banner">
+          <div class="welcome-text">
+            <h1>Hi there, Friend! 👋</h1>
+            <p>What fun game would you like to play and learn today?</p>
+          </div>
+          <div class="welcome-mascot">
+            <!-- Animated SVG Mascot: Sparky the Star -->
+            <svg class="mascot-svg animate-bounce-slow" viewBox="0 0 100 100" width="100" height="100">
+              <path d="M50 5 L63 36 L95 38 L70 59 L78 92 L50 74 L22 92 L30 59 L5 38 L37 36 Z" fill="#FFE082" stroke="#FFB300" stroke-width="4" stroke-linejoin="round"/>
+              <!-- Smiling Eyes -->
+              <circle cx="40" cy="45" r="4" fill="#3E2723"/>
+              <circle cx="60" cy="45" r="4" fill="#3E2723"/>
+              <!-- Happy Mouth -->
+              <path d="M43 55 Q50 63 57 55" fill="none" stroke="#3E2723" stroke-width="3" stroke-linecap="round"/>
+              <!-- Rosy Cheeks -->
+              <circle cx="34" cy="51" r="3.5" fill="#FF8A80" opacity="0.8"/>
+              <circle cx="66" cy="51" r="3.5" fill="#FF8A80" opacity="0.8"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="menu-grid">
+          <!-- Game Card 1: Speech Practice -->
+          <div class="menu-card card-speech" data-game="speech">
+            <div class="card-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                <circle cx="8" cy="10" r="1" fill="currentColor"></circle>
+                <circle cx="12" cy="10" r="1" fill="currentColor"></circle>
+                <circle cx="16" cy="10" r="1" fill="currentColor"></circle>
+              </svg>
+            </div>
+            <div class="card-info">
+              <h3>Speech Hub</h3>
+              <p>Listen and say friendly words</p>
+            </div>
+          </div>
+
+          <!-- Game Card 2: Manners & Behavior -->
+          <div class="menu-card card-manners" data-game="manners">
+            <div class="card-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </div>
+            <div class="card-info">
+              <h3>Manners & Behaviors</h3>
+              <p>Fun visual social stories</p>
+            </div>
+          </div>
+
+          <!-- Game Card 3: Color Sorting -->
+          <div class="menu-card card-sorting" data-game="sorting">
+            <div class="card-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="9" rx="1"></rect>
+                <rect x="14" y="3" width="7" height="5" rx="1"></rect>
+                <rect x="14" y="12" width="7" height="9" rx="1"></rect>
+                <rect x="3" y="16" width="7" height="5" rx="1"></rect>
+              </svg>
+            </div>
+            <div class="card-info">
+              <h3>Color Sorting</h3>
+              <p>Sort items by their color</p>
+            </div>
+          </div>
+
+          <!-- Game Card 4: Cooking Kitchen -->
+          <div class="menu-card card-cooking" data-game="cooking">
+            <div class="card-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+            </div>
+            <div class="card-info">
+              <h3>Cooking Game</h3>
+              <p>Make a delicious sandwich!</p>
+            </div>
+          </div>
+
+          <!-- Game Card 5: Find & Match -->
+          <div class="menu-card card-findmatch" data-game="findmatch">
+            <div class="card-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+              </svg>
+            </div>
+            <div class="card-info">
+              <h3>Find & Match</h3>
+              <p>Match words and pictures</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: SPEECH -->
+      <section id="view-speech" class="app-view">
+        <div class="view-header speech-color">
+          <h2>Speech Hub 🗣️</h2>
+          <p>Tap a category, choose a word, listen to it, and try saying it!</p>
+        </div>
+        
+        <div class="speech-category-select">
+          <button class="btn btn-category active" data-category="common">Common Words</button>
+          <button class="btn btn-category" data-category="animals">Animals</button>
+          <button class="btn btn-category" data-category="feelings">Feelings</button>
+          <button class="btn btn-category" data-category="actions">Actions</button>
+        </div>
+
+        <div class="speech-layout">
+          <!-- Card grid -->
+          <div class="speech-cards-grid" id="speech-cards-container">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Focus Practice Panel -->
+          <div class="speech-practice-panel">
+            <div class="practice-card-focus" id="speech-focus-card">
+              <div class="focus-illustration" id="speech-focus-svg-container">
+                <!-- Inline SVG rendered by JS -->
+              </div>
+              <h3 id="speech-focus-title">Select a word</h3>
+              <p class="pronunciation-hint" id="speech-focus-phonetic">...</p>
+              
+              <div class="speech-action-buttons">
+                <button class="btn btn-play-sound" id="btn-speech-listen">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                  </svg>
+                  Listen
+                </button>
+                <button class="btn btn-mic" id="btn-speech-mic">
+                  <svg class="mic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                  </svg>
+                  Tap to Say
+                </button>
+              </div>
+
+              <!-- Recognition Feedback Message -->
+              <div class="mic-feedback-area hidden" id="speech-mic-feedback">
+                <div class="mic-pulse-ring"></div>
+                <p class="feedback-text">Listening to you...</p>
+              </div>
+
+              <div class="practice-result hidden" id="speech-practice-result">
+                <!-- Dynamic feedback e.g. "Good Job!" -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: MANNERS & BEHAVIOR -->
+      <section id="view-manners" class="app-view">
+        <div class="view-header manners-color">
+          <h2>Manners & Behaviors 🤝</h2>
+          <p>Learn how to share, play, and express your feelings in different situations!</p>
+        </div>
+
+        <div class="manners-grid-selector" id="manners-story-selector">
+          <!-- Dynamically populated with stories -->
+        </div>
+
+        <div class="story-player-container hidden" id="manners-story-player">
+          <div class="story-progress-bar">
+            <div class="story-progress-fill" id="story-progress-fill"></div>
+          </div>
+
+          <div class="story-slide-card">
+            <div class="story-slide-image" id="story-slide-image-container">
+              <!-- Animated story SVGs -->
+            </div>
+            <div class="story-slide-content">
+              <p class="story-text" id="story-text">Story text goes here...</p>
+              
+              <!-- Story Options / Actions -->
+              <div class="story-options-container" id="story-options-container">
+                <!-- Option buttons dynamically generated -->
+              </div>
+
+              <div class="story-feedback hidden" id="story-feedback">
+                <p id="story-feedback-msg">Feedback message...</p>
+                <button class="btn btn-primary" id="btn-story-next">Next</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: COLOR SORTING -->
+      <section id="view-sorting" class="app-view">
+        <div class="view-header sorting-color">
+          <h2>Color Sorting Game 🎨</h2>
+          <p>Drag the items into the bucket with the matching color!</p>
+        </div>
+
+        <div class="sorting-game-container">
+          <!-- Floating draggable items pool -->
+          <div class="sorting-items-pool" id="sorting-items-pool">
+            <!-- Generated dynamically -->
+          </div>
+
+          <!-- Color Buckets Area -->
+          <div class="sorting-buckets-container" id="sorting-buckets-container">
+            <!-- Generated dynamically -->
+          </div>
+        </div>
+        
+        <div class="game-footer">
+          <div class="score-display">Score: <span id="sorting-score">0</span></div>
+          <button class="btn btn-secondary" id="btn-sorting-reset">Reset Game</button>
+        </div>
+      </section>
+
+      <!-- VIEW: COOKING KITCHEN -->
+      <section id="view-cooking" class="app-view">
+        <div class="view-header cooking-color">
+          <h2>Joyful Kitchen 🍳</h2>
+          <p>Help make a yummy sandwich! Follow the steps and cook along.</p>
+        </div>
+
+        <div class="cooking-workspace">
+          <!-- Step indicator -->
+          <div class="cooking-step-indicator" id="cooking-steps">
+            <div class="step-dot active" data-step="1">1</div>
+            <div class="step-dot" data-step="2">2</div>
+            <div class="step-dot" data-step="3">3</div>
+            <div class="step-dot" data-step="4">4</div>
+          </div>
+
+          <div class="cooking-board-layout">
+            <!-- Preparation Board / Interactive Area -->
+            <div class="cooking-canvas-container">
+              <div class="cooking-canvas" id="cooking-canvas">
+                <!-- SVG elements layered to show current assembly -->
+              </div>
+              <div class="interaction-overlay-hint" id="cooking-interaction-hint">
+                Drag ingredients to the board!
+              </div>
+            </div>
+
+            <!-- Ingredients / Tools Dock -->
+            <div class="cooking-dock-panel">
+              <h3 id="cooking-dock-title">Kitchen Cabinet</h3>
+              <div class="cooking-dock-items" id="cooking-dock-items">
+                <!-- Dynamic tools/ingredients depending on step -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="game-footer">
+          <p id="cooking-instructions-text" class="cooking-instructions">Let's start by placing a slice of bread on the board!</p>
+          <button class="btn btn-primary hidden" id="btn-cooking-next-step">Next Step &rarr;</button>
+        </div>
+      </section>
+
+      <!-- VIEW: FIND & MATCH -->
+      <section id="view-findmatch" class="app-view">
+        <div class="view-header findmatch-color">
+          <h2>Find & Match 🔍</h2>
+          <p>Find the correct picture or match the word card!</p>
+        </div>
+
+        <div class="findmatch-quiz-container">
+          <!-- Area for Clue Prompt (speaker or picture) -->
+          <div id="findmatch-prompt-area">
+            <!-- Filled dynamically by JS -->
+          </div>
+
+          <!-- Choice Grid Options -->
+          <div class="findmatch-choices-grid" id="findmatch-choices-container">
+            <!-- Choices generated dynamically -->
+          </div>
+        </div>
+
+        <div class="game-footer">
+          <div class="score-display">Stars: <span id="findmatch-score">0</span> ⭐</div>
+          <button class="btn btn-secondary" id="btn-findmatch-next">Skip Round</button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Parental Settings/Control Modal -->
+    <div class="modal-overlay hidden" id="settings-modal">
+      <div class="modal-card">
+        <!-- Verification Screen (Adult Gate) -->
+        <div class="adult-gate-screen" id="adult-gate">
+          <h3>Parent & Teacher Gate 🔐</h3>
+          <p>Please solve this simple problem to enter settings:</p>
+          <div class="gate-math-problem">
+            <span id="math-num1">5</span> + <span id="math-num2">7</span> = 
+            <input type="number" id="gate-answer" placeholder="?" min="0" max="99">
+          </div>
+          <p class="gate-error hidden" id="gate-error-msg">That's not correct, try again!</p>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" id="btn-gate-close">Cancel</button>
+            <button class="btn btn-primary" id="btn-gate-submit">Enter</button>
+          </div>
+        </div>
+
+        <!-- Actual Settings Panel -->
+        <div class="settings-panel-screen hidden" id="settings-panel">
+          <h3>Parent & Teacher Settings ⚙️</h3>
+          
+          <div class="setting-item">
+            <label for="select-voice">Speech Synthesis Voice</label>
+            <select id="select-voice" class="custom-select">
+              <option value="default">Default System Voice</option>
+            </select>
+          </div>
+
+          <div class="setting-item">
+            <label for="slider-speed">Voice Speed: <span id="speed-val">1.0</span>x</label>
+            <input type="range" id="slider-speed" min="0.5" max="1.5" step="0.1" value="0.9">
+            <div class="range-labels">
+              <span>Slower</span>
+              <span>Normal</span>
+              <span>Faster</span>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label for="slider-volume">Sound & Voice Volume</label>
+            <input type="range" id="slider-volume" min="0" max="1" step="0.1" value="0.7">
+          </div>
+
+          <div class="setting-item-toggle">
+            <span>Speech Recognition Hints</span>
+            <label class="switch">
+              <input type="checkbox" id="toggle-hints" checked>
+              <span class="slider-round"></span>
+            </label>
+          </div>
+
+          <div class="setting-item-toggle">
+            <span>High Contrast / Low Sensory Mode</span>
+            <label class="switch">
+              <input type="checkbox" id="toggle-high-contrast">
+              <span class="slider-round"></span>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label style="margin-bottom: 6px;">Game Difficulty Level</label>
+            <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg-primary); padding: 12px; border-radius: 12px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                <input type="radio" name="difficulty" value="easy" style="width: 18px; height: 18px;">
+                <span>Easy (2 Choices)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                <input type="radio" name="difficulty" value="medium" checked style="width: 18px; height: 18px;">
+                <span>Medium (4 Choices)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+                <input type="radio" name="difficulty" value="hard" style="width: 18px; height: 18px;">
+                <span>Hard (6 Choices)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn btn-secondary" id="btn-settings-reset-data">Reset Game Progress</button>
+            <button class="btn btn-primary" id="btn-settings-close">Close Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success Celebration Overlay (Celebratory Particles) -->
+    <div class="celebration-overlay hidden" id="celebration-layer">
+      <div class="celebration-card">
+        <svg class="celebration-mascot" viewBox="0 0 100 100" width="120" height="120">
+          <circle cx="50" cy="50" r="45" fill="#C8E6C9" stroke="#4CAF50" stroke-width="4"/>
+          <path d="M30 50 L45 65 L70 35" fill="none" stroke="#2E7D32" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h2>Super Job! 🎉</h2>
+        <p id="celebration-message">You did it!</p>
+        <button class="btn btn-primary btn-large" id="btn-celebration-continue">Keep Playing! 🚀</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JavaScript Modules -->
+  <script src="games/speech.js" type="module"></script>
+  <script src="games/manners.js" type="module"></script>
+  <script src="games/sorting.js" type="module"></script>
+  <script src="games/cooking.js" type="module"></script>
+  <script src="games/findmatch.js" type="module"></script>
+  <script src="app.js" type="module"></script>
+</body>
+</html>
