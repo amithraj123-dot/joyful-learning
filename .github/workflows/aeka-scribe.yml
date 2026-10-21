@@ -53,6 +53,9 @@ jobs:
           node-version: 24
       - run: pnpm install --frozen-lockfile
       - run: npm --prefix desktop ci
+      # Electron 44 downloads its binary on first use rather than at install time.
+      - name: Download the Electron binary
+        run: node desktop/node_modules/electron/install.js
       - name: Desktop unit tests, including the real PowerShell helper
         run: npm --prefix desktop test
       - run: npm --prefix desktop run build:ui
@@ -61,7 +64,7 @@ jobs:
         run: |
           $env:AEKA_SCRIBE_SMOKE_TEST = '1'
           $root = (Get-Location).Path
-          $electron = Join-Path $root 'desktop\node_modules\electron\dist\electron.exe'
+          $electron = node -e "process.stdout.write(require('./desktop/node_modules/electron'))"
           if (-not (Test-Path $electron)) { throw "Electron binary not found at $electron" }
           $p = Start-Process -FilePath $electron -ArgumentList (Join-Path $root 'desktop') -WorkingDirectory $root -PassThru -NoNewWindow -RedirectStandardOutput smoke.out -RedirectStandardError smoke.err
           if (-not $p.WaitForExit(120000)) { $p.Kill(); throw 'Aeka Scribe did not finish its smoke launch within 120 s.' }
