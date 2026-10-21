@@ -17,7 +17,7 @@ export function unseal(bytes, key) {
 export async function openVault(directory, safeStorage) {
   if (!safeStorage.isEncryptionAvailable())
     throw Error(
-      'Windows secure storage is unavailable. Flow will not save credentials or notes unencrypted.',
+      'Windows secure storage is unavailable. Aeka Scribe will not save credentials or notes unencrypted.',
     );
   await fs.mkdir(directory, { recursive: true });
   const keyPath = path.join(directory, 'device.key');
@@ -25,7 +25,7 @@ export async function openVault(directory, safeStorage) {
   try {
     key = Buffer.from(safeStorage.decryptString(await fs.readFile(keyPath)), 'base64');
   } catch (e) {
-    if (e.code !== 'ENOENT') throw Error('This Windows account cannot unlock the Flow data vault.');
+    if (e.code !== 'ENOENT') throw Error('This Windows account cannot unlock the Aeka Scribe data vault.');
     key = crypto.randomBytes(32);
     await fs.writeFile(keyPath, safeStorage.encryptString(key.toString('base64')), { mode: 0o600 });
   }
@@ -68,7 +68,7 @@ export function portableSeal(value, password) {
   return Buffer.concat([Buffer.from('FLOWBACKUP2'), salt, seal(Buffer.from(JSON.stringify(value)), key)]);
 }
 export function portableUnseal(bytes, password) {
-  if (bytes.subarray(0, 11).toString() !== 'FLOWBACKUP2') throw Error('Not a Flow encrypted backup.');
+  if (bytes.subarray(0, 11).toString() !== 'FLOWBACKUP2') throw Error('Not an Aeka Scribe encrypted backup.');
   const key = crypto.scryptSync(password, bytes.subarray(11, 27), 32);
   try {
     return JSON.parse(unseal(bytes.subarray(27), key).toString());

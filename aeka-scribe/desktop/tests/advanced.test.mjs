@@ -221,10 +221,10 @@ function release(bytes = Buffer.alloc(1000000)) {
     publicKey = keys.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
     feed = 'https://releases.example/flow.json',
     m = {
-      product: 'com.flowworkspace.desktop',
+      product: 'com.aekaadvisors.scribe',
       platform: 'win32-x64',
       version: '0.4.0',
-      url: 'https://releases.example/Flow.exe',
+      url: 'https://releases.example/Aeka-Scribe.exe',
       bytes: bytes.length,
       sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
       expiresAt: new Date(Date.now() + 3600000).toISOString(),
@@ -245,7 +245,7 @@ test('updater rejects tampered, expired, cross-origin and incompatible signed ma
     verifyManifest({ ...r.envelope, payload: r.envelope.payload + ' ' }, r.publicKey, r.feed, '0.3.0'),
   );
   for (const m of [
-    { ...r.m, url: 'https://attacker.example/Flow.exe' },
+    { ...r.m, url: 'https://attacker.example/Aeka-Scribe.exe' },
     { ...r.m, expiresAt: new Date(0).toISOString() },
     { ...r.m, platform: 'linux-x64' },
   ])
@@ -282,7 +282,7 @@ test('installer download and install require matching content, trusted publisher
   await assert.rejects(u.install(), /Finish/);
   assert.equal(launched, false);
   idle = true;
-  await fs.writeFile(path.join(cacheDir, 'Flow-update.exe'), 'tampered');
+  await fs.writeFile(path.join(cacheDir, 'Aeka-Scribe-update.exe'), 'tampered');
   await assert.rejects(u.install(), /changed/);
   await u.download();
   await u.install();

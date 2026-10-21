@@ -383,7 +383,7 @@ export function actionsCalendar(note) {
     return [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
-        'PRODID:-//Flow//Actions//EN',
+        'PRODID:-//Aeka Scribe//Actions//EN',
         ...noteDetails(note)
             .actions.filter((a) => a.due)
             .flatMap((a) => [

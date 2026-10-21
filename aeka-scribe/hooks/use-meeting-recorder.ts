@@ -84,7 +84,7 @@ export function useMeetingRecorder(onEnd: (noteId: string, duration: number) => 
       .catch((e) => {
         setRecovery((old) => [
           ...old,
-          { buffer: item.audioBuffer, name: 'Flow-unsaved-' + item.id + '.wav' },
+          { buffer: item.audioBuffer, name: 'Aeka-Scribe-unsaved-' + item.id + '.wav' },
         ]);
         failRef.current(e instanceof Error ? e.message : 'Audio could not be saved.');
         throw e;

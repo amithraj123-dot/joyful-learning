@@ -48,7 +48,7 @@ export function createBriefs({ vault, workspace, emit = () => {}, now = Date.now
     for (const h of all)
       if (h.state === 'generating') {
         h.state = 'interrupted';
-        h.error = 'Flow closed during generation. Retry explicitly if needed.';
+        h.error = 'Aeka Scribe closed during generation. Retry explicitly if needed.';
       }
     await vault.write('brief-history', all);
   };

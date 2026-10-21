@@ -491,8 +491,8 @@ export function WorkspacePanel(props: Props) {
               <>
                 <section className="meeting-hero">
                   <div>
-                    <span className="eyebrow">LISTEN. PARTICIPATE. REMEMBER.</span>
-                    <h2>Be there for the conversation.</h2>
+                    <span className="eyebrow">MEETING RECORDER</span>
+                    <h2>Record a Meeting</h2>
                     <p>
                       Record a meeting, keep your own notes, and turn the transcript into decisions and next
                       steps.
@@ -563,7 +563,7 @@ export function WorkspacePanel(props: Props) {
                     </div>
                     <span className="art-note">
                       <Check size={14} />
-                      Room to listen
+                      No meeting bot joins the call
                     </span>
                   </div>
                 </section>
@@ -586,7 +586,7 @@ export function WorkspacePanel(props: Props) {
                       ·{' '}
                       {queue.some((q) => q.error)
                         ? queue.find((q) => q.error)?.error
-                        : 'Saved on this device. Keep Flow open to process the queue.'}
+                        : 'Saved on this device. Keep Aeka Scribe open to process the queue.'}
                     </span>
                     <button
                       onClick={() =>
@@ -752,7 +752,7 @@ export function WorkspacePanel(props: Props) {
                 ) : !filtered.length ? (
                   <div className="notes-empty">
                     <FileText size={28} />
-                    <h3>A place for the details.</h3>
+                    <h3>Select or create a note</h3>
                     <p>Create your first {page === 'meetings' ? 'meeting note' : 'scratchpad'}.</p>
                   </div>
                 ) : (
@@ -813,7 +813,7 @@ export function WorkspacePanel(props: Props) {
                         onClick={() =>
                           void run('export', async () => {
                             if (native) await runtime('export.check');
-                            download('Flow-' + draft.id + '.md', exportNote(draft));
+                            download('Aeka-Scribe-' + draft.id + '.md', exportNote(draft));
                           })
                         }
                       >
@@ -950,7 +950,7 @@ export function WorkspacePanel(props: Props) {
               ) : (
                 <div className="note-detail-empty">
                   <FileText size={40} />
-                  <h3>Give a thought some space.</h3>
+                  <h3>No notes yet</h3>
                   <p>Choose a note, or start with a blank page.</p>
                 </div>
               )}
@@ -983,7 +983,7 @@ export function WorkspacePanel(props: Props) {
           <>
             <section className="card transform-controls">
               <div>
-                <h2>A second pass, with your voice intact.</h2>
+                <h2>Transform Text</h2>
                 <p>Review an AI edit beside the original. Changes to numbers or negation are flagged.</p>
               </div>
               <label className="field">
@@ -1401,7 +1401,7 @@ function DesktopSettings({
       <div className="settings-stack">
         <section className="desktop-intro card">
           <Monitor size={35} />
-          <h2>Flow, across your Windows workspace.</h2>
+          <h2>Aeka Scribe for Windows</h2>
           <p>
             The Windows package adds global dictation shortcuts, a tray and recording overlay, text insertion,
             microphone + system audio, calendar sign-in, reminders and encrypted local notes.
@@ -1418,7 +1418,7 @@ function DesktopSettings({
           </div>
           <p>
             Download the Windows package attached to this conversation, extract the full folder, and open{' '}
-            <strong>Flow Desktop.exe</strong>. Open Desktop settings in that app to connect your accounts.
+            <strong>Aeka Scribe.exe</strong>. Open Desktop settings in that app to connect your accounts.
           </p>
           <a href="/desktop-guide.html" className="button secondary" target="_blank" rel="noreferrer">
             Setup & feature status <ArrowUpRight size={15} />
@@ -1439,7 +1439,7 @@ function DesktopSettings({
           </p>
           <p className="small-print">
             Joining opens the meeting’s supported web link. Your browser or calling app handles its own login.
-            Flow does not sign in to calls or admit itself as a meeting bot.
+            Aeka Scribe does not sign in to calls or admit itself as a meeting bot.
           </p>
         </section>
       </div>
@@ -1636,8 +1636,8 @@ function DesktopSettings({
             </div>
           </details>
           <p className="small-print">
-            Flow opens your meeting link. Your calling app handles login, admission, microphone and camera
-            permissions. Flow does not join as a bot.
+            Aeka Scribe opens your meeting link. Your calling app handles login, admission, microphone and
+            camera permissions. Aeka Scribe does not join as a bot.
           </p>
         </div>
       </section>
@@ -1848,7 +1848,7 @@ function DesktopSettings({
           <p className="small-print">
             Snapshots contain notes, dictation profile and preferences. They exclude API keys, calendar tokens
             and raw audio. Keep the password safe; it cannot be recovered. Importing restores the dictation
-            profile after restarting Flow.
+            profile after restarting Aeka Scribe.
           </p>
           <button
             className="button danger"

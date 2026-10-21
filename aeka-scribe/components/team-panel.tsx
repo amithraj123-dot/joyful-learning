@@ -92,7 +92,7 @@ export function TeamPanel({
       <section className="card form-card">
         <div className="card-heading">
           <div>
-            <h2>Share with the right people.</h2>
+            <h2>Sharing</h2>
             <p>
               {account ? 'Signed in as ' + account.email : 'Connect to your web workspace to collaborate.'}
             </p>
@@ -313,7 +313,7 @@ export function TeamPanel({
             <section className="card form-card">
               {!selected ? (
                 <>
-                  <h2>A shared place for the details.</h2>
+                  <h2>Shared notes</h2>
                   <p>Choose an item to review it or discuss it with collaborators.</p>
                 </>
               ) : (
@@ -562,8 +562,8 @@ export function TeamPanel({
           <section className="card form-card">
             <h2>Use your notes in ChatGPT</h2>
             <p>
-              The private Flow workspace exposes read-only note search and retrieval through its own MCP
-              connection. Install or connect the Flow workspace plugin under ChatGPT Plugins → Personal →
+              The private Aeka Scribe workspace exposes read-only note search and retrieval through its own
+              MCP connection. Install or connect the Aeka Scribe plugin under ChatGPT Plugins → Personal →
               Created by you. It uses your existing sign-in and reads only your own saved notes. Turn off
               cloud AI below to block this access.
             </p>

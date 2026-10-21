@@ -112,7 +112,7 @@ export function mailMIME(action, from, id) {
         .toString('base64')
         .match(/.{1,76}/g)
         ?.join('\r\n') || '';
-  return `From: ${from}\r\nTo: ${action.recipients.join(', ')}\r\nSubject: =?UTF-8?B?${subject}?=\r\nMessage-ID: <${id}@flow.local>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${body}`;
+  return `From: ${from}\r\nTo: ${action.recipients.join(', ')}\r\nSubject: =?UTF-8?B?${subject}?=\r\nMessage-ID: <${id}@aeka-scribe.local>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${body}`;
 }
 async function responseJSON(r) {
   const reader = r.body?.getReader();
@@ -671,7 +671,7 @@ export function createIntegrations({
       for (const d of all) {
         if (d.state === 'sending') {
           d.state = 'uncertain';
-          d.error = 'Flow closed while this action was sending. Check the destination.';
+          d.error = 'Aeka Scribe closed while this action was sending. Check the destination.';
         }
         if (d.state !== 'review' || d.expiresAt < now()) {
           if (d.state === 'review') d.state = 'expired';
@@ -741,15 +741,13 @@ export function createIntegrations({
             }),
           a,
         );
-      messages = (r.value || [])
-        .slice(0, 10)
-        .map((d) => ({
-          id: d.id,
-          subject: d.subject,
-          from: d.from?.emailAddress?.address || '',
-          date: d.receivedDateTime,
-          text: d.bodyPreview || '',
-        }));
+      messages = (r.value || []).slice(0, 10).map((d) => ({
+        id: d.id,
+        subject: d.subject,
+        from: d.from?.emailAddress?.address || '',
+        date: d.receivedDateTime,
+        text: d.bodyPreview || '',
+      }));
     }
     return {
       account: a0.email,

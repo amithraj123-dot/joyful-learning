@@ -408,7 +408,7 @@ export function createWorkspace({
   };
   const restore = async (data) => {
     if (data?.version !== 3 || !Array.isArray(data.notes) || data.notes.length > 2000)
-      throw Error('This is not a Flow Desktop backup.');
+      throw Error('This is not an Aeka Scribe backup.');
     const studio = data.studio ? validStudio(data.studio.config) : null;
     const incoming = data.notes.map(validNote),
       profile = data.profile ? validateBackup(data.profile) : null;

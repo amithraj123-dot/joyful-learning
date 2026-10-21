@@ -72,16 +72,16 @@ const nav = [
   { id: 'meetings', label: 'Meetings', icon: CalendarDays },
   { id: 'notes', label: 'All notes', icon: StickyNote },
   { id: 'ask', label: 'Ask your notes', icon: MessageCircle },
-  { id: 'people', label: 'People & companies', icon: BookOpen },
-  { id: 'recipes', label: 'Templates & recipes', icon: WandSparkles },
+  { id: 'people', label: 'People and companies', icon: BookOpen },
+  { id: 'recipes', label: 'Templates and recipes', icon: WandSparkles },
   { id: 'trash', label: 'Trash', icon: History },
   { id: 'transforms', label: 'Transforms', icon: WandSparkles },
-  { id: 'team', label: 'Sharing & controls', icon: ShieldCheck },
+  { id: 'team', label: 'Sharing and controls', icon: ShieldCheck },
   { id: 'history', label: 'History', icon: History },
   { id: 'vocabulary', label: 'Vocabulary', icon: BookOpen },
   { id: 'snippets', label: 'Snippets', icon: FileText },
   { id: 'models', label: 'Speech models', icon: Sparkles },
-  { id: 'desktop', label: 'Desktop & calendars', icon: Monitor },
+  { id: 'desktop', label: 'Desktop setup', icon: Monitor },
 ] as const;
 function download(name: string, text: string, type = 'text/plain') {
   const save = () => {
@@ -114,7 +114,7 @@ function Field({ label, children, hint }: { label: string; children: React.React
     </label>
   );
 }
-export default function Flow() {
+export default function AekaScribe() {
   const [speechLabel, setSpeechLabel] = useState('gpt-transcribe');
   const [native, setNative] = useState(false),
     [meetingBusy, setMeetingBusy] = useState(false);
@@ -343,7 +343,7 @@ export default function Flow() {
     try {
       if (native) await runtime('export.check');
       download(
-        'flow-workspace-backup.json',
+        'aeka-scribe-backup.json',
         JSON.stringify(
           { version: 2, settings, terms, snippets, history: pruneHistory(history, settings.retention) },
           null,
@@ -373,7 +373,7 @@ export default function Flow() {
       setStorageError('');
       notify('Workspace restored');
     } catch {
-      notify('This is not a valid Flow workspace backup. Nothing was changed.');
+      notify('This is not a valid Aeka Scribe workspace backup. Nothing was changed.');
     }
   };
   const getDevices = async () => {
@@ -441,23 +441,24 @@ export default function Flow() {
     saved =
       !!draft.current &&
       history.some((e) => e.id === draft.current?.id && e.text === result && e.raw === raw);
-  const title = {
-    studio: 'Your words, with room to think.',
-    history: 'A little history. Nothing lost.',
-    vocabulary: 'Make the words yours.',
-    snippets: 'Say a little. Write a lot.',
-    models: 'The right ear for your words.',
-    settings: 'A workspace that fits you.',
-    meetings: 'Stay present. Keep the details.',
-    notes: 'Room for every thought.',
-    ask: 'The answer is in your notes.',
-    transforms: 'A little polish. Still you.',
-    desktop: 'Your voice, across Windows.',
-    team: 'Good work, shared thoughtfully.',
-    people: 'Every conversation, connected.',
-    recipes: 'Make good meetings repeatable.',
-    trash: 'Room to change your mind.',
-  }[page];
+  const heading: Record<Page, [string, string]> = {
+    studio: ['Dictation', 'Speak naturally, review the transcript and refine the text before use'],
+    history: ['History', 'Search, restore and export earlier dictations'],
+    vocabulary: ['Vocabulary', 'Names, acronyms and terminology used in your matters'],
+    snippets: ['Snippets', 'Short spoken triggers that expand into standard text'],
+    models: ['Speech Models', 'Transcription options by accuracy, speed and vocabulary support'],
+    settings: ['Settings', 'Transcription, microphone access and local history'],
+    meetings: ['Meetings', 'Recordings, decisions and agreed next steps'],
+    notes: ['All Notes', 'Search, organise and revisit your notes'],
+    ask: ['Ask Your Notes', 'Answers drawn only from the meetings and notes you select, with sources'],
+    transforms: ['Transforms', 'Edit, translate or restructure text with the original alongside'],
+    desktop: ['Desktop and Calendars', 'Windows controls, calendar connections and encrypted local storage'],
+    team: ['Sharing and Controls', 'Shared notes, access grants and retention'],
+    people: ['People and Companies', 'Meeting history by person or organisation'],
+    recipes: ['Templates and Recipes', 'Reusable structures, prompts and preferences for meeting notes'],
+    trash: ['Trash', 'Restore a note or delete it permanently'],
+  };
+  const [title, subtitle] = heading[page];
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -468,20 +469,19 @@ export default function Flow() {
             e.preventDefault();
             choosePage('studio');
           }}
-          aria-label="Flow home"
+          aria-label="Aeka Scribe home"
         >
-          <span className="brand-mark">
-            <AudioLines size={26} />
-          </span>
-          <span>
-            flow<span className="brand-dot">.</span>
+          <span className="brand-mark" aria-hidden="true" />
+          <span className="brand-word">
+            <b>aeka</b>
+            <span>scribe</span>
           </span>
         </a>
         <div className="workspace-tag">
           <span className="avatar">A</span>
           <div>
             <strong>Personal workspace</strong>
-            <small>Your voice, your space</small>
+            <small>Aeka Advisors</small>
           </div>
         </div>
         <p className="nav-label">WORKSPACE</p>
@@ -524,16 +524,15 @@ export default function Flow() {
             Settings
           </button>
           <div className="version-line">
-            <span>FLOW WORKSPACE</span>
-            <span>05</span>
+            <span>AEKA SCRIBE</span>
+            <span>0.6</span>
           </div>
         </div>
       </aside>
       <main>
         <header className="topbar">
           <div className="breadcrumb">
-            Workspace <span>/</span>{' '}
-            <strong>{page === 'studio' ? 'Dictation' : page.charAt(0).toUpperCase() + page.slice(1)}</strong>
+            Workspace <span>/</span> <strong>{title}</strong>
           </div>
           <button className="connection-pill" onClick={() => choosePage(native ? 'desktop' : 'settings')}>
             <span className={'status-dot ' + (configured ? 'green' : '')} />
@@ -544,41 +543,9 @@ export default function Flow() {
         <div className="page-content">
           <div className="page-heading">
             <div>
-              <p className="eyebrow">
-                {page === 'studio' ? 'A CLEARER WAY TO WRITE' : 'YOUR VOICE WORKSPACE'}
-              </p>
+              <p className="eyebrow">AEKA SCRIBE</p>
               <h1>{title}</h1>
-              <p className="subtitle">
-                {page === 'studio'
-                  ? 'Speak naturally. Keep the thought. Refine the words.'
-                  : page === 'history'
-                    ? 'Find, restore, and export the words you wanted to keep.'
-                    : page === 'vocabulary'
-                      ? 'Names, acronyms, and the terminology you use every day.'
-                      : page === 'snippets'
-                        ? 'Turn a memorable phrase into text you use often.'
-                        : page === 'models'
-                          ? 'Choose transcription for accuracy, speed, and your vocabulary.'
-                          : page === 'meetings'
-                            ? 'Meetings, decisions and the next steps worth keeping.'
-                            : page === 'notes'
-                              ? 'Search, organise and revisit your own notes.'
-                              : page === 'ask'
-                                ? 'Grounded answers from the meetings and notes you choose.'
-                                : page === 'transforms'
-                                  ? 'Edit, translate or reshape text with the original beside you.'
-                                  : page === 'desktop'
-                                    ? 'Set up Windows controls, calendars and private local storage.'
-                                    : page === 'team'
-                                      ? 'Review shared notes, manage access and control retention.'
-                                      : page === 'people'
-                                        ? 'Find the history behind a person or company.'
-                                        : page === 'recipes'
-                                          ? 'Reusable structures, prompts and preferences for meeting work.'
-                                          : page === 'trash'
-                                            ? 'Restore a note or remove it permanently.'
-                                            : 'Control transcription, microphone access, and local history.'}
-              </p>
+              <p className="subtitle">{subtitle}</p>
             </div>
             {page === 'studio' && (
               <button className="button secondary new-draft" onClick={reset} disabled={recorder.busy}>
@@ -627,21 +594,21 @@ export default function Flow() {
                   </div>
                   <h2>
                     {recorder.state === 'recording'
-                      ? 'Go ahead. We’re listening.'
+                      ? 'Recording'
                       : recorder.state === 'requesting'
-                        ? 'Waiting for your microphone…'
+                        ? 'Waiting for microphone access'
                         : recorder.state === 'stopping'
-                          ? 'Finishing your recording…'
+                          ? 'Finalising the recording'
                           : recorder.state === 'transcribing'
-                            ? 'Turning your voice into text…'
-                            : 'A thought worth saying?'}
+                            ? 'Transcribing'
+                            : 'Ready to dictate'}
                   </h2>
                   <p>
                     {recorder.state === 'recording'
                       ? `${duration(recorder.elapsed)} · Up to 5 minutes per recording`
                       : recorder.state === 'transcribing'
                         ? 'Keep this page open. You can cancel at any time.'
-                        : 'Tap the microphone and let it flow.'}
+                        : 'Select the microphone to begin dictation'}
                   </p>
                   <div className="record-actions">
                     <button
@@ -784,7 +751,7 @@ export default function Flow() {
                 <div className="editor-header">
                   <div>
                     <h2>Your draft</h2>
-                    <p>Always keep the original within reach.</p>
+                    <p>The original transcript is retained alongside the edited text</p>
                   </div>
                   <div className="style-switch" role="group" aria-label="Cleanup style">
                     {Object.entries(styleLabels).map(([key, label]) => (
@@ -841,7 +808,7 @@ export default function Flow() {
                       id="result-text"
                       value={result}
                       onChange={(e) => setResult(e.target.value)}
-                      placeholder="A clearer draft, ready for your review."
+                      placeholder="The cleaned-up text appears here for review"
                       disabled={recorder.busy}
                       maxLength={100000}
                     />
@@ -897,7 +864,7 @@ export default function Flow() {
                     <button
                       className="button ghost"
                       disabled={!result.trim()}
-                      onClick={() => download('flow-draft.txt', result)}
+                      onClick={() => download('aeka-scribe-draft.txt', result)}
                     >
                       <Download size={15} />
                       Export
@@ -912,7 +879,7 @@ export default function Flow() {
                 <div className="small-feature">
                   <BookOpen size={21} />
                   <div>
-                    <h3>A vocabulary that knows you</h3>
+                    <h3>Custom vocabulary</h3>
                     <p>{terms.length} custom terms, ready to recognise.</p>
                     <button onClick={() => choosePage('vocabulary')}>
                       Manage vocabulary <ArrowRight size={13} />
@@ -922,14 +889,14 @@ export default function Flow() {
                 <div className="small-feature">
                   <ShieldCheck size={21} />
                   <div>
-                    <h3>You’re in control</h3>
+                    <h3>Review before use</h3>
                     <p>
                       {settings.engine === 'browser'
                         ? 'Your browser’s speech service may process audio online.'
                         : native && speechLabel === 'Local Whisper'
                           ? 'Local Whisper processes audio on this PC.'
                           : 'Audio and chosen hints go to OpenAI when you record.'}{' '}
-                      Flow does not save audio on its server.
+                      Aeka Scribe does not save audio on its server.
                     </p>
                     <button onClick={() => choosePage('settings')}>
                       Privacy & storage <ArrowRight size={13} />
@@ -981,7 +948,7 @@ export default function Flow() {
                   disabled={!history.length}
                   onClick={() =>
                     download(
-                      'flow-history.txt',
+                      'aeka-scribe-history.txt',
                       history
                         .map(
                           (e) =>
@@ -1172,7 +1139,7 @@ export default function Flow() {
                 </form>
                 <div className="explain-card">
                   <Sparkles size={20} />
-                  <h3>Small hints. Better recognition.</h3>
+                  <h3>Recognition hints</h3>
                   <p>
                     Cloud transcription receives the preferred spellings when vocabulary is enabled. Local
                     cleanup replaces complete phrases only. Verbatim mode keeps the transcript untouched.
@@ -1332,7 +1299,7 @@ export default function Flow() {
               </div>
               <section className="card cost-card">
                 <div>
-                  <h2>A sense of the cost</h2>
+                  <h2>Indicative cost</h2>
                   <p>
                     Transcription only. Excludes hosting, taxes, and optional text rewriting. Rates checked 18
                     October 2026.
@@ -1359,7 +1326,7 @@ export default function Flow() {
                 </div>
               </section>
               <section className="card testing-guide">
-                <h2>Choose with your own voice</h2>
+                <h2>Compare models on your own recordings</h2>
                 <p>
                   No model is proven best for your accent until it is tested on representative recordings.
                   Compare names, Indian amounts, section references, negation, and code switching.
@@ -1675,8 +1642,8 @@ export default function Flow() {
             onMeetingBusy={setMeetingBusy}
           />
           <footer className="page-footer">
-            <span>Made for your train of thought.</span>
-            <span>Flow · Personal voice workspace</span>
+            <span>Aeka Advisors India LLP</span>
+            <span>Aeka Scribe</span>
           </footer>
         </div>
       </main>

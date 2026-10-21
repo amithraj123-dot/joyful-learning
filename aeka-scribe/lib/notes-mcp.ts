@@ -5,7 +5,7 @@ const tools = [
   {
     name: 'search_notes',
     description:
-      'Search your own saved Flow notes and meeting transcripts. Returns at most 20 note titles, IDs and short excerpts. Shared notes, raw audio, credentials and dictation history are excluded.',
+      'Search your own saved Aeka Scribe notes and meeting transcripts. Returns at most 20 note titles, IDs and short excerpts. Shared notes, raw audio, credentials and dictation history are excluded.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -20,7 +20,7 @@ const tools = [
   {
     name: 'get_note',
     description:
-      'Read one of your own Flow notes by its ID, including its summary and timestamped transcript. Use search_notes to find an ID first.',
+      'Read one of your own Aeka Scribe notes by its ID, including its summary and timestamped transcript. Use search_notes to find an ID first.',
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'string', maxLength: 100 } },
@@ -44,7 +44,7 @@ export async function notesMCP(request: Request, db: D1Database | undefined, use
       return result({
         supportedVersions: ['2026-07-28'],
         capabilities: { tools: {} },
-        serverInfo: { name: 'Flow notes', version: '0.5.0' },
+        serverInfo: { name: 'Aeka Scribe notes', version: '0.6.0' },
       });
     if (rpc.method === 'tools/list') return result({ tools });
     if (rpc.method !== 'tools/call')
@@ -52,7 +52,7 @@ export async function notesMCP(request: Request, db: D1Database | undefined, use
         { jsonrpc: '2.0', id: rpc.id ?? null, error: { code: -32601, message: 'Method not found' } },
         { headers },
       );
-    if (!userId) throw Error('Sign in to the Flow workspace with your own account.');
+    if (!userId) throw Error('Sign in to the Aeka Scribe workspace with your own account.');
     if (!db) throw Error('Workspace storage is unavailable.');
     if (!(await policyFor(db, userId)).cloudAI)
       throw Error('Cloud AI access is disabled in your workspace controls.');

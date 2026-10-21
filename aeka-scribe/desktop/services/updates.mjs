@@ -33,7 +33,7 @@ export function verifyManifest(envelope, key, feed, current, at = Date.now()) {
     origin = https(feed).origin,
     url = https(m.url);
   if (
-    m.product !== 'com.flowworkspace.desktop' ||
+    m.product !== 'com.aekaadvisors.scribe' ||
     m.platform !== 'win32-x64' ||
     url.origin !== origin ||
     !url.pathname.toLowerCase().endsWith('.exe') ||
@@ -100,8 +100,8 @@ export function createUpdates({
       if (!m.available) return status();
       state.phase = 'downloading';
       await fs.mkdir(cacheDir, { recursive: true });
-      const filename = path.join(cacheDir, 'Flow-update.exe'),
-        temp = path.join(cacheDir, 'Flow-update.partial.exe');
+      const filename = path.join(cacheDir, 'Aeka-Scribe-update.exe'),
+        temp = path.join(cacheDir, 'Aeka-Scribe-update.partial.exe');
       const r = await fetcher(m.url, { redirect: 'error', signal: AbortSignal.timeout(300000) });
       if (!r.ok || !r.body) throw Error('The installer could not be downloaded.');
       const handle = await fs.open(temp, 'w', 0o600),
@@ -132,7 +132,7 @@ export function createUpdates({
     } catch (e) {
       state.error = e.message;
       state.phase = 'error';
-      await fs.rm(path.join(cacheDir, 'Flow-update.partial.exe'), { force: true }).catch(() => {});
+      await fs.rm(path.join(cacheDir, 'Aeka-Scribe-update.partial.exe'), { force: true }).catch(() => {});
       throw e;
     } finally {
       busy = false;
@@ -177,7 +177,7 @@ export function createUpdates({
         throw Error('Finish all recordings and pending transcription before installing an update.');
       const c = await config(),
         pending = await vault.read('pending-update');
-      if (!pending || pending.filename !== path.join(cacheDir, 'Flow-update.exe'))
+      if (!pending || pending.filename !== path.join(cacheDir, 'Aeka-Scribe-update.exe'))
         throw Error('Download and verify an update first.');
       const m = pending.manifest;
       if (!newer(m.version, current) || Date.parse(m.expiresAt) <= Date.now())

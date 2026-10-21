@@ -1,9 +1,9 @@
 {
-  "name": "flow-desktop",
-  "productName": "Flow Desktop",
-  "version": "0.5.0",
-  "description": "Independent Windows dictation and meeting workspace",
-  "author": "Flow Workspace",
+  "name": "aeka-scribe-desktop",
+  "productName": "Aeka Scribe",
+  "version": "0.6.0",
+  "description": "Aeka Scribe for Windows: dictation and meeting notes",
+  "author": "Aeka Advisors India LLP",
   "license": "UNLICENSED",
   "private": true,
   "main": "main.cjs",
@@ -18,8 +18,8 @@
     "electron-builder": "26.15.3"
   },
   "build": {
-    "appId": "com.flowworkspace.desktop",
-    "productName": "Flow Desktop",
+    "appId": "com.aekaadvisors.scribe",
+    "productName": "Aeka Scribe",
     "asar": true,
     "directories": {
       "output": "release"
@@ -45,8 +45,8 @@
         "zip"
       ],
       "signAndEditExecutable": false,
-      "artifactName": "Flow-Desktop-${version}-Windows-${arch}.${ext}",
-      "icon": "assets/flow-icon.ico"
+      "artifactName": "Aeka-Scribe-${version}-Windows-${arch}.${ext}",
+      "icon": "assets/aeka-scribe-icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -64,6 +64,7 @@
         "from": "admin",
         "to": "Admin"
       }
-    ]
+    ],
+    "copyright": "Copyright (c) 2026 Aeka Advisors India LLP"
   }
 }

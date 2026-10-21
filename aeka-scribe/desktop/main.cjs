@@ -59,7 +59,7 @@ const cloudOrigin = 'https://flow-voice-workspace.amithraj123.chatgpt.site';
 const emit = (type, payload = {}) => {
   if (type === 'automation-countdown' && window && !window.isDestroyed()) {
     window.showInactive();
-    toast('Scheduled recording', 'Recording starts in 20 seconds. Open Flow to cancel.');
+    toast('Scheduled recording', 'Recording starts in 20 seconds. Open Aeka Scribe to cancel.');
   }
   if (window && !window.isDestroyed()) window.webContents.send('flow-event', { type, ...payload });
 };
@@ -82,7 +82,7 @@ async function startTarget() {
       !f.isPassword &&
       f.focusKnown &&
       !s.excludedApps.some((x) => x.toLowerCase() === f.process.toLowerCase()) &&
-      !['Flow Desktop', 'electron'].includes(f.process)
+      !['Aeka Scribe', 'Flow Desktop', 'electron'].includes(f.process)
         ? f
         : null;
     return {
@@ -237,7 +237,7 @@ function openCloudWindow() {
   cloudWindow = new BrowserWindow({
     width: 1000,
     height: 820,
-    title: 'Connect Flow web workspace',
+    title: 'Connect Aeka Scribe web workspace',
     webPreferences: {
       partition: 'persist:flow-web-account',
       contextIsolation: true,
@@ -475,8 +475,8 @@ async function dispatch(action, p = {}) {
         { portableSeal } = await import('./services/vault.mjs');
       const b = portableSeal(data, p.password);
       const result = await dialog.showSaveDialog(window, {
-        defaultPath: 'Flow-backup.flowbackup',
-        filters: [{ name: 'Encrypted Flow backup', extensions: ['flowbackup'] }],
+        defaultPath: 'Aeka-Scribe-backup.aekabackup',
+        filters: [{ name: 'Encrypted Aeka Scribe backup', extensions: ['aekabackup'] }],
       });
       if (result.canceled) return { cancelled: true };
       await fs.writeFile(result.filePath, b);
@@ -486,7 +486,8 @@ async function dispatch(action, p = {}) {
       const { portableUnseal } = await import('./services/vault.mjs');
       const result = await dialog.showOpenDialog(window, {
         properties: ['openFile'],
-        filters: [{ name: 'Encrypted Flow backup', extensions: ['flowbackup'] }],
+        // .flowbackup files were written by releases before the Aeka Scribe rename.
+        filters: [{ name: 'Encrypted Aeka Scribe backup', extensions: ['aekabackup', 'flowbackup'] }],
       });
       if (result.canceled) return { cancelled: true };
       const stat = await fs.stat(result.filePaths[0]);
@@ -506,7 +507,7 @@ async function dispatch(action, p = {}) {
       const config = await vault.read('sync');
       if (!config?.folder) throw Error('Choose a synced folder first.');
       const { portableSeal } = await import('./services/vault.mjs');
-      const dest = path.join(config.folder, 'Flow-workspace.flowbackup'),
+      const dest = path.join(config.folder, 'Aeka-Scribe-workspace.aekabackup'),
         temp = dest + '.tmp';
       await fs.writeFile(temp, portableSeal(await workspace.backup(), p.password));
       await fs.rename(temp, dest);
@@ -516,7 +517,10 @@ async function dispatch(action, p = {}) {
       const config = await vault.read('sync');
       if (!config?.folder) throw Error('Choose a synced folder first.');
       const { portableUnseal } = await import('./services/vault.mjs');
-      const filename = path.join(config.folder, 'Flow-workspace.flowbackup');
+      let filename = path.join(config.folder, 'Aeka-Scribe-workspace.aekabackup');
+      const legacy = path.join(config.folder, 'Flow-workspace.flowbackup');
+      if (!(await fs.stat(filename).catch(() => null)) && (await fs.stat(legacy).catch(() => null)))
+        filename = legacy;
       if ((await fs.stat(filename)).size > 100 * 1024 * 1024) throw Error('Snapshot is too large.');
       return workspace.restore(portableUnseal(await fs.readFile(filename), p.password));
     }
@@ -589,6 +593,22 @@ async function dispatch(action, p = {}) {
       throw Error('Unknown desktop action.');
   }
 }
+// Releases before the rename kept data in %APPDATA%\Flow Desktop. Copy it once (the original stays as a
+// fallback) so the vault, notes, settings and web sign-in carry over. Electron's safeStorage key lives in
+// the copied "Local State" file, so the vault still unlocks for the same Windows user.
+function migrateLegacyData() {
+  const fsSync = require('node:fs');
+  try {
+    const target = app.getPath('userData'),
+      legacy = path.join(app.getPath('appData'), 'Flow Desktop');
+    if (target === legacy || fsSync.existsSync(path.join(target, 'vault'))) return;
+    if (!fsSync.existsSync(path.join(legacy, 'vault'))) return;
+    fsSync.cpSync(legacy, target, { recursive: true, force: false, errorOnExist: false });
+  } catch (e) {
+    console.error('Could not copy data from the earlier Flow Desktop installation:', e?.message);
+  }
+}
+migrateLegacyData();
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => window && show());
@@ -598,20 +618,22 @@ else {
       if (process.platform !== 'win32') {
         dialog.showErrorBox(
           'Windows build required',
-          'Flow Desktop targets Windows 10/11. Use the hosted workspace on other platforms.',
+          'Aeka Scribe targets Windows 10/11. Use the hosted workspace on other platforms.',
         );
         app.quit();
         return;
       }
-      app.setAppUserModelId('com.flowworkspace.desktop');
+      app.setAppUserModelId('com.aekaadvisors.scribe');
       const { openVault } = await import('./services/vault.mjs'),
         { createWorkspace } = await import('./services/workspace.mjs'),
         { createCalendars } = await import('./services/calendars.mjs'),
         { windowsBridge } = await import('./services/windows.mjs');
       policyManager = await import('./services/policy.mjs');
-      managedPolicy = await policyManager.loadPolicy(
-        path.join(process.env.ProgramData || 'C:\\ProgramData', 'Flow Desktop', 'policy.json'),
-      );
+      const programData = process.env.ProgramData || 'C:\\ProgramData';
+      managedPolicy = await policyManager.loadPolicy(path.join(programData, 'Aeka Scribe', 'policy.json'));
+      // Keep honouring a policy deployed for the pre-rename product, so restrictions never lapse silently.
+      if (!managedPolicy.managed)
+        managedPolicy = await policyManager.loadPolicy(path.join(programData, 'Flow Desktop', 'policy.json'));
       vault = await openVault(path.join(app.getPath('userData'), 'vault'), safeStorage);
       const { createLocalASR } = await import('./services/local-asr.mjs');
       localASR = createLocalASR({
@@ -695,8 +717,8 @@ else {
         minWidth: 920,
         minHeight: 650,
         show: false,
-        backgroundColor: '#f8f8f4',
-        title: 'Flow Desktop',
+        backgroundColor: '#ffffff',
+        title: 'Aeka Scribe',
         webPreferences: {
           preload: path.join(__dirname, 'preload.cjs'),
           contextIsolation: true,
@@ -719,12 +741,7 @@ else {
           const u = new URL(url);
           if (
             u.protocol === 'https:' &&
-            [
-              'developers.openai.com',
-              'developers.deepgram.com',
-              'elevenlabs.io',
-              'docs.wisprflow.ai',
-            ].includes(u.hostname)
+            ['developers.openai.com', 'developers.deepgram.com', 'elevenlabs.io'].includes(u.hostname)
           )
             void shell.openExternal(url);
         } catch {}
@@ -784,7 +801,7 @@ else {
         alwaysOnTop: true,
         skipTaskbar: true,
         show: false,
-        backgroundColor: '#183b35',
+        backgroundColor: '#991b1e',
         webPreferences: {
           preload: path.join(__dirname, 'overlay-preload.cjs'),
           contextIsolation: true,
@@ -794,17 +811,17 @@ else {
       });
       overlay.setIgnoreMouseEvents(true);
       await overlay.loadFile(path.join(__dirname, 'overlay.html'));
-      const icon = nativeImage.createFromPath(path.join(__dirname, 'ui-dist', 'flow-icon.png'));
+      const icon = nativeImage.createFromPath(path.join(__dirname, 'ui-dist', 'aeka-scribe-icon.png'));
       tray = new Tray(icon);
-      tray.setToolTip('Flow Desktop');
+      tray.setToolTip('Aeka Scribe');
       tray.setContextMenu(
         Menu.buildFromTemplate([
-          { label: 'Open Flow', click: show },
+          { label: 'Open Aeka Scribe', click: show },
           { label: 'Start / stop dictation', click: toggle },
           { label: 'Cancel dictation', click: () => emit('dictation-cancel') },
           { type: 'separator' },
           {
-            label: 'Quit Flow',
+            label: 'Quit Aeka Scribe',
             click: () => {
               quitting = true;
               app.quit();
@@ -898,7 +915,7 @@ else {
             if (r.candidate) {
               lastCall = Date.now();
               emit('call-detected', { process: r.process });
-              toast('Possible meeting detected', 'Open Flow to confirm and start recording.');
+              toast('Possible meeting detected', 'Open Aeka Scribe to confirm and start recording.');
             }
           } catch {}
         }, 15000),
@@ -907,7 +924,7 @@ else {
       void workspace.processQueue();
     })
     .catch((e) => {
-      dialog.showErrorBox('Flow could not start', e.message || 'Startup failed.');
+      dialog.showErrorBox('Aeka Scribe could not start', e.message || 'Startup failed.');
       quitting = true;
       app.quit();
     });
@@ -920,11 +937,11 @@ else {
         void dialog
           .showMessageBox(window, {
             type: 'question',
-            buttons: ['Finish recording & quit', 'Keep Flow open'],
+            buttons: ['Finish recording & quit', 'Keep Aeka Scribe open'],
             defaultId: 1,
             cancelId: 1,
             message: 'A recording or transcription is active.',
-            detail: 'Flow will finish and save the current recording before it closes.',
+            detail: 'Aeka Scribe will finish and save the current recording before it closes.',
           })
           .then(({ response }) => {
             quitPrompt = false;

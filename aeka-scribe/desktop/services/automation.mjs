@@ -162,7 +162,7 @@ export function createAutomation({ vault, emit, join = async () => {}, now = Dat
         for (const e of entries)
           if (['running', 'starting', 'countdown'].includes(e.state)) {
             e.state = 'interrupted';
-            e.reason = 'Flow restarted; start recording manually.';
+            e.reason = 'Aeka Scribe restarted; start recording manually.';
           }
         await vault.write('automation', entries);
       }),

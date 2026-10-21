@@ -392,8 +392,8 @@ export function NoteStudio({
             className="button ghost"
             disabled={!d.followUp}
             onClick={() =>
-              void studioDownload('Flow-follow-up.eml', draftEmail(note), 'message/rfc822').catch((e) =>
-                setError(errorText(e)),
+              void studioDownload('Aeka-Scribe-follow-up.eml', draftEmail(note), 'message/rfc822').catch(
+                (e) => setError(errorText(e)),
               )
             }
           >
@@ -401,7 +401,7 @@ export function NoteStudio({
           </button>
         </div>
         <p className="small-print">
-          Open the draft in your email app and choose recipients. Flow has not sent it.
+          Open the draft in your email app and choose recipients. Aeka Scribe has not sent it.
         </p>
       </details>
       <details className="studio-details">
@@ -482,8 +482,8 @@ export function NoteStudio({
             className="button ghost"
             disabled={!d.actions.some((a) => a.due)}
             onClick={() =>
-              void studioDownload('Flow-actions.ics', actionsCalendar(note), 'text/calendar').catch((e) =>
-                setError(errorText(e)),
+              void studioDownload('Aeka-Scribe-actions.ics', actionsCalendar(note), 'text/calendar').catch(
+                (e) => setError(errorText(e)),
               )
             }
           >
@@ -774,7 +774,7 @@ export function StudioSettings({ notify }: { notify: (s: string) => void }) {
             className="button ghost"
             onClick={() =>
               void studioDownload(
-                'Flow-templates-recipes.json',
+                'Aeka-Scribe-templates-recipes.json',
                 JSON.stringify(config, null, 2),
                 'application/json',
               ).catch((e) => setError(errorText(e)))
@@ -1133,7 +1133,7 @@ export function MeetingChat({
   return (
     <div className="ask-layout">
       <section className="card form-card">
-        <h2>Choose your evidence.</h2>
+        <h2>Select the source notes</h2>
         <p>
           Search your saved meetings, a folder, a person or a company. Choose individual notes for a focused
           answer.
@@ -1238,7 +1238,7 @@ export function MeetingChat({
         <div className="card-heading">
           <div>
             <Sparkles size={24} />
-            <h2>Ask, remember, act.</h2>
+            <h2>Questions across your notes</h2>
           </div>
           <button
             className="button ghost"
@@ -1415,7 +1415,7 @@ export function PeoplePanel({
       </div>
       {!people.length && (
         <div className="card form-card">
-          <h3>Your meeting history will appear here.</h3>
+          <h3>No meetings recorded yet</h3>
           <p>Prepare a note from a calendar event, or add attendee emails in a note’s meeting toolkit.</p>
         </div>
       )}

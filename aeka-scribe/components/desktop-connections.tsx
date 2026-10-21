@@ -19,7 +19,7 @@ const setup: Record<string, string> = {
   attio: 'Use an Attio token with note:read-write, record_permission:read and object_configuration:read.',
   affinity: 'Use an Affinity API key belonging to the account that should create the notes.',
   zapier:
-    'Paste a Catch Hook URL from Webhooks by Zapier. Your Zap defines all downstream actions. Flow only sends after review.',
+    'Paste a Catch Hook URL from Webhooks by Zapier. Your Zap defines all downstream actions. Aeka Scribe only sends after review.',
 };
 export function DesktopConnections() {
   const [states, setStates] = useState<any[]>([]),
@@ -156,7 +156,7 @@ export function DesktopConnections() {
             onClick={() => {
               if (
                 confirm(
-                  'Remove this connection from Flow? Revoke its token at the provider if it should no longer work elsewhere.',
+                  'Remove this connection from Aeka Scribe? Revoke its token at the provider if it should no longer work elsewhere.',
                 )
               )
                 void run(() => runtime('integrations.configure', { provider, disconnect: true }));
@@ -226,8 +226,8 @@ export function DesktopConnections() {
           <span className="eyebrow">READY BEFORE THE MEETING</span>
           <h2>Automatic meeting briefs</h2>
           <p>
-            Prepare upcoming calendar notes from earlier related meetings. Keep Flow running in the tray,
-            Windows awake and your calendar connected.
+            Prepare upcoming calendar notes from earlier related meetings. Keep Aeka Scribe running in the
+            tray, Windows awake and your calendar connected.
           </p>
           <label className="toggle-row">
             <span>Enable automatic briefs · uses your OpenAI API credits</span>
@@ -315,7 +315,7 @@ export function DesktopConnections() {
           </div>
           <p className="small-print">
             Checks every minute after the chosen hour; one generation per check. Missed runs catch up for
-            future meetings when Flow resumes. Existing briefs and recordings are left intact. Failed
+            future meetings when Aeka Scribe resumes. Existing briefs and recordings are left intact. Failed
             generations require an explicit retry. This is a local scheduler, not an overnight cloud service;
             it does not read your inbox automatically.
           </p>

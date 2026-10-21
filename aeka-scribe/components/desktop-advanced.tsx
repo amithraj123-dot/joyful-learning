@@ -62,8 +62,8 @@ export function DesktopAdvanced({
       <section className="card form-card">
         <h2>Continuous web sync</h2>
         <p>
-          Keep meeting notes, scratchpads and transcripts in your signed-in web workspace. Flow checks every
-          15 seconds while open. Active recordings and pending audio wait until they are complete.
+          Keep meeting notes, scratchpads and transcripts in your signed-in web workspace. Aeka Scribe checks
+          every 15 seconds while open. Active recordings and pending audio wait until they are complete.
         </p>
         <p>
           {sync?.enabled ? 'Sync enabled' : 'Sync is off'}
@@ -196,8 +196,8 @@ export function DesktopAdvanced({
           </select>
         </label>
         <p className="small-print">
-          Retention runs while Flow is open. Active recordings and pending audio are protected. Use Save
-          desktop preferences below to apply speech and retention changes.
+          Retention runs while Aeka Scribe is open. Active recordings and pending audio are protected. Use
+          Save desktop preferences below to apply speech and retention changes.
         </p>
       </section>
       <section className="card form-card">
@@ -235,7 +235,7 @@ export function DesktopAdvanced({
             className="button primary"
             disabled={busy || update?.phase !== 'ready'}
             onClick={() => {
-              if (confirm('Install the verified update and close Flow? Save your edits first.'))
+              if (confirm('Install the verified update and close Aeka Scribe? Save your edits first.'))
                 void run(() => runtime('updates.install'));
             }}
           >
@@ -314,10 +314,10 @@ export function DesktopAdvanced({
         <details>
           <summary>Administrator deployment</summary>
           <p>
-            Administrators can deploy a read-only policy at{' '}
-            <code>%ProgramData%\Flow Desktop\policy.json</code> and restart Flow. It can disable recording,
-            cloud AI, cloud sync, calendar access, exports, retained audio or local ASR, and set a maximum
-            retention period. Protect that file with Windows administrator permissions.
+            Administrators can deploy a read-only policy at <code>%ProgramData%\Aeka Scribe\policy.json</code>{' '}
+            and restart Aeka Scribe. It can disable recording, cloud AI, cloud sync, calendar access, exports,
+            retained audio or local ASR, and set a maximum retention period. Protect that file with Windows
+            administrator permissions.
           </p>
           <p className="small-print">
             These application controls are not SSO, SCIM, MDM enrollment or a data-loss-prevention guarantee.
@@ -366,9 +366,9 @@ export function MeetingAutomation({ events }: { events: CalendarEvent[] }) {
     <section className="card form-card">
       <h2>Schedule a recording</h2>
       <p>
-        Choose each meeting explicitly. Flow starts with a visible 20-second countdown, can open its call
-        link, and stops after its scheduled end plus your grace period. Keep Flow running and Windows
-        unlocked.
+        Choose each meeting explicitly. Aeka Scribe starts with a visible 20-second countdown, can open its
+        call link, and stops after its scheduled end plus your grace period. Keep Aeka Scribe running and
+        Windows unlocked.
       </p>
       {error && (
         <p role="alert" className="inline-error">

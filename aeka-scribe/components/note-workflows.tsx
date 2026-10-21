@@ -315,8 +315,8 @@ export function NoteWorkflows({
                 </label>
                 {review.provider === 'zapier' && (
                   <p className="notice warning">
-                    Your Zap may trigger further actions outside Flow. Check its configured steps before
-                    sending.
+                    Your Zap may trigger further actions outside Aeka Scribe. Check its configured steps
+                    before sending.
                   </p>
                 )}
                 <button className="button primary" disabled={busy || !checked} onClick={() => void send()}>
@@ -350,7 +350,8 @@ export function NoteWorkflows({
                 <p role="status">{review.result || review.error}</p>
                 {review.state === 'uncertain' && (
                   <p className="notice warning">
-                    Check the provider before trying again. Flow will not automatically replay this action.
+                    Check the provider before trying again. Aeka Scribe will not automatically replay this
+                    action.
                   </p>
                 )}
                 <button className="button ghost" onClick={() => setReview(null)}>

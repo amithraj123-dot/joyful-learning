@@ -196,7 +196,7 @@ export function createCalendars({ vault, openExternal, fetcher = fetch }) {
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Cache-Control', 'no-store');
         if (u.searchParams.has('error')) {
-          res.end('Calendar sign-in was cancelled. Return to Flow.');
+          res.end('Calendar sign-in was cancelled. Return to Aeka Scribe.');
           finish(Error('Calendar sign-in was cancelled.'));
           return;
         }
@@ -210,7 +210,7 @@ export function createCalendars({ vault, openExternal, fetcher = fetch }) {
           return;
         }
         exchanging = true;
-        res.end('Sign-in received. You can close this tab and return to Flow.');
+        res.end('Sign-in received. You can close this tab and return to Aeka Scribe.');
         try {
           const redirect =
             'http://' +

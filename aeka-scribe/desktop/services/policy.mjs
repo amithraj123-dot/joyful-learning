@@ -29,7 +29,7 @@ export async function loadPolicy(filename) {
   } catch (e) {
     if (e.code === 'ENOENT') return { managed: false, values: { ...managedDefaults } };
     throw Error(
-      'The managed Flow policy is invalid. Ask your administrator to correct it before starting Flow.',
+      'The managed Aeka Scribe policy is invalid. Ask your administrator to correct it before starting Aeka Scribe.',
     );
   }
 }
