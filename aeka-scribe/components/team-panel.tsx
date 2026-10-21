@@ -23,6 +23,8 @@ export function TeamPanel({
     [selected, setSelected] = useState<any>(null),
     [draft, setDraft] = useState<Note | null>(null),
     [resourceDraft, setResourceDraft] = useState<any>(null),
+    // The open item as last loaded or saved, to tell real edits apart.
+    [loaded, setLoaded] = useState(''),
     [comments, setComments] = useState<any[]>([]),
     [comment, setComment] = useState(''),
     [recipient, setRecipient] = useState(''),
@@ -59,21 +61,35 @@ export function TeamPanel({
   useEffect(() => {
     void run(refresh);
   }, []);
+  // Older audit entries record the account ID, newer ones the email.
+  const isMe = (actor: string) =>
+    !!account &&
+    (actor === account.account || (!!account.email && actor?.toLowerCase() === account.email.toLowerCase()));
   const open = async (item: any) => {
-    if ((draft || resourceDraft) && !confirm('Open another item? Unsaved edits will be discarded.')) return;
+    const current = draft || resourceDraft;
+    if (
+      current &&
+      JSON.stringify(current) !== loaded &&
+      !confirm('Open another item? Unsaved edits will be discarded.')
+    )
+      return;
     setSelected(item);
     setDraft(null);
     setResourceDraft(null);
+    setLoaded('');
     setComment('');
     setComments([]);
-    if (item.kind === 'resources')
-      setResourceDraft(await cloudRuntime('resources.get', { owner: item.owner }));
-    else {
+    if (item.kind === 'resources') {
+      const value = await cloudRuntime('resources.get', { owner: item.owner });
+      setResourceDraft(value);
+      setLoaded(JSON.stringify(value));
+    } else {
       const [note, discussion] = await Promise.all([
         cloudRuntime('shared.get', { owner: item.owner, id: item.target }),
         cloudRuntime('comments.list', { owner: item.owner, id: item.target }),
       ]);
       setDraft(note);
+      setLoaded(JSON.stringify(note));
       setComments(discussion);
     }
   };
@@ -378,6 +394,7 @@ export function TeamPanel({
                                 baseUpdatedAt: draft.updatedAt,
                               });
                               setDraft(saved);
+                              setLoaded(JSON.stringify(saved));
                               notify('Shared note saved');
                             })
                           }
@@ -538,13 +555,13 @@ export function TeamPanel({
                             disabled={busy}
                             onClick={() =>
                               void run(async () => {
-                                setResourceDraft(
-                                  await cloudRuntime('resources.save', {
-                                    owner: selected.owner,
-                                    value: resourceDraft.value,
-                                    revision: resourceDraft.revision,
-                                  }),
-                                );
+                                const saved = await cloudRuntime('resources.save', {
+                                  owner: selected.owner,
+                                  value: resourceDraft.value,
+                                  revision: resourceDraft.revision,
+                                });
+                                setResourceDraft(saved);
+                                setLoaded(JSON.stringify(saved));
                                 notify('Team dictionary updated');
                               })
                             }
@@ -589,7 +606,7 @@ export function TeamPanel({
               />
             </label>
             <label className="toggle-row">
-              <strong>Allow cloud AI on hosted notes</strong>
+              <strong>Allow cloud AI and transcription on hosted notes</strong>
               <input
                 type="checkbox"
                 checked={account.policy.cloudAI}
@@ -617,8 +634,9 @@ export function TeamPanel({
               </select>
             </label>
             <p className="small-print">
-              Retention runs on workspace access, up to 100 expired notes per request. Active recordings are
-              excluded. Deletions propagate through sync; independent backups are retained separately.
+              Expired notes are hidden at once and purged on workspace access, at most every five minutes.
+              Active recordings are excluded; one not updated for six hours counts as interrupted. Deletions
+              propagate through sync; independent backups are retained separately.
             </p>
             <button
               className="button primary"
@@ -656,7 +674,7 @@ export function TeamPanel({
                     {audit.map((a, i) => (
                       <tr key={i}>
                         <td>{new Date(a.at).toLocaleString()}</td>
-                        <td>{a.actor === account.account ? 'You' : a.actor}</td>
+                        <td>{isMe(a.actor) ? 'You' : a.actor}</td>
                         <td>{a.action}</td>
                         <td>{a.target}</td>
                       </tr>

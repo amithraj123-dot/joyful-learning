@@ -8,5 +8,5 @@ export async function POST(request: Request) {
       { error: 'Sign in to save and read your notes.', signInPath: chatGPTSignInPath('/') },
       { status: 401, headers: { 'Cache-Control': 'private, no-store' } },
     );
-  return workspaceRequest(request, env.DB, env.OPENAI_API_KEY, user.userId);
+  return workspaceRequest(request, env.DB, env.OPENAI_API_KEY, user.userId, fetch, user.email || '');
 }

@@ -47,6 +47,31 @@ export async function runtime(action: string, payload: any = {}) {
   }
   return result.value;
 }
+// notes.get and notes.index avoid downloading every note. Older desktop or server versions reject them as
+// unknown, so fall back to notes.list and stop asking.
+const unsupported = new Set<string>();
+const isUnknown = (e: unknown) => e instanceof Error && /^Unknown .*action/.test(e.message);
+export async function fetchNote(id: string): Promise<Note | null> {
+  if (!unsupported.has('notes.get'))
+    try {
+      return (await runtime('notes.get', { id })) as Note | null;
+    } catch (e) {
+      if (!isUnknown(e)) throw e;
+      unsupported.add('notes.get');
+    }
+  return ((await runtime('notes.list')) as Note[]).find((n) => n.id === id) || null;
+}
+// Every note's id and revision, newest first, or null when the runtime cannot list them cheaply.
+export async function fetchNoteIndex(): Promise<{ id: string; updatedAt: number }[] | null> {
+  if (unsupported.has('notes.index')) return null;
+  try {
+    return await runtime('notes.index');
+  } catch (e) {
+    if (!isUnknown(e)) throw e;
+    unsupported.add('notes.index');
+    return null;
+  }
+}
 export async function transcribeAudio(
   file: File,
   language: string,
@@ -164,8 +189,7 @@ export async function processAudio() {
         if (!(await readAudio()).some((x) => x.id === item.id)) continue;
         let saved = false;
         for (let attempt = 0; attempt < 3; attempt++) {
-          const all = (await runtime('notes.list')) as Note[],
-            note = all.find((n) => n.id === item.noteId);
+          const note = await fetchNote(item.noteId);
           if (!note || isTrashed(note)) {
             await removeAudio(item.id);
             saved = true;

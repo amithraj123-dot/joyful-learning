@@ -1,4 +1,5 @@
 import { sanitizeKeywords } from './flow-core.ts';
+import { policyFor } from './cloud-store.ts';
 
 export const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 const limits = new Map<string, { start: number; count: number }>();
@@ -10,11 +11,15 @@ export async function transcribe(
   key: string | undefined,
   userId: string | null,
   fetcher: typeof fetch = fetch,
+  db?: D1Database,
 ) {
   if (!userId) return json({ error: 'Sign in to use cloud transcription.' }, 401);
   const origin = request.headers.get('origin');
   if (!origin || origin !== new URL(request.url).origin)
     return json({ error: 'Please submit audio from this workspace.' }, 403);
+  // The workspace cloud-AI control covers speech as well as text AI.
+  if (db && !(await policyFor(db, userId)).cloudAI)
+    return json({ error: 'Cloud transcription is disabled in workspace controls.' }, 403);
   if (!key)
     return json(
       {

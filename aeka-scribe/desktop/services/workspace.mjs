@@ -116,6 +116,9 @@ export function createWorkspace({
     await lock;
     return notes();
   };
+  // One note, or each note's id and revision in list order, for callers that need no more.
+  const get = async (id) => (await list()).find((n) => n.id === id) || null;
+  const index = async () => (await list()).map((n) => ({ id: n.id, updatedAt: n.updatedAt }));
   const save = async (value, baseUpdatedAt) =>
     mutate(async () => {
       const n = validNote(value),
@@ -555,6 +558,8 @@ export function createWorkspace({
   return {
     semantic,
     list,
+    get,
+    index,
     save,
     remove,
     ai,

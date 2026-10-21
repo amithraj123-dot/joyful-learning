@@ -134,12 +134,16 @@ test('editor saves use CAS; revocation and disabled sharing take effect on the n
 });
 test('retention removes inactive notes and grants but preserves active recordings', async () => {
   const db = database();
-  for (const [id, status] of [
-    ['old', 'complete'],
-    ['active', 'recording'],
+  // A recording counts as active while it keeps saving; 'stale' stopped saving long ago.
+  for (const [id, status, at] of [
+    ['old', 'complete', 1],
+    ['active', 'recording', Date.now()],
+    ['stale', 'recording', 1],
   ]) {
-    const n = { ...note, id, status, updatedAt: 1 };
-    db.sql.prepare('INSERT INTO workspace_notes VALUES(?,?,?,?)').run(owner.userId, id, JSON.stringify(n), 1);
+    const n = { ...note, id, status, updatedAt: at };
+    db.sql
+      .prepare('INSERT INTO workspace_notes VALUES(?,?,?,?)')
+      .run(owner.userId, id, JSON.stringify(n), at);
   }
   await call(db, owner, 'shares.grant', { id: 'old', email: viewer.email, role: 'viewer' });
   await call(db, owner, 'policy.save', { policy: { sharing: true, cloudAI: true, retentionDays: 7 } });

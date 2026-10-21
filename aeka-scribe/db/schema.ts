@@ -63,3 +63,9 @@ export const workspaceStudio = sqliteTable('workspace_studio', {
   value: text('value').notNull(),
   revision: integer('revision').notNull(),
 });
+
+// Last time each owner's retention purge ran, so it runs at most every few minutes.
+export const workspaceMaintenance = sqliteTable('workspace_maintenance', {
+  owner: text('owner').primaryKey(),
+  retentionAt: integer('retention_at').notNull(),
+});

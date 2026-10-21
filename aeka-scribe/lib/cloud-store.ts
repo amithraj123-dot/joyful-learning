@@ -47,19 +47,64 @@ export async function audit(db: D1Database, owner: string, actor: string, action
       .bind(owner, owner),
   ]);
 }
-export async function getNote(db: D1Database, owner: string, id: string) {
+const DAY = 86400000;
+// A recording not saved for six hours was interrupted (for example by a browser crash).
+export const STALE_RECORDING_MS = 6 * 3600000;
+const RETENTION_INTERVAL_MS = 5 * 60000;
+export const RETENTION_ACTOR = 'Retention policy';
+const retentionDays =
+  "coalesce((SELECT json_extract(p.value,'$.retentionDays') FROM workspace_policy p WHERE p.owner = workspace_notes.owner),0)";
+// SQL over workspace_notes that is true once a note is past the 30-day trash window or the owner's
+// retention period. Live recordings are exempt. Bind expiryParams() where it appears.
+export const expiredSql = `((json_extract(value,'$.status') != 'recording' OR updated_at < ?) AND ((coalesce(json_extract(value,'$.details.trashedAt'),0) > 0 AND json_extract(value,'$.details.trashedAt') < ?) OR (${retentionDays} > 0 AND updated_at < ? - ${retentionDays} * ${DAY})))`;
+export const expiryParams = (now = Date.now()) => [now - STALE_RECORDING_MS, now - 30 * DAY, now];
+// Report a stale recording as interrupted so it can be trashed and is not shown as live.
+export const served = (n: Note, now = Date.now()): Note =>
+  n.status === 'recording' && n.updatedAt < now - STALE_RECORDING_MS ? { ...n, status: 'interrupted' } : n;
+async function readNote(db: D1Database, owner: string, id: string) {
   const r = await db
-    .prepare('SELECT value FROM workspace_notes WHERE owner = ? AND id = ?')
-    .bind(owner, id)
-    .first<{ value: string }>();
-  return r ? (JSON.parse(r.value) as Note) : null;
+    .prepare(`SELECT value, ${expiredSql} AS expired FROM workspace_notes WHERE owner = ? AND id = ?`)
+    .bind(...expiryParams(), owner, id)
+    .first<{ value: string; expired: number }>();
+  return r ? { note: JSON.parse(r.value) as Note, expired: !!r.expired } : null;
+}
+const ignoreConflict = (e: unknown) => {
+  if (!(e instanceof CloudError)) throw e;
+};
+// Returns null for a missing or expired note; an expired one is purged now rather than at the next sweep.
+export async function getNote(db: D1Database, owner: string, id: string) {
+  const r = await readNote(db, owner, id);
+  if (!r) return null;
+  if (!r.expired) return served(r.note);
+  await deleteNote(db, owner, id, r.note.updatedAt, RETENTION_ACTOR).catch(ignoreConflict);
+  return null;
+}
+// Owner's live notes (trashed included, expired excluded), newest first.
+export async function listNotes(db: D1Database, owner: string) {
+  const r = await db
+    .prepare(
+      `SELECT value FROM workspace_notes WHERE owner = ? AND NOT ${expiredSql} ORDER BY updated_at DESC LIMIT 2000`,
+    )
+    .bind(owner, ...expiryParams())
+    .all<{ value: string }>();
+  return r.results.map((x) => served(JSON.parse(x.value) as Note));
+}
+// The same notes as listNotes, as id and revision only.
+export async function noteIndex(db: D1Database, owner: string) {
+  const r = await db
+    .prepare(
+      `SELECT id, updated_at FROM workspace_notes WHERE owner = ? AND NOT ${expiredSql} ORDER BY updated_at DESC LIMIT 2000`,
+    )
+    .bind(owner, ...expiryParams())
+    .all<{ id: string; updated_at: number }>();
+  return r.results;
 }
 export async function saveNote(
   db: D1Database,
   owner: string,
   value: unknown,
   base: number | undefined,
-  actor = owner,
+  actor: string,
 ) {
   const n = validNote(value),
     old = await getNote(db, owner, n.id);
@@ -75,6 +120,7 @@ export async function saveNote(
     throw new CloudError('This note was deleted. Save the changes as a new note.', 410);
   if (!old && base !== undefined && base !== 0)
     throw new CloudError('This note was deleted elsewhere. Save your edits as a new note.', 409);
+  if (isTrashed(n) && n.status === 'recording' && old?.status === 'interrupted') n.status = 'interrupted';
   if (isTrashed(n) && (n.status === 'recording' || old?.status === 'recording'))
     throw new CloudError('Finish recording before moving this note to trash.');
   n.updatedAt = Math.max(Date.now(), (old?.updatedAt || 0) + 1);
@@ -99,9 +145,15 @@ export async function saveNote(
   await audit(db, owner, actor, old ? 'note.updated' : 'note.created', n.id);
   return n;
 }
-export async function deleteNote(db: D1Database, owner: string, id: string, base?: number) {
+export async function deleteNote(
+  db: D1Database,
+  owner: string,
+  id: string,
+  base: number | undefined,
+  actor: string,
+) {
   if (!/^[\w-]{1,100}$/.test(id)) throw new CloudError('Invalid note.');
-  const old = await getNote(db, owner, id);
+  const old = (await readNote(db, owner, id))?.note;
   if (!old) return true;
   if (base !== undefined && base !== old.updatedAt)
     throw new CloudError('This note changed before deletion. Refresh and review it.', 409);
@@ -126,25 +178,29 @@ export async function deleteNote(db: D1Database, owner: string, id: string, base
       .bind(owner, id, owner, id),
   ]);
   if (!results[1].meta.changes) throw new CloudError('This note changed before deletion.', 409);
-  await audit(db, owner, owner, 'note.deleted', id);
+  await audit(db, owner, actor, 'note.deleted', id);
   return true;
 }
+// Purges expired notes at most every five minutes per owner. Reads hide expired notes in between.
 export async function enforceRetention(db: D1Database, owner: string) {
-  const p = await policyFor(db, owner);
+  const now = Date.now();
+  const claim = await db
+    .prepare(
+      'INSERT INTO workspace_maintenance(owner,retention_at) VALUES(?,?) ON CONFLICT(owner) DO UPDATE SET retention_at = excluded.retention_at WHERE workspace_maintenance.retention_at <= ?',
+    )
+    .bind(owner, now, now - RETENTION_INTERVAL_MS)
+    .run();
+  if (!claim.meta.changes) return;
   const expired = await db
-    .prepare(
-      "SELECT id,updated_at FROM workspace_notes WHERE owner = ? AND coalesce(json_extract(value,'$.details.trashedAt'),0) > 0 AND json_extract(value,'$.details.trashedAt') < ? AND json_extract(value,'$.status') != 'recording' LIMIT 100",
-    )
-    .bind(owner, Date.now() - 30 * 86400000)
+    .prepare(`SELECT id,updated_at FROM workspace_notes WHERE owner = ? AND ${expiredSql} LIMIT 100`)
+    .bind(owner, ...expiryParams(now))
     .all<{ id: string; updated_at: number }>();
-  for (const n of expired.results) await deleteNote(db, owner, n.id, n.updated_at);
-  if (!p.retentionDays) return;
-  const cutoff = Date.now() - p.retentionDays * 86400000;
-  const old = await db
-    .prepare(
-      "SELECT id,updated_at FROM workspace_notes WHERE owner = ? AND updated_at < ? AND json_extract(value,'$.status') != 'recording' LIMIT 100",
-    )
-    .bind(owner, cutoff)
-    .all<{ id: string; updated_at: number }>();
-  for (const n of old.results) await deleteNote(db, owner, n.id, n.updated_at);
+  for (const n of expired.results)
+    await deleteNote(db, owner, n.id, n.updated_at, RETENTION_ACTOR).catch(ignoreConflict);
+  // More remain: let the next request continue.
+  if (expired.results.length === 100) await resetRetention(db, owner);
+}
+// Makes the next request run the purge, e.g. after a shorter retention period is saved.
+export async function resetRetention(db: D1Database, owner: string) {
+  await db.prepare('DELETE FROM workspace_maintenance WHERE owner = ?').bind(owner).run();
 }

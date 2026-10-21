@@ -10,6 +10,11 @@ import {
   saveNote,
   deleteNote,
   enforceRetention,
+  resetRetention,
+  noteIndex,
+  expiredSql,
+  expiryParams,
+  STALE_RECORDING_MS,
 } from './cloud-store.ts';
 import { validResources } from './resources-core.ts';
 type User = { userId: string; email: string };
@@ -80,18 +85,13 @@ export async function cloudRequest(request: Request, db: D1Database | undefined,
       throw new CloudError('You do not have permission for this item.', 403);
     };
     if (p.action === 'status') return reply({ account: me, email: user.email, policy: ownPolicy });
-    if (p.action === 'sync.index') {
-      const r = await db
-        .prepare('SELECT id,updated_at FROM workspace_notes WHERE owner = ? ORDER BY id LIMIT 2000')
-        .bind(me)
-        .all();
-      return reply(r.results);
-    }
+    if (p.action === 'sync.index')
+      return reply((await noteIndex(db, me)).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
     if (p.action === 'sync.get') return reply(await getNote(db, me, id(p.id)));
-    if (p.action === 'sync.save') return reply(await saveNote(db, me, p.note, p.baseUpdatedAt));
+    if (p.action === 'sync.save') return reply(await saveNote(db, me, p.note, p.baseUpdatedAt, myEmail));
     if (p.action === 'sync.delete') {
       if (!Number.isFinite(p.baseUpdatedAt)) throw new CloudError('A revision is required.');
-      return reply(await deleteNote(db, me, id(p.id), p.baseUpdatedAt));
+      return reply(await deleteNote(db, me, id(p.id), p.baseUpdatedAt, myEmail));
     }
     if (p.action === 'policy.save') {
       if (
@@ -112,6 +112,8 @@ export async function cloudRequest(request: Request, db: D1Database | undefined,
         .bind(me, JSON.stringify(policy))
         .run();
       await audit(db, me, myEmail, 'policy.updated', 'workspace');
+      // Apply a new retention period now rather than after the purge interval.
+      await resetRetention(db, me);
       await enforceRetention(db, me);
       return reply(policy);
     }
@@ -159,8 +161,8 @@ export async function cloudRequest(request: Request, db: D1Database | undefined,
         throw new CloudError('Sync or save the note to the web workspace first.', 404);
       if (kind === 'folder') {
         const rows = await db
-          .prepare('SELECT value FROM workspace_notes WHERE owner = ? LIMIT 2000')
-          .bind(me)
+          .prepare(`SELECT value FROM workspace_notes WHERE owner = ? AND NOT ${expiredSql} LIMIT 2000`)
+          .bind(me, ...expiryParams())
           .all<{ value: string }>();
         if (
           !rows.results.some((r) => {
@@ -198,9 +200,9 @@ export async function cloudRequest(request: Request, db: D1Database | undefined,
     if (p.action === 'shared.list') {
       const r = await db
         .prepare(
-          `SELECT g.owner,g.kind,g.target,g.role,n.id AS note_id,n.updated_at,json_extract(n.value,'$.title') AS title FROM workspace_grants g LEFT JOIN workspace_notes n ON g.owner = n.owner AND ((g.kind = 'note' AND g.target = n.id) OR (g.kind = 'folder' AND (json_extract(n.value,'$.folder') = g.target OR substr(json_extract(n.value,'$.folder'),1,length(g.target)+1) = g.target || '/' OR EXISTS (SELECT 1 FROM json_each(coalesce(json_extract(n.value,'$.details.folders'),'[]')) f WHERE f.value = g.target OR substr(f.value,1,length(g.target)+1) = g.target || '/')))) LEFT JOIN workspace_policy p ON p.owner = g.owner WHERE g.email = ? AND (g.expires_at = 0 OR g.expires_at > ?) AND coalesce(json_extract(p.value,'$.sharing'),1) = 1 AND (g.kind = 'resources' OR (n.id IS NOT NULL AND coalesce(json_extract(n.value,'$.details.trashedAt'),0) = 0 AND (coalesce(json_extract(p.value,'$.retentionDays'),0) = 0 OR n.updated_at >= ? - json_extract(p.value,'$.retentionDays')*86400000 OR json_extract(n.value,'$.status') = 'recording'))) LIMIT 2000`,
+          `SELECT g.owner,g.kind,g.target,g.role,n.id AS note_id,n.updated_at,json_extract(n.value,'$.title') AS title FROM workspace_grants g LEFT JOIN workspace_notes n ON g.owner = n.owner AND ((g.kind = 'note' AND g.target = n.id) OR (g.kind = 'folder' AND (json_extract(n.value,'$.folder') = g.target OR substr(json_extract(n.value,'$.folder'),1,length(g.target)+1) = g.target || '/' OR EXISTS (SELECT 1 FROM json_each(coalesce(json_extract(n.value,'$.details.folders'),'[]')) f WHERE f.value = g.target OR substr(f.value,1,length(g.target)+1) = g.target || '/')))) LEFT JOIN workspace_policy p ON p.owner = g.owner WHERE g.email = ? AND (g.expires_at = 0 OR g.expires_at > ?) AND coalesce(json_extract(p.value,'$.sharing'),1) = 1 AND (g.kind = 'resources' OR (n.id IS NOT NULL AND coalesce(json_extract(n.value,'$.details.trashedAt'),0) = 0 AND (coalesce(json_extract(p.value,'$.retentionDays'),0) = 0 OR n.updated_at >= ? - json_extract(p.value,'$.retentionDays')*86400000 OR (json_extract(n.value,'$.status') = 'recording' AND n.updated_at >= ?)))) LIMIT 2000`,
         )
-        .bind(myEmail, Date.now(), Date.now())
+        .bind(myEmail, Date.now(), Date.now(), Date.now() - STALE_RECORDING_MS)
         .all<{
           owner: string;
           kind: string;

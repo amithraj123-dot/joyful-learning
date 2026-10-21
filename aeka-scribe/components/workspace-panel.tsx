@@ -24,7 +24,14 @@ import {
   Copy,
   Undo2,
 } from 'lucide-react';
-import { isDesktop, runtime, processAudio, type DesktopEvent } from '../lib/desktop-runtime';
+import {
+  isDesktop,
+  runtime,
+  processAudio,
+  fetchNote,
+  fetchNoteIndex,
+  type DesktopEvent,
+} from '../lib/desktop-runtime';
 import { newId, reviewChanges, type Term, type Snippet } from '../lib/flow-core';
 import {
   exportNote,
@@ -126,9 +133,22 @@ export function WorkspacePanel(props: Props) {
     !!draft && !!base && fieldKeys.some((k) => JSON.stringify(draft[k]) !== JSON.stringify(base[k]));
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
+  // Fetch only notes whose revision changed, when the runtime can list revisions cheaply.
+  const fetchNotes = async (): Promise<Note[]> => {
+    const index = await fetchNoteIndex();
+    if (!index) return runtime('notes.list');
+    const known = new Map(notesRef.current.map((n) => [n.id, n])),
+      changed = index.filter((x) => known.get(x.id)?.updatedAt !== x.updatedAt);
+    if (!changed.length && index.length === known.size) return notesRef.current;
+    if (changed.length > 10) return runtime('notes.list');
+    const fetched = await Promise.all(changed.map((x) => fetchNote(x.id)));
+    if (fetched.some((n) => !n)) return runtime('notes.list');
+    for (const n of fetched) known.set(n!.id, n!);
+    return index.map((x) => known.get(x.id)!);
+  };
   const load = async () => {
     try {
-      const all = (await runtime('notes.list')) as Note[];
+      const all = await fetchNotes();
       setNotes(all);
       const fresh = all.find((n) => n.id === selectedRef.current);
       if (fresh && !dirtyRef.current) {
@@ -184,8 +204,7 @@ export function WorkspacePanel(props: Props) {
   };
   const recorder = useMeetingRecorder(async (id, duration) => {
     for (let attempt = 0; attempt < 3; attempt++) {
-      const all = (await runtime('notes.list')) as Note[],
-        n = all.find((x) => x.id === id);
+      const n = await fetchNote(id);
       if (!n) break;
       try {
         await runtime('notes.save', {
@@ -334,8 +353,7 @@ export function WorkspacePanel(props: Props) {
     const draft = draftRef.current,
       base = baseRef.current;
     if (!draft || !base) return;
-    const all = (await runtime('notes.list')) as Note[],
-      latest = all.find((x) => x.id === draft.id);
+    const latest = await fetchNote(draft.id);
     if (!latest) throw Error('This note was deleted elsewhere. Copy your edits before refreshing.');
     const updates: Record<string, unknown> = {};
     for (const key of fieldKeys) {
@@ -370,8 +388,7 @@ export function WorkspacePanel(props: Props) {
     if (!consent && !automated) throw Error('Confirm you have informed the participants before recording.');
     const n = note || (await create('meeting', event));
     if (!n) return;
-    const all = (await runtime('notes.list')) as Note[],
-      fresh = all.find((x) => x.id === n.id) || n;
+    const fresh = (await fetchNote(n.id)) || n;
     if (automated) {
       autoNote.current = n.id;
       const schedules = await runtime('automation.list');
@@ -390,7 +407,7 @@ export function WorkspacePanel(props: Props) {
       offset: fresh.duration,
     });
     if (!started) {
-      const current = ((await runtime('notes.list')) as Note[]).find((x) => x.id === n.id);
+      const current = await fetchNote(n.id);
       if (current)
         await runtime('notes.save', {
           note: { ...current, status: 'interrupted' },
@@ -1303,8 +1320,7 @@ function DiarizedImport({
               mime: file.type,
               diarize: true,
             });
-            const all = (await runtime('notes.list')) as Note[],
-              latest = all.find((n) => n.id === note.id);
+            const latest = await fetchNote(note.id);
             if (!latest) throw Error('Note no longer exists.');
             const prefix = newId();
             const segments = (

@@ -1,13 +1,15 @@
 import {
   saveNote,
   deleteNote,
+  getNote,
+  listNotes,
+  noteIndex,
   CloudError,
   clientError,
   declaredTooLarge,
   enforceRetention,
   policyFor,
 } from './cloud-store.ts';
-import { validNote, type Note } from './workspace-core.ts';
 import { extractImageText } from './image-context.ts';
 import { generateText } from './ai-workspace.ts';
 import { defaultStudio, validStudio, prepareStudioTask, parseActions } from './meeting-studio.ts';
@@ -23,6 +25,7 @@ export async function workspaceRequest(
   key: string | undefined,
   userId: string | null,
   fetcher: typeof fetch = fetch,
+  email = '',
 ) {
   if (!userId) return response('Sign in to save and read your notes.', 401);
   if (request.headers.get('Origin') !== new URL(request.url).origin)
@@ -33,18 +36,20 @@ export async function workspaceRequest(
   if (text.length > 1800000) return response('This note exceeds the storage limit.', 413);
   try {
     const p = JSON.parse(text),
-      owner = userId;
+      owner = userId,
+      actor = email.toLowerCase() || owner;
     await enforceRetention(db, owner);
-    const getNotes = async () => {
-      const r = await db
-        .prepare('SELECT value FROM workspace_notes WHERE owner = ? ORDER BY updated_at DESC LIMIT 2000')
-        .bind(owner)
-        .all<{ value: string }>();
-      return r.results.map((x) => JSON.parse(x.value) as Note);
-    };
-    if (p.action === 'notes.list') return response(await getNotes());
-    if (p.action === 'notes.save') return response(await saveNote(db, owner, p.note, p.baseUpdatedAt));
-    if (p.action === 'notes.delete') return response(await deleteNote(db, owner, p.id, p.baseUpdatedAt));
+    if (p.action === 'notes.list') return response(await listNotes(db, owner));
+    // Lightweight reads for polling and per-chunk updates: one note, or every note's revision.
+    if (p.action === 'notes.get') {
+      if (typeof p.id !== 'string' || !/^[\w-]{1,100}$/.test(p.id)) throw new CloudError('Invalid note.');
+      return response(await getNote(db, owner, p.id));
+    }
+    if (p.action === 'notes.index')
+      return response((await noteIndex(db, owner)).map((r) => ({ id: r.id, updatedAt: r.updated_at })));
+    if (p.action === 'notes.save') return response(await saveNote(db, owner, p.note, p.baseUpdatedAt, actor));
+    if (p.action === 'notes.delete')
+      return response(await deleteNote(db, owner, p.id, p.baseUpdatedAt, actor));
     const studioGet = async () => {
       const old = await db
         .prepare('SELECT value,revision FROM workspace_studio WHERE owner = ?')
@@ -88,7 +93,7 @@ export async function workspaceRequest(
       });
       if (limits.size > 5000) for (const [id, r] of limits) if (now - r.at > 60000) limits.delete(id);
       if (p.action === 'context.image') return response(await extractImageText(key, p.image, fetcher));
-      const task = prepareStudioTask(await getNotes(), (await studioGet()).config, p);
+      const task = prepareStudioTask(await listNotes(db, owner), (await studioGet()).config, p);
       const answer = await generateText(key, task.input, task.instructions, fetcher);
       return response({
         text: answer,

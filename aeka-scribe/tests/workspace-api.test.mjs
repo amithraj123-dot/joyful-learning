@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { database } from './helpers/database.mjs';
 import { workspaceRequest } from '../lib/workspace-api.ts';
+import { cloudRequest } from '../lib/cloud-api.ts';
 const note = {
   id: 'same-id',
   title: 'Private note',
@@ -25,6 +26,16 @@ const request = (body, origin = 'https://flow.example') =>
   });
 const call = (db, user, action, data = {}) =>
   workspaceRequest(request({ action, ...data }), db, undefined, user);
+const json = async (r) => (await r.json()).value;
+const insert = (db, owner, n) =>
+  db.sql
+    .prepare('INSERT INTO workspace_notes VALUES(?,?,?,?)')
+    .run(owner, n.id, JSON.stringify(n), n.updatedAt);
+const stored = (db) =>
+  db.sql
+    .prepare('SELECT id FROM workspace_notes ORDER BY id')
+    .all()
+    .map((r) => r.id);
 test('workspace refuses unauthenticated and cross-origin requests before touching storage', async () => {
   assert.equal(
     (await workspaceRequest(request({ action: 'notes.list' }), undefined, undefined, null)).status,
@@ -111,4 +122,75 @@ test('AI without a credential stays disabled and notes responses are private/no-
   const ai = await call(db, 'one', 'ai', { kind: 'summary', noteIds: [note.id], text: '', instruction: '' });
   assert.equal(ai.status, 400);
   assert.match((await ai.json()).error, /Connect OpenAI/);
+});
+test('notes.get and notes.index return one owner note or revisions only', async () => {
+  const db = database(),
+    saved = await json(await call(db, 'one', 'notes.save', { note }));
+  await call(db, 'two', 'notes.save', { note: { ...note, id: 'theirs' } });
+  assert.deepEqual(await json(await call(db, 'one', 'notes.index')), [
+    { id: saved.id, updatedAt: saved.updatedAt },
+  ]);
+  assert.equal((await json(await call(db, 'one', 'notes.get', { id: saved.id }))).body, note.body);
+  assert.equal(await json(await call(db, 'one', 'notes.get', { id: 'theirs' })), null);
+  assert.equal((await call(db, 'one', 'notes.get', { id: '../x' })).status, 400);
+});
+test('retention sweeps at most every five minutes while reads hide expired notes at once', async () => {
+  const db = database();
+  await call(db, 'one', 'notes.list');
+  db.sql.prepare('INSERT INTO workspace_policy VALUES(?,?)').run('one', JSON.stringify({ retentionDays: 7 }));
+  insert(db, 'one', { ...note, id: 'old', updatedAt: 1 });
+  insert(db, 'one', { ...note, id: 'older', updatedAt: 1 });
+  assert.deepEqual(await json(await call(db, 'one', 'notes.list')), []);
+  assert.deepEqual(await json(await call(db, 'one', 'notes.index')), []);
+  // The sweep ran on the first request, so nothing is purged yet.
+  assert.deepEqual(stored(db), ['old', 'older']);
+  // Reading an expired note purges it.
+  assert.equal(await json(await call(db, 'one', 'notes.get', { id: 'old' })), null);
+  assert.deepEqual(stored(db), ['older']);
+  db.sql.prepare('UPDATE workspace_maintenance SET retention_at = ?').run(Date.now() - 6 * 60000);
+  await call(db, 'one', 'notes.list');
+  assert.deepEqual(stored(db), []);
+});
+test('a recording idle for six hours is served as interrupted, can be trashed and expires', async () => {
+  const db = database(),
+    stale = Date.now() - 7 * 3600000;
+  insert(db, 'one', { ...note, id: 'crashed', status: 'recording', updatedAt: stale });
+  const live = await json(await call(db, 'one', 'notes.save', { note: { ...note, status: 'recording' } }));
+  const listed = await json(await call(db, 'one', 'notes.list'));
+  assert.equal(listed.find((n) => n.id === 'crashed').status, 'interrupted');
+  assert.equal(listed.find((n) => n.id === live.id).status, 'recording');
+  const trash = (n) => ({ ...n, status: 'recording', details: { trashedAt: Date.now() } });
+  assert.equal(
+    (await call(db, 'one', 'notes.save', { note: trash(live), baseUpdatedAt: live.updatedAt })).status,
+    400,
+  );
+  const trashed = await call(db, 'one', 'notes.save', {
+    note: trash(listed.find((n) => n.id === 'crashed')),
+    baseUpdatedAt: stale,
+  });
+  assert.equal(trashed.status, 200);
+  assert.equal((await json(trashed)).status, 'interrupted');
+  // Retention no longer exempts it once it is idle.
+  insert(db, 'one', { ...note, id: 'old-recording', status: 'recording', updatedAt: 1 });
+  db.sql.prepare('INSERT INTO workspace_policy VALUES(?,?)').run('one', JSON.stringify({ retentionDays: 7 }));
+  assert.equal(await json(await call(db, 'one', 'notes.get', { id: 'old-recording' })), null);
+});
+test('audit entries name the signed-in email whichever API made the change', async () => {
+  const db = database(),
+    user = { userId: 'one', email: 'One@Example.com' };
+  await workspaceRequest(request({ action: 'notes.save', note }), db, undefined, 'one', fetch, user.email);
+  await cloudRequest(
+    new Request('https://flow.example/api/cloud', {
+      method: 'POST',
+      headers: { Origin: 'https://flow.example' },
+      body: JSON.stringify({ action: 'sync.save', note: { ...note, id: 'synced' } }),
+    }),
+    db,
+    user,
+  );
+  const actors = db.sql.prepare('SELECT DISTINCT actor FROM workspace_audit').all();
+  assert.deepEqual(
+    actors.map((a) => a.actor),
+    ['one@example.com'],
+  );
 });

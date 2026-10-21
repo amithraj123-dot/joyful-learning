@@ -44,6 +44,8 @@ const actions = new Set([
   'studio.get',
   'studio.save',
   'notes.list',
+  'notes.get',
+  'notes.index',
   'notes.save',
   'notes.delete',
   'ai',

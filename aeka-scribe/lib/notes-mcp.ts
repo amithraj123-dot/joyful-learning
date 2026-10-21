@@ -1,5 +1,12 @@
 import { isTrashed } from './note-details.ts';
-import { declaredTooLarge, enforceRetention, getNote, policyFor } from './cloud-store.ts';
+import {
+  declaredTooLarge,
+  enforceRetention,
+  expiredSql,
+  expiryParams,
+  getNote,
+  policyFor,
+} from './cloud-store.ts';
 import { exportNote, type Note } from './workspace-core.ts';
 const tools = [
   {
@@ -73,13 +80,13 @@ export async function notesMCP(request: Request, db: D1Database | undefined, use
           .prepare(
             // Match note content only: the raw JSON also holds keys and fixed values ("kind":"meeting",
             // "status":"complete") that would make common words match every note.
-            `SELECT value FROM workspace_notes WHERE owner = ? AND coalesce(json_extract(value,'$.details.trashedAt'),0) = 0
+            `SELECT value FROM workspace_notes WHERE owner = ? AND coalesce(json_extract(value,'$.details.trashedAt'),0) = 0 AND NOT ${expiredSql}
              AND lower(coalesce(json_extract(value,'$.title'),'') || ' ' || coalesce(json_extract(value,'$.body'),'') || ' ' ||
                coalesce(json_extract(value,'$.summary'),'') || ' ' ||
                coalesce((SELECT group_concat(json_extract(s.value,'$.text'),' ') FROM json_each(value,'$.segments') s),''))
              LIKE ? ESCAPE '\\' ORDER BY updated_at DESC LIMIT ?`,
           )
-          .bind(userId, q, args.limit || 10)
+          .bind(userId, ...expiryParams(), q, args.limit || 10)
           .all<{ value: string }>();
       output = rows.results.map((r) => {
         const n = JSON.parse(r.value) as Note;

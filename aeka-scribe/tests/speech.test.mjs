@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBrowserDictation } from '../lib/browser-dictation.ts';
+import { transcribe } from '../lib/transcription.ts';
+import { database } from './helpers/database.mjs';
 
 const hypothesis = (transcript, isFinal = false) => ({ isFinal, 0: { transcript } });
 const growingSentence = [
@@ -333,4 +335,31 @@ test('Cancel clears a pending finish watchdog', (t) => {
   t.mock.timers.tick(6000);
   assert.deepEqual(h.completions, []);
   assert.deepEqual(h.errors, []);
+});
+test('cloud transcription honours the workspace cloud-AI control before any upload', async () => {
+  const db = database(),
+    upload = () => {
+      const body = new FormData();
+      body.set('audio', new File(['audio'], 'speech.webm', { type: 'audio/webm' }));
+      return new Request('https://flow.test/api/transcribe', {
+        method: 'POST',
+        headers: { origin: 'https://flow.test' },
+        body,
+      });
+    };
+  let calls = 0;
+  const fetcher = async () => {
+    calls++;
+    return Response.json({ text: 'Allowed.' });
+  };
+  db.sql
+    .prepare('INSERT INTO workspace_policy VALUES(?,?)')
+    .run('blocked', JSON.stringify({ sharing: true, cloudAI: false, retentionDays: 0 }));
+  const blocked = await transcribe(upload(), 'test', 'blocked', fetcher, db);
+  assert.equal(blocked.status, 403);
+  assert.match((await blocked.json()).error, /disabled in workspace controls/);
+  assert.equal(calls, 0);
+  const allowed = await transcribe(upload(), 'test', 'allowed', fetcher, db);
+  assert.equal(allowed.status, 200);
+  assert.equal(calls, 1);
 });

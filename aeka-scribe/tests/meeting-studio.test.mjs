@@ -218,7 +218,11 @@ test('trash remains restorable but cannot enter AI, MCP or shared note access; e
     note: { ...restored, details: { ...restored.details, trashedAt: Date.now() - 31 * 86400000 } },
     baseUpdatedAt: restored.updatedAt,
   });
+  // Hidden at once; purged when the throttled retention sweep next runs.
   assert.equal((await call(db, 'owner', 'notes.list')).value.length, 0);
+  db.sql.exec('DELETE FROM workspace_maintenance');
+  await call(db, 'owner', 'notes.index');
+  assert.equal(db.sql.prepare('SELECT count(*) AS n FROM workspace_notes').get().n, 0);
 });
 test('folder grants cover new and nested notes, reject privilege changes and stop at folder boundaries', async () => {
   const db = database();
