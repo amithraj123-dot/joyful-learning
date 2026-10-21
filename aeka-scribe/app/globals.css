@@ -1457,9 +1457,14 @@ h1 {
     gap: 7px;
   }
   .brand-mark {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
+    width: 34px;
+    height: 34px;
+  }
+  .brand-word b {
+    font-size: 20px;
+  }
+  .brand-word span {
+    font-size: 13px;
   }
   .brand-mark svg {
     width: 21px;
@@ -1576,7 +1581,7 @@ h1 {
   .brand {
     font-size: 25px;
   }
-  .brand-mark {
+  .brand-word {
     display: none;
   }
   .nav-item {

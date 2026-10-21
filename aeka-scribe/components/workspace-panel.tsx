@@ -206,7 +206,9 @@ export function WorkspacePanel(props: Props) {
   useEffect(() => {
     setNative(isDesktop());
     setLoading(true);
-    void Promise.all([
+    // allSettled: one failing request (e.g. status while offline) must not leave an unhandled rejection
+    // or block the notes and queue from loading.
+    void Promise.allSettled([
       load(),
       loadQueue(),
       runtime('status').then((d) => setConfigured(d.openaiConfigured)),
@@ -217,7 +219,9 @@ export function WorkspacePanel(props: Props) {
     window.addEventListener('flow-queue-changed', onQueue);
     try {
       if (isDesktop())
-        void runtime('status').then((d) => setCustomTransforms(d.settings?.customTransforms || []));
+        void runtime('status')
+          .then((d) => setCustomTransforms(d.settings?.customTransforms || []))
+          .catch(() => {});
       else setCustomTransforms(JSON.parse(localStorage.getItem('flow-transforms') || '[]'));
     } catch {}
     const off = window.flowDesktop?.on((e: DesktopEvent) => {
@@ -1154,7 +1158,9 @@ export function WorkspacePanel(props: Props) {
             notify={notify}
             onStatusChange={() => {
               props.onStatusChange();
-              void runtime('status').then((s) => setConfigured(s.openaiConfigured));
+              void runtime('status')
+                .then((s) => setConfigured(s.openaiConfigured))
+                .catch(() => {});
             }}
           />
         )}
