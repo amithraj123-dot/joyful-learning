@@ -45,6 +45,11 @@ npm --prefix desktop run build:ui
 npm --prefix desktop run package:win
 ```
 
+Continuous integration (`.github/workflows/aeka-scribe.yml` at the repository root) runs the checks
+above on Linux, and on Windows runs the desktop tests against the real PowerShell helper, a smoke
+launch of the application and the unsigned packaging, uploading the ZIP and installer as an
+artifact.
+
 `desktop/generated/` is produced from `lib/` by `desktop/build-shared.mjs` (run as part of
 `build:ui`); edit the `lib/` sources, not the generated copies.
 
@@ -65,6 +70,12 @@ top of `app/globals.css`. Icons are generated from the Aeka mark (`desktop/asset
   still be restored.
 - The hosted web workspace address (`cloudOrigin` in `desktop/main.cjs`) is unchanged. Rename it
   only after the Site is redeployed under a new address.
+
+## Hosting
+
+The web workspace identifies users from `oai-authenticated-user-*` headers set by the OpenAI Sites
+edge. When deploying anywhere else, set `AEKA_SELF_HOSTED=true` (the worker then removes those headers
+from incoming requests) and place your own authentication in front of the application.
 
 ## Credentials and data
 
