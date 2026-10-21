@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { windowsBridge } from '../services/windows.mjs';
+import { windowsBridge, holdKeyCode } from '../services/windows.mjs';
 
 function fakeSpawn() {
   const spawned = [];
@@ -52,5 +52,22 @@ test('Windows helper restarts after it exits', async () => {
   await new Promise((r) => setImmediate(r));
   spawned[1].reply(JSON.stringify({ id: spawned[1].last.id, result: { ok: true } }) + '\n');
   assert.deepEqual(await next, { ok: true });
+  bridge.close();
+});
+
+test('hold-to-talk accepts only F1 to F12', async () => {
+  assert.equal(holdKeyCode('F1'), 112);
+  assert.equal(holdKeyCode('F8'), 119);
+  assert.equal(holdKeyCode('F12'), 123);
+  for (const bad of [undefined, '', 'F0', 'F13', 'f8', 'Escape', 119]) assert.equal(holdKeyCode(bad), null);
+  const { spawned, spawnProcess } = fakeSpawn();
+  const bridge = windowsBridge('bridge.ps1', { spawnProcess, platform: 'win32' });
+  for (const key of [17, 124, 119.5, '119'])
+    await assert.rejects(bridge.call('holdKey', { key }), /Unsupported hold-to-talk key/);
+  const call = bridge.call('holdKey', { key: 120 });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(spawned[0].last.key, 120);
+  spawned[0].reply(JSON.stringify({ id: spawned[0].last.id, result: true }) + '\n');
+  assert.equal(await call, true);
   bridge.close();
 });

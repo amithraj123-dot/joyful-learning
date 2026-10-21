@@ -4,6 +4,15 @@ import path from 'node:path';
 const ACTIONS = ['focus', 'paste', 'selection', 'clipboardSequence', 'call', 'holdKey', 'verifyInstaller'];
 // Authenticode checks on a large installer (with antivirus scanning) can take far longer than a paste.
 const TIMEOUTS = { verifyInstaller: 120000 };
+// Hold-to-talk may poll only F1 to F12 (virtual-key codes 112 to 123).
+export const holdKeyCode = (name) => {
+  const m = /^F([1-9]|1[0-2])$/.exec(typeof name === 'string' ? name : '');
+  return m ? 111 + Number(m[1]) : null;
+};
+const validArgs = (action, args) =>
+  action !== 'holdKey' ||
+  args.key === undefined ||
+  (Number.isInteger(args.key) && args.key >= 112 && args.key <= 123);
 
 export function windowsBridge(script, { spawnProcess = spawn, platform = process.platform } = {}) {
   if (platform !== 'win32')
@@ -90,6 +99,10 @@ export function windowsBridge(script, { spawnProcess = spawn, platform = process
       new Promise((resolve, reject) => {
         if (!ACTIONS.includes(action)) {
           reject(Error('Unknown Windows operation.'));
+          return;
+        }
+        if (!validArgs(action, args)) {
+          reject(Error('Unsupported hold-to-talk key.'));
           return;
         }
         if (closed) {

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { runtime } from '../lib/desktop-runtime';
 import type { CalendarEvent } from '../lib/workspace-core';
 export function DesktopAdvanced({
@@ -21,7 +21,8 @@ export function DesktopAdvanced({
     [automatic, setAutomatic] = useState(false),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
-    [syncConsent, setSyncConsent] = useState(false);
+    [syncConsent, setSyncConsent] = useState(false),
+    updateLoaded = useRef(false);
   const load = async () => {
     const [s, l, p, u] = await Promise.all([
       runtime('cloud.status'),
@@ -33,6 +34,9 @@ export function DesktopAdvanced({
     setLocal(l);
     setPolicy(p.policy);
     setUpdate(u);
+    // Start the checkbox from the saved preference once; later refreshes keep the user's unsaved choice.
+    if (!updateLoaded.current) setAutomatic(!!u.automatic);
+    updateLoaded.current = true;
   };
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -203,9 +207,11 @@ export function DesktopAdvanced({
       <section className="card form-card">
         <h2>Updates</h2>
         <p>
-          {update?.configured
-            ? 'Trusted feed configured.'
-            : 'No trusted publisher feed is configured for this development build.'}{' '}
+          {update?.managed
+            ? 'The update publisher is managed by your administrator.'
+            : update?.configured
+              ? 'Trusted feed configured.'
+              : 'No trusted publisher feed is configured for this development build.'}{' '}
           {update?.phase === 'ready'
             ? 'A verified update is ready to install.'
             : update?.phase === 'available'
@@ -234,25 +240,31 @@ export function DesktopAdvanced({
           <button
             className="button primary"
             disabled={busy || update?.phase !== 'ready'}
-            onClick={() => {
-              if (confirm('Install the verified update and close Aeka Scribe? Save your edits first.'))
-                void run(() => runtime('updates.install'));
-            }}
+            onClick={() => void run(() => runtime('updates.install'))}
           >
             Install update
           </button>
         </div>
         <details>
           <summary>Publisher setup</summary>
-          <p>
-            Use the feed URL, Ed25519 public key and Windows certificate thumbprint supplied by your trusted
-            publisher. A release must pass the signed manifest, file hash, size and Windows publisher checks.
-            Never paste a private key here.
-          </p>
+          {update?.managed ? (
+            <p>
+              Managed by your administrator. The feed, public key and Windows publisher thumbprint are set by
+              device policy and cannot be changed here.
+            </p>
+          ) : (
+            <p>
+              Use the feed URL, Ed25519 public key and Windows certificate thumbprint supplied by your trusted
+              publisher. A release must pass the signed manifest, file hash, size and Windows publisher
+              checks. Windows asks you to confirm the feed and publisher before they are trusted. Never paste
+              a private key here.
+            </p>
+          )}
           <label className="field">
             <span>HTTPS manifest URL</span>
             <input
-              value={feed}
+              value={update?.managed ? update.feed : feed}
+              disabled={update?.managed}
               onChange={(e) => setFeed(e.target.value)}
               placeholder={update?.feed || 'https://publisher.example/flow/updates.json'}
             />
@@ -260,7 +272,8 @@ export function DesktopAdvanced({
           <label className="field">
             <span>Ed25519 public key (PEM)</span>
             <textarea
-              value={publicKey}
+              value={update?.managed ? update.publicKey : publicKey}
+              disabled={update?.managed}
               onChange={(e) => setPublicKey(e.target.value)}
               rows={3}
               maxLength={1000}
@@ -269,7 +282,8 @@ export function DesktopAdvanced({
           <label className="field">
             <span>Windows publisher certificate thumbprint</span>
             <input
-              value={publisher}
+              value={update?.managed ? update.publisherThumbprint : publisher}
+              disabled={update?.managed}
               onChange={(e) => setPublisher(e.target.value.replace(/\s/g, ''))}
               maxLength={40}
             />
@@ -278,17 +292,32 @@ export function DesktopAdvanced({
             <span>Automatically check and download verified updates every six hours</span>
             <input type="checkbox" checked={automatic} onChange={(e) => setAutomatic(e.target.checked)} />
           </label>
-          <button
-            className="button secondary"
-            disabled={busy || !feed || !publicKey || publisher.length !== 40}
-            onClick={() =>
-              void run(() =>
-                runtime('updates.configure', { feed, publicKey, publisherThumbprint: publisher, automatic }),
-              )
-            }
-          >
-            Trust this publisher
-          </button>
+          {update?.managed ? (
+            <button
+              className="button secondary"
+              disabled={busy}
+              onClick={() => void run(() => runtime('updates.configure', { automatic }))}
+            >
+              Save update preference
+            </button>
+          ) : (
+            <button
+              className="button secondary"
+              disabled={busy || !feed || !publicKey || publisher.length !== 40}
+              onClick={() =>
+                void run(() =>
+                  runtime('updates.configure', {
+                    feed,
+                    publicKey,
+                    publisherThumbprint: publisher,
+                    automatic,
+                  }),
+                )
+              }
+            >
+              Trust this publisher
+            </button>
+          )}
         </details>
         <p className="small-print">
           Installation is blocked during recordings or pending transcription. This release is unsigned, so it
@@ -304,11 +333,14 @@ export function DesktopAdvanced({
         </p>
         {policy?.managed && (
           <div className="capability-chips">
-            {Object.entries(policy.values).map(([k, v]) => (
-              <span key={k}>
-                {k}: {String(v)}
-              </span>
-            ))}
+            {Object.entries(policy.values)
+              .filter(([k]) => !k.startsWith('update'))
+              .map(([k, v]) => (
+                <span key={k}>
+                  {k}: {String(v)}
+                </span>
+              ))}
+            {policy.values.updateFeed && <span>update publisher: managed</span>}
           </div>
         )}
         <details>
@@ -316,8 +348,8 @@ export function DesktopAdvanced({
           <p>
             Administrators can deploy a read-only policy at <code>%ProgramData%\Aeka Scribe\policy.json</code>{' '}
             and restart Aeka Scribe. It can disable recording, cloud AI, cloud sync, calendar access, exports,
-            retained audio or local ASR, and set a maximum retention period. Protect that file with Windows
-            administrator permissions.
+            retained audio or local ASR, set a maximum retention period and pin the update publisher. Protect
+            that file with Windows administrator permissions.
           </p>
           <p className="small-print">
             These application controls are not SSO, SCIM, MDM enrollment or a data-loss-prevention guarantee.

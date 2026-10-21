@@ -61,15 +61,31 @@ export function createUpdates({
   verifyInstaller,
   launch,
   canInstall = () => true,
+  // Trust anchors pinned by managed policy ({ feed, publicKey, publisherThumbprint }) or null.
+  pinned = () => null,
+  // Native confirmations shown by the main process. Both refuse unless the host supplies them.
+  confirmTrust = async () => false,
+  confirmInstall = async () => false,
 }) {
   let state = { phase: 'idle', error: '', version: current, notes: '', lastChecked: 0 },
     busy = false;
-  const config = () => vault.read('updates', {});
+  const config = async () => {
+    const c = await vault.read('updates', {}),
+      p = pinned();
+    return p ? { ...c, ...p, managed: true } : c;
+  };
+  // Identifies the trust anchors a pending installer was verified against.
+  const trustId = (c) =>
+    crypto
+      .createHash('sha256')
+      .update(JSON.stringify([c.feed, c.publicKey, c.publisherThumbprint]))
+      .digest('hex');
   const status = async () => {
     const c = await config();
     return {
       ...state,
       configured: !!c.feed,
+      managed: !!c.managed,
       automatic: !!c.automatic,
       feed: c.feed || '',
       publicKey: c.publicKey || '',
@@ -92,12 +108,30 @@ export function createUpdates({
     };
     return { manifest: m, config: c };
   };
-  const download = async () => {
+  const download = async ({ reuse = false } = {}) => {
     if (busy) throw Error('An update check is already running.');
     busy = true;
     try {
       const { manifest: m, config: c } = await check();
       if (!m.available) return status();
+      if (reuse) {
+        // Keep an installer already verified for this exact release instead of downloading it again.
+        const pending = await vault.read('pending-update'),
+          size = await fs
+            .stat(path.join(cacheDir, 'Aeka-Scribe-update.exe'))
+            .then((x) => x.size)
+            .catch(() => -1);
+        if (
+          pending?.manifest?.version === m.version &&
+          pending.manifest.sha256 === m.sha256 &&
+          pending.manifest.bytes === m.bytes &&
+          pending.trust === trustId(c) &&
+          size === m.bytes
+        ) {
+          state.phase = 'ready';
+          return status();
+        }
+      }
       state.phase = 'downloading';
       await fs.mkdir(cacheDir, { recursive: true });
       const filename = path.join(cacheDir, 'Aeka-Scribe-update.exe'),
@@ -126,7 +160,12 @@ export function createUpdates({
       )
         throw Error('The installer is not signed by the trusted Windows publisher.');
       await fs.rename(temp, filename);
-      await vault.write('pending-update', { filename, manifest: m });
+      await vault.write('pending-update', {
+        filename,
+        manifest: m,
+        trust: trustId(c),
+        publisher: typeof signature.publisher === 'string' ? signature.publisher.slice(0, 200) : '',
+      });
       state.phase = 'ready';
       return status();
     } catch (e) {
@@ -141,14 +180,27 @@ export function createUpdates({
   return {
     status,
     configure: async (c) => {
+      if (pinned()) {
+        // Managed devices: only the automatic preference is the user's to change.
+        if (c.feed || c.publicKey || c.publisherThumbprint)
+          throw Error('Update publisher settings are managed by your administrator.');
+        await vault.write('updates', {
+          ...(await vault.read('updates', {})),
+          automatic: c.automatic === true,
+        });
+        return status();
+      }
       const feed = https(c.feed).href,
         key = crypto.createPublicKey(c.publicKey);
       if (key.asymmetricKeyType !== 'ed25519' || !/^[A-Fa-f0-9]{40}$/.test(c.publisherThumbprint || ''))
         throw Error('Provide an Ed25519 public key and the publisher’s 40-character certificate thumbprint.');
+      const publisherThumbprint = c.publisherThumbprint.toUpperCase();
+      if (!(await confirmTrust({ host: new URL(feed).host, feed, publisherThumbprint })))
+        throw Error('The update publisher was not changed.');
       await vault.write('updates', {
         feed,
         publicKey: key.export({ type: 'spki', format: 'pem' }).toString(),
-        publisherThumbprint: c.publisherThumbprint.toUpperCase(),
+        publisherThumbprint,
         automatic: c.automatic === true,
       });
       await vault.remove('pending-update');
@@ -169,7 +221,7 @@ export function createUpdates({
     automatic: async () => {
       if ((await config()).automatic && !busy)
         try {
-          await download();
+          await download({ reuse: true });
         } catch {}
     },
     install: async () => {
@@ -182,12 +234,26 @@ export function createUpdates({
       const m = pending.manifest;
       if (!newer(m.version, current) || Date.parse(m.expiresAt) <= Date.now())
         throw Error('Check for updates again; this installer is no longer current.');
-      const bytes = await fs.readFile(pending.filename);
-      if (bytes.length !== m.bytes || crypto.createHash('sha256').update(bytes).digest('hex') !== m.sha256)
-        throw Error('The downloaded installer changed. Download it again.');
+      // An installer verified against other trust anchors (for example before a policy change) is not used.
+      if (pending.trust !== trustId(c)) throw Error('Download and verify an update first.');
+      const intact = async () => {
+        const bytes = await fs.readFile(pending.filename);
+        if (bytes.length !== m.bytes || crypto.createHash('sha256').update(bytes).digest('hex') !== m.sha256)
+          throw Error('The downloaded installer changed. Download it again.');
+      };
+      await intact();
       const sig = await verifyInstaller(pending.filename);
       if (!sig.valid || sig.thumbprint !== c.publisherThumbprint)
         throw Error('Publisher verification failed.');
+      const publisher = typeof sig.publisher === 'string' ? sig.publisher.slice(0, 200) : '';
+      if (
+        !(await confirmInstall({ version: m.version, publisher, publisherThumbprint: c.publisherThumbprint }))
+      )
+        return false;
+      // The confirmation can stay open for a while: check the app is still idle and the file unchanged.
+      if (!(await canInstall()))
+        throw Error('Finish all recordings and pending transcription before installing an update.');
+      await intact();
       await launch(pending.filename);
       return true;
     },

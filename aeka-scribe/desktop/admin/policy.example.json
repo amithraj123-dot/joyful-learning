@@ -7,5 +7,8 @@
   "allowLocalASR": true,
   "allowAudioRetention": true,
   "retentionDays": 0,
-  "allowIntegrations": true
+  "allowIntegrations": true,
+  "updateFeed": "",
+  "updatePublicKey": "",
+  "updateThumbprint": ""
 }

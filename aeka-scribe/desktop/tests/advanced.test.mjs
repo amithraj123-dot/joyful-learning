@@ -273,6 +273,8 @@ test('installer download and install require matching content, trusted publisher
     launch: async () => {
       launched = true;
     },
+    confirmTrust: async () => true,
+    confirmInstall: async () => true,
   });
   await u.configure({ feed: r.feed, publicKey: r.publicKey, publisherThumbprint: thumbprint });
   publisher = 'B'.repeat(40);

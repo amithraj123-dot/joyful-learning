@@ -56,7 +56,9 @@ let window,
   powerId = null,
   shortcutErrors = [],
   captureGrantedUntil = 0,
-  holdEnabled = false;
+  holdEnabled = false,
+  holdCode = 119,
+  holdKeyCode;
 const ui = path.join(__dirname, 'ui-dist', 'index.html'),
   trustedURL = pathToFileURL(ui).href;
 const cloudOrigin = 'https://flow-voice-workspace.amithraj123.chatgpt.site';
@@ -113,6 +115,8 @@ async function toggle() {
 }
 function registerShortcuts(s) {
   holdEnabled = s.holdToTalk;
+  // Saved settings may predate the hold key choice; anything outside F1 to F12 falls back to F8.
+  holdCode = holdKeyCode(s.holdKey) || 119;
   globalShortcut.unregisterAll();
   shortcutErrors = [];
   for (const [key, fn] of [
@@ -655,9 +659,12 @@ else {
       const { openVault } = await import('./services/vault.mjs'),
         { createWorkspace } = await import('./services/workspace.mjs'),
         { createCalendars } = await import('./services/calendars.mjs'),
-        { windowsBridge } = await import('./services/windows.mjs');
+        windowsService = await import('./services/windows.mjs'),
+        { windowsBridge } = windowsService;
+      holdKeyCode = windowsService.holdKeyCode;
       policyManager = await import('./services/policy.mjs');
-      const programData = process.env.ProgramData || 'C:\\ProgramData';
+      // %ProgramData% in the environment is user-controlled; resolve it from the machine registry.
+      const programData = await policyManager.resolveProgramData();
       managedPolicy = await policyManager.loadPolicy(path.join(programData, 'Aeka Scribe', 'policy.json'));
       // Keep honouring a policy deployed for the pre-rename product, so restrictions never lapse silently.
       if (!managedPolicy.managed)
@@ -718,6 +725,47 @@ else {
         current: app.getVersion(),
         verifyInstaller: (file) => windows.call('verifyInstaller', { file }),
         canInstall: async () => !meeting && !recording && !(await workspace.queueStatus()).length,
+        // Trust anchors come from managed policy when pinned; otherwise a renderer request to change them
+        // or to run an installer needs the user's confirmation in a native dialog the renderer cannot drive.
+        pinned: () => policyManager.updatePins(managedPolicy.values),
+        confirmTrust: async ({ host, publisherThumbprint }) => {
+          show();
+          const { response } = await dialog.showMessageBox(window, {
+            type: 'warning',
+            buttons: ['Trust this publisher', 'Cancel'],
+            defaultId: 1,
+            cancelId: 1,
+            noLink: true,
+            title: 'Aeka Scribe updates',
+            message: 'Trust a new update publisher?',
+            detail:
+              'Aeka Scribe will download and offer to install updates from this publisher only.\n\nUpdate feed: ' +
+              host +
+              '\nWindows publisher thumbprint: ' +
+              publisherThumbprint +
+              '\n\nContinue only if your administrator or the publisher supplied these details.',
+          });
+          return response === 0;
+        },
+        confirmInstall: async ({ version, publisher, publisherThumbprint }) => {
+          show();
+          const { response } = await dialog.showMessageBox(window, {
+            type: 'question',
+            buttons: ['Install and close Aeka Scribe', 'Cancel'],
+            defaultId: 1,
+            cancelId: 1,
+            noLink: true,
+            title: 'Aeka Scribe updates',
+            message: 'Install Aeka Scribe ' + version + '?',
+            detail:
+              'Publisher: ' +
+              (publisher || 'Unknown') +
+              '\nWindows publisher thumbprint: ' +
+              publisherThumbprint +
+              '\n\nSave your edits first. Aeka Scribe closes while the installer runs.',
+          });
+          return response === 0;
+        },
         launch: async (file) => {
           const error = await shell.openPath(file);
           if (error) throw Error(error);
@@ -944,7 +992,7 @@ else {
           if (!holdEnabled || checkingKey) return;
           checkingKey = true;
           try {
-            const down = await windows.call('holdKey');
+            const down = await windows.call('holdKey', { key: holdCode });
             if (down && !holding && !recording && !meeting) {
               holdStarted = true;
               await toggle();

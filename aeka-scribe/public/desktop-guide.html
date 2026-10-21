@@ -197,8 +197,9 @@
     <h2 id="getting-started">1. Getting started on Windows</h2>
     <ol>
       <li>
-        Download the Windows ZIP supplied with this workspace. Use the NSIS installer for a normal per-user
-        installation, or extract the <strong>entire ZIP folder</strong> to a location you control, then open
+        Download the Windows ZIP supplied with this workspace. The NSIS installer installs Aeka Scribe for all
+        users of the computer and asks for administrator approval; use it on managed devices. Alternatively,
+        extract the <strong>entire ZIP folder</strong> to a location you control (a per-user copy), then open
         <strong>Aeka Scribe.exe</strong>. Keep its resource files beside it. Windows 10/ 11 x64 is required.
       </li>
       <li>
@@ -271,7 +272,10 @@
           </tr>
           <tr>
             <td>Hold-to-talk</td>
-            <td>Hold F8, release to finish; enable this option first</td>
+            <td>
+              Hold F8 (or another key from F1 to F12 chosen in Desktop settings), release to finish; enable
+              this option first
+            </td>
           </tr>
         </tbody>
       </table>
@@ -343,12 +347,12 @@
           <tr>
             <td>Desktop shell</td>
             <td>
-              Tray, launch at login, non-focusing recording overlay, global shortcuts, optional F8
-              hold-to-talk, single-instance launch
+              Tray, launch at login, non-focusing recording overlay, global shortcuts, optional hold-to-talk
+              (F8 by default), single-instance launch
             </td>
             <td>
-              Real Windows verification is pending. A portable ZIP and a per-user NSIS installer are supplied;
-              both are unsigned
+              Real Windows verification is pending. A portable per-user ZIP and a per-machine NSIS installer
+              are supplied; both are unsigned
             </td>
           </tr>
           <tr>
@@ -882,21 +886,30 @@
       Administrators can install the supplied <code>Admin/policy.example.json</code> at
       <code>%ProgramData%\Aeka Scribe\policy.json</code> with administrator-only write permissions. A policy
       file at the earlier location, <code>%ProgramData%\Flow Desktop\policy.json</code>, is still honoured as
-      a fallback.
+      a fallback. Aeka Scribe finds the ProgramData folder from the machine registry rather than the
+      <code>%ProgramData%</code> environment variable, which users can change. The policy can also pin the
+      update publisher with <code>updateFeed</code>, <code>updatePublicKey</code> and
+      <code>updateThumbprint</code>; set all three or none. Use the per-machine installer on managed devices,
+      because a user can modify a ZIP copy.
     </p>
     <p>
       <strong>Updates:</strong> Publisher setup accepts only a public release-signing key, HTTPS feed and
       Windows publisher certificate thumbprint. A compatible, unexpired signed manifest, an exact byte count/
-      hash and a valid Windows publisher signature are all required. Optional automatic downloads check every
-      six hours. Installation requires a click and waits for recordings/ transcription to finish. No
-      production signing certificate or feed is included, and the delivered unsigned build cannot pass this
-      production update check. See <code>Admin/ADMIN-SETUP.txt</code>.
+      hash and a valid Windows publisher signature are all required. When your administrator pins the
+      publisher, Publisher setup shows <strong>Managed by your administrator</strong> and cannot be changed.
+      Otherwise, Windows asks you to confirm the feed host and publisher thumbprint before they are trusted.
+      Optional automatic downloads check every six hours and keep an installer already verified for the same
+      release. Installation requires a click and a Windows confirmation showing the version and publisher, and
+      waits for recordings/ transcription to finish. No production signing certificate or feed is included,
+      and the delivered unsigned build cannot pass this production update check. See
+      <code>Admin/ADMIN-SETUP.txt</code>.
     </p>
 
     <h2 id="verification">10. Windows verification checklist</h2>
     <ol>
       <li>
-        Confirm launch, tray reopen and quit. Confirm shortcuts register and F8 release stops recording.
+        Confirm launch, tray reopen and quit. Confirm shortcuts register and releasing the hold-to-talk key
+        (F8 by default) stops recording.
       </li>
       <li>
         Dictate the reported test phrase "hello, how is the weather today?" once and confirm that a single

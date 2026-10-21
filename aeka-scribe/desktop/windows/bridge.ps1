@@ -39,10 +39,10 @@ while($null -ne ($line=[Console]::ReadLine())) {
    'focus' {$result=Focus-Info}
    'paste' { $f=Focus-Info;if($f.handle -ne $r.handle -or $f.isPassword -or -not $f.focusKnown){throw 'The focused field changed or cannot be checked safely. Copy the text manually.'};if(-not [FlowNative]::Paste()){throw 'Windows blocked text insertion. Copy the text manually.'};$result=@{pasted=$true} }
    'clipboardSequence' {$result=[FlowNative]::GetClipboardSequenceNumber()}
-   'holdKey' {$result=([FlowNative]::GetAsyncKeyState(119) -band 0x8000) -ne 0}
+   'holdKey' { $k=$r.key;if($null -eq $k){$k=119};if(-not ($k -is [int] -or $k -is [long]) -or $k -lt 112 -or $k -gt 123){throw 'Unsupported hold-to-talk key.'};$result=([FlowNative]::GetAsyncKeyState([int]$k) -band 0x8000) -ne 0 }
    'selection' { $f=Focus-Info;if($f.isPassword -or -not $f.focusKnown){throw 'Selected text is unavailable in this field.'};$el=[System.Windows.Automation.AutomationElement]::FocusedElement;$pattern=$null;$value='';if($el.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern,[ref]$pattern)){$ranges=$pattern.GetSelection();foreach($range in $ranges){$value+=$range.GetText(20000)}};$result=@{text=$value;process=$f.process} }
    'call' { $f=Focus-Info;$b=New-Object System.Text.StringBuilder 1000;[void][FlowNative]::GetWindowText([IntPtr]::new([int64]$f.handle),$b,1000);$title=$b.ToString();$candidate=($f.process -match '^(ms-teams|Teams|Zoom|slack|chrome|msedge|firefox)$') -and ($title -match '(?i)(meeting|google meet|zoom meeting|microsoft teams call|huddle)');$result=@{candidate=$candidate;process=$f.process} }
-   'verifyInstaller' { $sig=Get-AuthenticodeSignature -LiteralPath ([string]$r.file);$result=@{valid=($sig.Status -eq 'Valid');thumbprint=if($sig.SignerCertificate){$sig.SignerCertificate.Thumbprint}else{''}} }
+   'verifyInstaller' { $sig=Get-AuthenticodeSignature -LiteralPath ([string]$r.file);$c=$sig.SignerCertificate;$result=@{valid=($sig.Status -eq 'Valid');thumbprint=if($c){$c.Thumbprint}else{''};publisher=if($c){$c.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName,$false)}else{''}} }
    default {throw 'Unknown Windows operation.'}
   }
   @{id=$r.id;result=$result}|ConvertTo-Json -Compress -Depth 5|%{[Console]::WriteLine($_)}
