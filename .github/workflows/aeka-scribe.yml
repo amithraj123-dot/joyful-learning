@@ -20,11 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
         with:
           version: 11.25.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
       - run: pnpm install --frozen-lockfile
@@ -44,11 +44,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
         with:
           version: 11.25.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
       - run: pnpm install --frozen-lockfile
@@ -60,7 +60,10 @@ jobs:
         shell: pwsh
         run: |
           $env:AEKA_SCRIBE_SMOKE_TEST = '1'
-          $p = Start-Process -FilePath "desktop\node_modules\electron\dist\electron.exe" -ArgumentList "desktop" -PassThru -NoNewWindow -RedirectStandardOutput smoke.out -RedirectStandardError smoke.err
+          $root = (Get-Location).Path
+          $electron = Join-Path $root 'desktop\node_modules\electron\dist\electron.exe'
+          if (-not (Test-Path $electron)) { throw "Electron binary not found at $electron" }
+          $p = Start-Process -FilePath $electron -ArgumentList (Join-Path $root 'desktop') -WorkingDirectory $root -PassThru -NoNewWindow -RedirectStandardOutput smoke.out -RedirectStandardError smoke.err
           if (-not $p.WaitForExit(120000)) { $p.Kill(); throw 'Aeka Scribe did not finish its smoke launch within 120 s.' }
           Get-Content smoke.out, smoke.err
           if ($p.ExitCode -ne 0) { throw "Smoke launch failed with exit code $($p.ExitCode)." }
