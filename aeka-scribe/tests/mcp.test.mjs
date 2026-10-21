@@ -18,7 +18,7 @@ const note = {
   duration: 0,
 };
 const req = (method, params = {}) =>
-  new Request('https://flow.example/mcp', {
+  new Request('https://aeka-scribe.example/mcp', {
     method: 'POST',
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });

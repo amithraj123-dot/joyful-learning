@@ -60,13 +60,13 @@ test('hosted image extraction enforces identity, origin and owner cloud policy b
     throw Error('No network expected');
   };
   const request = (origin) =>
-    new Request('https://flow.test/api/workspace', {
+    new Request('https://aeka-scribe.test/api/workspace', {
       method: 'POST',
       headers: { Origin: origin },
       body: JSON.stringify({ action: 'context.image', image }),
     });
   assert.equal(
-    (await workspaceRequest(request('https://flow.test'), db, 'sk-test', null, fetcher)).status,
+    (await workspaceRequest(request('https://aeka-scribe.test'), db, 'sk-test', null, fetcher)).status,
     401,
   );
   assert.equal(
@@ -77,7 +77,7 @@ test('hosted image extraction enforces identity, origin and owner cloud policy b
     `INSERT INTO workspace_policy(owner,value) VALUES('owner','{"cloudAI":false,"retentionDays":0}')`,
   );
   assert.equal(
-    (await workspaceRequest(request('https://flow.test'), db, 'sk-test', 'owner', fetcher)).status,
+    (await workspaceRequest(request('https://aeka-scribe.test'), db, 'sk-test', 'owner', fetcher)).status,
     403,
   );
   assert.equal(calls, 0);

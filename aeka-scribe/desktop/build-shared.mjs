@@ -4,7 +4,7 @@ const dest = new URL('./generated/', import.meta.url);
 await fs.mkdir(dest, { recursive: true });
 for (const name of [
   'workspace-core',
-  'flow-core',
+  'scribe-core',
   'ai-workspace',
   'note-details',
   'meeting-studio',

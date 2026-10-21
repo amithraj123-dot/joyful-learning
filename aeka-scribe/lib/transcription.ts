@@ -1,4 +1,4 @@
-import { sanitizeKeywords } from './flow-core.ts';
+import { sanitizeKeywords } from './scribe-core.ts';
 import { policyFor } from './cloud-store.ts';
 
 export const MAX_AUDIO_BYTES = 20 * 1024 * 1024;

@@ -73,17 +73,17 @@ const actions = new Set([
   'window.hide',
   'help.open',
 ]);
-contextBridge.exposeInMainWorld('flowDesktop', {
+contextBridge.exposeInMainWorld('aekaScribe', {
   invoke: async (action, payload = {}) => {
     if (!actions.has(action)) throw Error('Unknown desktop action.');
-    const r = await ipcRenderer.invoke('flow', action, payload);
+    const r = await ipcRenderer.invoke('aeka-scribe', action, payload);
     if (!r.ok) throw Error(r.error || 'Desktop action failed.');
     return r.value;
   },
   on: (callback) => {
     if (typeof callback !== 'function') return () => {};
     const listener = (_event, data) => callback(data);
-    ipcRenderer.on('flow-event', listener);
-    return () => ipcRenderer.removeListener('flow-event', listener);
+    ipcRenderer.on('aeka-scribe-event', listener);
+    return () => ipcRenderer.removeListener('aeka-scribe-event', listener);
   },
 });

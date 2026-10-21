@@ -11,7 +11,7 @@ import { verifyManifest, createUpdates } from '../services/updates.mjs';
 import { mono16kWav } from '../services/local-asr.mjs';
 import { validatePolicy, enforcePolicy, managedDefaults } from '../services/policy.mjs';
 import { encodeWav } from '../generated/workspace-core.mjs';
-import { defaults, validateBackup } from '../generated/flow-core.mjs';
+import { defaults, validateBackup } from '../generated/scribe-core.mjs';
 import { cloudRequest } from '../../lib/cloud-api.ts';
 import { database } from '../../tests/helpers/database.mjs';
 const vault = (initial = {}) => {
@@ -126,9 +126,9 @@ test('continuous sync survives conflicts, server deletion, retry and a changed a
   let account = 'owner';
   const request = async (p) => {
     const r = await cloudRequest(
-        new Request('https://flow.example/api/cloud', {
+        new Request('https://aeka-scribe.example/api/cloud', {
           method: 'POST',
-          headers: { Origin: 'https://flow.example' },
+          headers: { Origin: 'https://aeka-scribe.example' },
           body: JSON.stringify(p),
         }),
         db,
@@ -219,7 +219,7 @@ test('native dictation profiles retain their version and migrate the earlier unv
 function release(bytes = Buffer.alloc(1000000)) {
   const keys = crypto.generateKeyPairSync('ed25519'),
     publicKey = keys.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
-    feed = 'https://releases.example/flow.json',
+    feed = 'https://releases.example/aeka-scribe.json',
     m = {
       product: 'com.aekaadvisors.scribe',
       platform: 'win32-x64',
@@ -256,7 +256,7 @@ test('updater rejects tampered, expired, cross-origin and incompatible signed ma
   );
 });
 test('installer download and install require matching content, trusted publisher and an idle app', async (t) => {
-  const cacheDir = await fs.mkdtemp(path.join(os.tmpdir(), 'flow-update-test-'));
+  const cacheDir = await fs.mkdtemp(path.join(os.tmpdir(), 'aeka-scribe-update-test-'));
   t.after(() => fs.rm(cacheDir, { recursive: true, force: true }));
   const r = release(),
     thumbprint = 'A'.repeat(40);

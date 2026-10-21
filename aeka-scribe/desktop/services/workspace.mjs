@@ -3,7 +3,7 @@ import { extractImageText } from '../generated/image-context.mjs';
 import { noteHash } from './sync.mjs';
 import crypto from 'node:crypto';
 import { validNote, upsertSegment } from '../generated/workspace-core.mjs';
-import { validateBackup } from '../generated/flow-core.mjs';
+import { validateBackup } from '../generated/scribe-core.mjs';
 import { audioToText, textAI } from './ai.mjs';
 import {
   defaultStudio,

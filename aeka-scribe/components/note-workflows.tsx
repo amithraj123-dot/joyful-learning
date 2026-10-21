@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { runtime, isDesktop } from '../lib/desktop-runtime';
 import { type Note } from '../lib/workspace-core';
 import { noteDetails, type ContextFile } from '../lib/note-details';
-import { newId } from '../lib/flow-core';
+import { newId } from '../lib/scribe-core';
 const providers: Record<string, string> = {
   gmail: 'Gmail',
   outlook: 'Outlook email',

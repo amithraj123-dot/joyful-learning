@@ -32,7 +32,7 @@ import {
   fetchNoteIndex,
   type DesktopEvent,
 } from '../lib/desktop-runtime';
-import { newId, reviewChanges, type Term, type Snippet } from '../lib/flow-core';
+import { newId, reviewChanges, type Term, type Snippet } from '../lib/scribe-core';
 import {
   exportNote,
   transcriptText,
@@ -234,16 +234,21 @@ export function WorkspacePanel(props: Props) {
     ]).finally(() => setLoading(false));
     const onNotes = () => void actions.current.load(),
       onQueue = () => void actions.current.loadQueue();
-    window.addEventListener('flow-notes-changed', onNotes);
-    window.addEventListener('flow-queue-changed', onQueue);
+    window.addEventListener('aeka-scribe-notes-changed', onNotes);
+    window.addEventListener('aeka-scribe-queue-changed', onQueue);
     try {
       if (isDesktop())
         void runtime('status')
           .then((d) => setCustomTransforms(d.settings?.customTransforms || []))
           .catch(() => {});
-      else setCustomTransforms(JSON.parse(localStorage.getItem('flow-transforms') || '[]'));
+      else
+        setCustomTransforms(
+          JSON.parse(
+            localStorage.getItem('aeka-scribe-transforms') || localStorage.getItem('flow-transforms') || '[]',
+          ),
+        );
     } catch {}
-    const off = window.flowDesktop?.on((e: DesktopEvent) => {
+    const off = window.aekaScribe?.on((e: DesktopEvent) => {
       if (e.type === 'app-finish') void automationAction.current({ type: 'finish-all' });
       if (e.type === 'automation-start' || e.type === 'automation-stop') void automationAction.current(e);
       if (e.type === 'automation-countdown') setCountdown(e.entry);
@@ -269,8 +274,8 @@ export function WorkspacePanel(props: Props) {
     const timer = setInterval(() => void processAudio(), 60000);
     return () => {
       off?.();
-      window.removeEventListener('flow-notes-changed', onNotes);
-      window.removeEventListener('flow-queue-changed', onQueue);
+      window.removeEventListener('aeka-scribe-notes-changed', onNotes);
+      window.removeEventListener('aeka-scribe-queue-changed', onQueue);
       window.removeEventListener('online', online);
       clearInterval(timer);
     };
@@ -1071,7 +1076,7 @@ export function WorkspacePanel(props: Props) {
                       if (native) {
                         const status = await runtime('status');
                         await runtime('settings.save', { ...status.settings, customTransforms: list });
-                      } else localStorage.setItem('flow-transforms', JSON.stringify(list));
+                      } else localStorage.setItem('aeka-scribe-transforms', JSON.stringify(list));
                       setCustomTransforms(list);
                       notify('Custom transform saved');
                     })

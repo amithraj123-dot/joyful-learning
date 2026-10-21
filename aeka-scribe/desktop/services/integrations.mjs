@@ -605,7 +605,7 @@ export function createIntegrations({
         write: true,
         plain: true,
         body: {
-          event: 'flow.note.reviewed',
+          event: 'aeka_scribe.note.reviewed',
           delivery_id: d.id,
           note_id: d.noteId,
           title: d.title,

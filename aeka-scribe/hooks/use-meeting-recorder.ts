@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { encodeWav } from '../lib/workspace-core';
 import { isDesktop, runtime } from '../lib/desktop-runtime';
-import { newId } from '../lib/flow-core';
+import { newId } from '../lib/scribe-core';
 import { pcmProcessorSource } from '../lib/pcm-processor';
 type Phase = 'idle' | 'requesting' | 'recording' | 'paused' | 'stopping' | 'error';
 type Options = {
@@ -204,7 +204,7 @@ export function useMeetingRecorder(onEnd: (noteId: string, duration: number) => 
         release();
         return;
       }
-      const processor = new AudioWorkletNode(ac, 'flow-pcm', {
+      const processor = new AudioWorkletNode(ac, 'aeka-pcm', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         outputChannelCount: [1],

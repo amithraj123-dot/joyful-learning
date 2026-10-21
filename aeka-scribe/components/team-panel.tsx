@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { cloudRuntime, isDesktop, runtime } from '../lib/desktop-runtime';
-import { newId, type Term, type Snippet } from '../lib/flow-core';
+import { newId, type Term, type Snippet } from '../lib/scribe-core';
 import { noteFolders, inFolder } from '../lib/note-details';
 import type { Note } from '../lib/workspace-core';
 type Resources = { terms: Term[]; snippets: Snippet[] };

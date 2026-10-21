@@ -68,7 +68,7 @@ test('portable backups round-trip and reject weak passwords, tampering and wrong
   assert.throws(() => portableUnseal(b, password));
 });
 test('vault serializes writes, denies traversal and never replaces an unreadable device key', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'flow-test-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'aeka-scribe-test-'));
   const safe = {
     isEncryptionAvailable: () => true,
     encryptString: (s) => Buffer.from(s),

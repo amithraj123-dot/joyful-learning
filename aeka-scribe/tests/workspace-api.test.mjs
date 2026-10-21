@@ -18,8 +18,8 @@ const note = {
   status: 'draft',
   duration: 0,
 };
-const request = (body, origin = 'https://flow.example') =>
-  new Request('https://flow.example/api/workspace', {
+const request = (body, origin = 'https://aeka-scribe.example') =>
+  new Request('https://aeka-scribe.example/api/workspace', {
     method: 'POST',
     headers: { Origin: origin, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -180,9 +180,9 @@ test('audit entries name the signed-in email whichever API made the change', asy
     user = { userId: 'one', email: 'One@Example.com' };
   await workspaceRequest(request({ action: 'notes.save', note }), db, undefined, 'one', fetch, user.email);
   await cloudRequest(
-    new Request('https://flow.example/api/cloud', {
+    new Request('https://aeka-scribe.example/api/cloud', {
       method: 'POST',
-      headers: { Origin: 'https://flow.example' },
+      headers: { Origin: 'https://aeka-scribe.example' },
       body: JSON.stringify({ action: 'sync.save', note: { ...note, id: 'synced' } }),
     }),
     db,

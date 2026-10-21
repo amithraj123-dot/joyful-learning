@@ -21,8 +21,8 @@ const note = {
 const owner = { userId: 'owner', email: 'owner@example.com' },
   viewer = { userId: 'viewer', email: 'viewer@example.com' },
   stranger = { userId: 'stranger', email: 'stranger@example.com' };
-const req = (action, p = {}, origin = 'https://flow.example') =>
-  new Request('https://flow.example/api/cloud', {
+const req = (action, p = {}, origin = 'https://aeka-scribe.example') =>
+  new Request('https://aeka-scribe.example/api/cloud', {
     method: 'POST',
     headers: { Origin: origin },
     body: JSON.stringify({ action, ...p }),
@@ -203,9 +203,9 @@ test('editors cannot change a shared note’s status, kind or creation time', as
 });
 test('internal errors are not echoed to the client', async () => {
   const r = await cloudRequest(
-    new Request('https://flow.example/api/cloud', {
+    new Request('https://aeka-scribe.example/api/cloud', {
       method: 'POST',
-      headers: { Origin: 'https://flow.example' },
+      headers: { Origin: 'https://aeka-scribe.example' },
       body: 'null',
     }),
     database(),

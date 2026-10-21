@@ -7,7 +7,7 @@ Add-Type -TypeDefinition @'
 using System;
 using System.Text;
 using System.Runtime.InteropServices;
-public static class FlowNative {
+public static class AekaNative {
  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder b, int size);
@@ -26,7 +26,7 @@ public static class FlowNative {
 }
 '@
 function Focus-Info {
- $h=[FlowNative]::GetForegroundWindow();$windowPid=[uint32]0;[void][FlowNative]::GetWindowThreadProcessId($h,[ref]$windowPid)
+ $h=[AekaNative]::GetForegroundWindow();$windowPid=[uint32]0;[void][AekaNative]::GetWindowThreadProcessId($h,[ref]$windowPid)
  $processName='';try{$processName=(Get-Process -Id $windowPid).ProcessName}catch{}
  $isPassword=$true;$selection='';$focusKnown=$false
  try{$el=[System.Windows.Automation.AutomationElement]::FocusedElement;if($null -ne $el){$isPassword=$el.Current.IsPassword;$focusKnown=$true}}catch{}
@@ -37,11 +37,11 @@ while($null -ne ($line=[Console]::ReadLine())) {
   $r=$line|ConvertFrom-Json;$result=$null
   switch($r.action) {
    'focus' {$result=Focus-Info}
-   'paste' { $f=Focus-Info;if($f.handle -ne $r.handle -or $f.isPassword -or -not $f.focusKnown){throw 'The focused field changed or cannot be checked safely. Copy the text manually.'};if(-not [FlowNative]::Paste()){throw 'Windows blocked text insertion. Copy the text manually.'};$result=@{pasted=$true} }
-   'clipboardSequence' {$result=[FlowNative]::GetClipboardSequenceNumber()}
-   'holdKey' { $k=$r.key;if($null -eq $k){$k=119};if(-not ($k -is [int] -or $k -is [long]) -or $k -lt 112 -or $k -gt 123){throw 'Unsupported hold-to-talk key.'};$result=([FlowNative]::GetAsyncKeyState([int]$k) -band 0x8000) -ne 0 }
+   'paste' { $f=Focus-Info;if($f.handle -ne $r.handle -or $f.isPassword -or -not $f.focusKnown){throw 'The focused field changed or cannot be checked safely. Copy the text manually.'};if(-not [AekaNative]::Paste()){throw 'Windows blocked text insertion. Copy the text manually.'};$result=@{pasted=$true} }
+   'clipboardSequence' {$result=[AekaNative]::GetClipboardSequenceNumber()}
+   'holdKey' { $k=$r.key;if($null -eq $k){$k=119};if(-not ($k -is [int] -or $k -is [long]) -or $k -lt 112 -or $k -gt 123){throw 'Unsupported hold-to-talk key.'};$result=([AekaNative]::GetAsyncKeyState([int]$k) -band 0x8000) -ne 0 }
    'selection' { $f=Focus-Info;if($f.isPassword -or -not $f.focusKnown){throw 'Selected text is unavailable in this field.'};$el=[System.Windows.Automation.AutomationElement]::FocusedElement;$pattern=$null;$value='';if($el.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern,[ref]$pattern)){$ranges=$pattern.GetSelection();foreach($range in $ranges){$value+=$range.GetText(20000)}};$result=@{text=$value;process=$f.process} }
-   'call' { $f=Focus-Info;$b=New-Object System.Text.StringBuilder 1000;[void][FlowNative]::GetWindowText([IntPtr]::new([int64]$f.handle),$b,1000);$title=$b.ToString();$candidate=($f.process -match '^(ms-teams|Teams|Zoom|slack|chrome|msedge|firefox)$') -and ($title -match '(?i)(meeting|google meet|zoom meeting|microsoft teams call|huddle)');$result=@{candidate=$candidate;process=$f.process} }
+   'call' { $f=Focus-Info;$b=New-Object System.Text.StringBuilder 1000;[void][AekaNative]::GetWindowText([IntPtr]::new([int64]$f.handle),$b,1000);$title=$b.ToString();$candidate=($f.process -match '^(ms-teams|Teams|Zoom|slack|chrome|msedge|firefox)$') -and ($title -match '(?i)(meeting|google meet|zoom meeting|microsoft teams call|huddle)');$result=@{candidate=$candidate;process=$f.process} }
    'verifyInstaller' { $sig=Get-AuthenticodeSignature -LiteralPath ([string]$r.file);$c=$sig.SignerCertificate;$result=@{valid=($sig.Status -eq 'Valid');thumbprint=if($c){$c.Thumbprint}else{''};publisher=if($c){$c.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName,$false)}else{''}} }
    default {throw 'Unknown Windows operation.'}
   }

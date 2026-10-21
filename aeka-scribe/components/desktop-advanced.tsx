@@ -266,7 +266,7 @@ export function DesktopAdvanced({
               value={update?.managed ? update.feed : feed}
               disabled={update?.managed}
               onChange={(e) => setFeed(e.target.value)}
-              placeholder={update?.feed || 'https://publisher.example/flow/updates.json'}
+              placeholder={update?.feed || 'https://publisher.example/aeka-scribe/updates.json'}
             />
           </label>
           <label className="field">
@@ -385,7 +385,7 @@ export function MeetingAutomation({ events }: { events: CalendarEvent[] }) {
   };
   useEffect(() => {
     void load();
-    const off = window.flowDesktop?.on((e) => {
+    const off = window.aekaScribe?.on((e) => {
       if (e.type.startsWith('automation-')) void load();
     });
     const timer = setInterval(() => setNow(Date.now()), 1000);

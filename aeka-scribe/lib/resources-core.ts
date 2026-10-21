@@ -1,4 +1,4 @@
-import type { Term, Snippet } from './flow-core.ts';
+import type { Term, Snippet } from './scribe-core.ts';
 export function validResources(v: unknown): { terms: Term[]; snippets: Snippet[] } {
   const x = v as { terms: Term[]; snippets: Snippet[] };
   if (

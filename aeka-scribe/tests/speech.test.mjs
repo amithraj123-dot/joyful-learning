@@ -341,9 +341,9 @@ test('cloud transcription honours the workspace cloud-AI control before any uplo
     upload = () => {
       const body = new FormData();
       body.set('audio', new File(['audio'], 'speech.webm', { type: 'audio/webm' }));
-      return new Request('https://flow.test/api/transcribe', {
+      return new Request('https://aeka-scribe.test/api/transcribe', {
         method: 'POST',
-        headers: { origin: 'https://flow.test' },
+        headers: { origin: 'https://aeka-scribe.test' },
         body,
       });
     };

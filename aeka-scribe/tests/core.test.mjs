@@ -8,7 +8,7 @@ import {
   reviewChanges,
   sanitizeKeywords,
   validateBackup,
-} from '../lib/flow-core.ts';
+} from '../lib/scribe-core.ts';
 import { transcribe } from '../lib/transcription.ts';
 test('Cleanup keeps amounts, negation, and intentional repetition', () => {
   const raw = 'um do not file 12,50,000. No no changes to 7.5% or 194J. The museum stays.';
@@ -91,9 +91,9 @@ const request = (opts = {}) => {
   body.set('audio', new File(['fake test audio'], 'test.webm', { type: 'audio/webm' }));
   body.set('keywords', JSON.stringify(['GST', 'Ind AS']));
   body.set('language', 'en-IN');
-  return new Request('https://flow.test/api/transcribe', {
+  return new Request('https://aeka-scribe.test/api/transcribe', {
     method: 'POST',
-    headers: { origin: opts.origin ?? 'https://flow.test' },
+    headers: { origin: opts.origin ?? 'https://aeka-scribe.test' },
     body,
   });
 };
@@ -140,9 +140,9 @@ test('Unsupported upload format rejected before provider call', async () => {
   body.set('audio', new File(['test'], 'test.exe'));
   let called = false;
   const r = await transcribe(
-    new Request('https://flow.test/api/transcribe', {
+    new Request('https://aeka-scribe.test/api/transcribe', {
       method: 'POST',
-      headers: { origin: 'https://flow.test' },
+      headers: { origin: 'https://aeka-scribe.test' },
       body,
     }),
     'test',

@@ -33,9 +33,9 @@ const note = (id, patch = {}) => ({
   ...patch,
 });
 const request = (body) =>
-  new Request('https://flow.example/api/workspace', {
+  new Request('https://aeka-scribe.example/api/workspace', {
     method: 'POST',
-    headers: { Origin: 'https://flow.example' },
+    headers: { Origin: 'https://aeka-scribe.example' },
     body: JSON.stringify(body),
   });
 const call = async (db, owner, action, data = {}) => {

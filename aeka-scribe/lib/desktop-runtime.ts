@@ -3,15 +3,15 @@ import { encodeWav, upsertSegment, type Note } from './workspace-core';
 export type DesktopEvent = { type: string; [key: string]: unknown };
 declare global {
   interface Window {
-    flowDesktop?: {
+    aekaScribe?: {
       invoke: (action: string, payload?: unknown) => Promise<any>;
       on: (callback: (event: DesktopEvent) => void) => () => void;
     };
   }
 }
-export const isDesktop = () => typeof window !== 'undefined' && !!window.flowDesktop;
+export const isDesktop = () => typeof window !== 'undefined' && !!window.aekaScribe;
 export async function runtime(action: string, payload: any = {}) {
-  if (isDesktop()) return window.flowDesktop!.invoke(action, payload);
+  if (isDesktop()) return window.aekaScribe!.invoke(action, payload);
   if (action.startsWith('cloud.')) return cloudRuntime(action.slice(6), payload);
   if (action === 'status') {
     const r = await fetch('/api/status');
@@ -43,7 +43,7 @@ export async function runtime(action: string, payload: any = {}) {
     });
   if (action === 'notes.delete') {
     for (const item of await readAudio()) if (item.noteId === payload.id) await removeAudio(item.id);
-    window.dispatchEvent(new Event('flow-queue-changed'));
+    window.dispatchEvent(new Event('aeka-scribe-queue-changed'));
   }
   return result.value;
 }
@@ -102,7 +102,7 @@ export async function transcribeAudio(
         await ac.close();
       }
     }
-    const result = await window.flowDesktop!.invoke('transcribe', {
+    const result = await window.aekaScribe!.invoke('transcribe', {
       audioBuffer: bytes,
       filename: name,
       mime,
@@ -137,6 +137,7 @@ let dbPromise: Promise<IDBDatabase> | null = null,
 function audioDB() {
   if (!dbPromise)
     dbPromise = new Promise((resolve, reject) => {
+      // Store name kept from 0.5 so queued meeting audio survives the upgrade.
       const r = indexedDB.open('flow-meeting-audio-v1', 1);
       r.onupgradeneeded = () => r.result.createObjectStore('chunks', { keyPath: 'id' });
       r.onsuccess = () => resolve(r.result);
@@ -168,7 +169,7 @@ const removeAudio = (id: string) => storeAudio('readwrite', (s) => s.delete(id))
 const clearAudio = () => storeAudio('readwrite', (s) => s.clear());
 async function addAudio(p: PendingAudio) {
   await storeAudio('readwrite', (s) => s.put(p));
-  window.dispatchEvent(new Event('flow-queue-changed'));
+  window.dispatchEvent(new Event('aeka-scribe-queue-changed'));
   void processAudio();
   return { saved: true };
 }
@@ -215,7 +216,7 @@ export async function processAudio() {
           }
         }
         if (saved) await removeAudio(item.id);
-        window.dispatchEvent(new Event('flow-notes-changed'));
+        window.dispatchEvent(new Event('aeka-scribe-notes-changed'));
       } catch (e) {
         await storeAudio('readwrite', (s) =>
           s.put({ ...item, error: e instanceof Error ? e.message : 'Transcription failed.' }),
@@ -227,12 +228,12 @@ export async function processAudio() {
     /* Keep the durable queue intact until the next explicit retry. */
   } finally {
     processing = false;
-    window.dispatchEvent(new Event('flow-queue-changed'));
+    window.dispatchEvent(new Event('aeka-scribe-queue-changed'));
   }
 }
 
 export async function cloudRuntime(action: string, payload: any = {}) {
-  if (isDesktop()) return window.flowDesktop!.invoke('cloud.request', { action, ...payload });
+  if (isDesktop()) return window.aekaScribe!.invoke('cloud.request', { action, ...payload });
   const r = await fetch('/api/cloud', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

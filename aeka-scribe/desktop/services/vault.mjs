@@ -32,6 +32,7 @@ export async function openVault(directory, safeStorage) {
   let queue = Promise.resolve();
   const filename = (id) => {
     if (!/^[a-zA-Z0-9_-]{1,150}$/.test(id)) throw Error('Invalid storage identifier.');
+    // File extension kept from 0.5: existing vault records must stay readable.
     return path.join(directory, id + '.flow');
   };
   const read = async (id, fallback = null) => {

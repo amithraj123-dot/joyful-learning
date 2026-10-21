@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type Settings, type Term } from '../lib/flow-core';
+import { type Settings, type Term } from '../lib/scribe-core';
 import {
   createBrowserDictation,
   type BrowserDictation,

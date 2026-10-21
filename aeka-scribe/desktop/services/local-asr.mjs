@@ -68,7 +68,7 @@ export function createLocalASR({ vault, tempDir, permitted = () => true, spawnPr
       if (!config.executable || !config.model)
         throw Error('Choose whisper-cli.exe and a Whisper model in Desktop settings.');
       const wave = mono16kWav(payload.audioBuffer);
-      const folder = await fs.mkdtemp(path.join(tempDir, 'flow-asr-'));
+      const folder = await fs.mkdtemp(path.join(tempDir, 'aeka-scribe-asr-'));
       try {
         const file = path.join(folder, 'audio.wav'),
           output = path.join(folder, 'result');

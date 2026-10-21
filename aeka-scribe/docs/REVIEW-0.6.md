@@ -69,57 +69,46 @@ was not launched and no Windows, microphone, calendar or paid AI path was exerci
 | Exports             | Bare carriage returns could inject iCalendar properties; long lines unfolded; non-ASCII email subjects garbled                                 | Escaping, RFC 5545 folding and RFC 2047 subjects                              |
 | Interface           | Unhandled rejection when the AI status check failed; style toggle state not announced; mobile header hid the logo                              | Fixed                                                                         |
 
+### Second round: recommendations implemented
+
+| Recommendation                 | Change                                                                                                                                                                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows verification           | GitHub Actions workflow: Linux checks, and on Windows the desktop tests (including the real PowerShell helper), a smoke launch with a throwaway profile and unsigned ZIP/ NSIS packaging uploaded as an artifact                                                    |
+| Identity headers outside Sites | `AEKA_SELF_HOSTED=true` makes the worker drop client-supplied `oai-authenticated-user-*` headers                                                                                                                                                                    |
+| Update trust anchors           | Feed, Ed25519 key and publisher thumbprint can be pinned in `policy.json`; unpinned changes and every installation need a native confirmation; a pending installer verified under different anchors is refused; a cached verified installer is not downloaded again |
+| Managed policy hardening       | Policy location read from `HKLM` through `reg.exe`, not the `%ProgramData%` variable; per-machine NSIS installer; Electron fuses (no run-as-node, no `NODE_OPTIONS` or inspector flags, ASAR integrity, load only from ASAR, cookie encryption)                     |
+| Performance                    | `notes.get` and `notes.index`; meeting audio, saves and the 15-second poll fetch only what changed; retention purge at most every five minutes per owner (migration 0003, `workspace_maintenance`), with expired notes hidden from every read in between            |
+| Interrupted recordings         | A recording not saved for six hours is served as interrupted, can be trashed and is subject to retention                                                                                                                                                            |
+| Smaller items                  | Team panel prompt only on real edits; cloud-AI switch governs transcription; hold-to-talk key selectable (F1 to F12); audit actor recorded as email                                                                                                                 |
+| Internal names                 | `window.aekaScribe`, IPC and DOM event names, `lib/scribe-core.ts`, native helper class names and the Zapier event (`aeka_scribe.note.reviewed`) renamed; browser settings migrate from the old keys                                                                |
+
 ### Verification
 
-120 automated tests pass (57 web and shared, 63 desktop; 8 new tests cover the clean-up, snippet,
-search, sharing, error, helper and migration fixes). TypeScript, Prettier and ESLint (0 errors)
+134 automated tests pass on Linux (63 web and shared, 71 desktop), with one further test that runs
+only on Windows against the real PowerShell helper. TypeScript, Prettier and ESLint (0 errors)
 pass, and the web and desktop interface builds succeed.
 
-## Open recommendations
+## Remaining items
 
-Each item lists options; the first is the recommended course.
-
-1. **Windows smoke test before distribution.** Nothing in the Windows path was run in this review.
-   - Run the checklist in the setup guide on a clean Windows 11 machine, including an upgrade over
-     Flow Desktop 0.5 with notes in the vault.
-   - Alternatively, add a Windows CI job (GitHub Actions `windows-latest`) that launches the app and
-     runs the helper and migration tests on Windows.
-2. **Identity headers in a self-hosted deployment.** The server trusts `oai-authenticated-user-*`
-   request headers, which the OpenAI Sites edge sets. Behind any other host, anyone could send them.
-   - Keep the Sites deployment; do not host elsewhere without the next step.
-   - Before moving hosts, strip those headers in `build/sites-worker.ts` and verify a signed
-     assertion instead (for example Cloudflare Access).
-3. **Update trust anchors.** The renderer can set the update feed, Ed25519 key and publisher
-   thumbprint; any renderer compromise would then become code execution.
-   - Pin the key and thumbprint in `policy.json` or at build time, and confirm configuration and
-     installation in a native dialog.
-   - Alternatively, keep the current behaviour and only confirm in a native dialog.
-4. **Managed policy hardening.** A standard user can redirect `%ProgramData%` through an environment
-   variable, and the per-user install allows editing the application archive.
-   - Read the policy location from `HKLM` (or `HKLM\SOFTWARE\Policies\Aeka Scribe`), ship a
-     per-machine installer and enable Electron fuses (ASAR integrity, only-load-from-ASAR).
-   - Alternatively, document that the policy is advisory for unmanaged machines.
-5. **Performance at scale.** Every poll, save and meeting chunk downloads all notes (up to 2,000 notes
-   or 16 MB), and every request rescans notes for retention.
-   - Add `notes.get` and `notes.index` actions and a stored `last_retention_at` per owner (one D1
-     migration).
-   - Alternatively, lower the poll frequency only, which reduces load without changing the API.
-6. **Notes left in "recording" after a browser crash.** Such notes cannot be trashed and are exempt
-   from retention.
-   - Mark a "recording" note older than six hours as interrupted, on the server.
-   - Alternatively, offer a "Mark as finished" button on the note.
-7. **Code structure.** `workspace-panel.tsx`, `page.tsx` and `meeting-studio.tsx` hold most of the
-   interface; 133 lint warnings (mostly `any` and effect patterns) remain.
-   - Split by page into smaller components and adopt a schema validator (zod is already a
-     dependency) for note, settings and request validation.
-   - Alternatively, tighten types file by file as features change.
-8. **Remaining "flow" names that users do not see.** Internal identifiers (`window.flowDesktop`,
-   `flow-core.ts`, IPC channel and storage keys) and the hosted address
-   `flow-voice-workspace.amithraj123.chatgpt.site` are unchanged, so existing installs and data keep
-   working.
-   - Redeploy the Site under an Aeka address, then update `cloudOrigin` in `desktop/main.cjs` and the
-     ChatGPT plugin registration.
-   - Rename internal identifiers in the same release, with a storage-key migration.
-9. **Smaller items.** The Team panel warns about unsaved edits when there are none; the workspace
-   cloud-AI switch does not govern `/api/transcribe`; hold-to-talk is fixed to F8; automatic updates
-   re-download an installer that is already verified; audit entries mix user IDs and emails.
+1. **Run the Windows workflow and a manual check before distribution.** The workflow runs on the
+   next push; its smoke launch, helper test and packaging have not yet run. A person should still
+   test on a clean Windows 11 machine: dictation insertion, meeting audio, calendar sign-in, the two
+   update confirmation dialogs, per-machine installation over an existing per-user Flow Desktop, and
+   start-up with the new Electron fuses.
+2. **Code signing.** Builds remain unsigned. Obtain the firm's Windows code-signing certificate and an
+   Ed25519 release key, then follow `desktop/admin/ADMIN-SETUP.txt`.
+3. **Hosted address.** `flow-voice-workspace.amithraj123.chatgpt.site` is unchanged. Redeploy the Site
+   under an Aeka address, then update `cloudOrigin` in `desktop/main.cjs` and the ChatGPT plugin.
+4. **Database migration.** Apply migration 0003 to the hosted D1 database before deploying this
+   release; every request reads the new table.
+5. **Known limits of the hardening.** The portable ZIP is user-writable, so policy and update pinning
+   are effective only with the per-machine installer. On a machine where Windows is not on `C:`, a
+   user could still redirect `%SystemRoot%`. Policy through `HKLM\SOFTWARE\Policies\Aeka Scribe`
+   registry values is not implemented. The `grantFileProtocolExtraPrivileges` fuse stays enabled
+   because the interface loads ES modules from `file://`; moving to a custom protocol would allow
+   disabling it.
+6. **Code structure.** `workspace-panel.tsx`, `page.tsx` and `meeting-studio.tsx` remain large and 132
+   lint warnings remain. Splitting them without interface tests risks regressions; add interface
+   tests first, then split by page and adopt zod for validation.
+7. **Storage names kept on purpose.** The vault file extension, the browser audio store and the web
+   sign-in partition keep their 0.5 names so existing data and sign-ins survive the upgrade.

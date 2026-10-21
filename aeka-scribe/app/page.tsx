@@ -45,12 +45,13 @@ import {
   type Snippet,
   type Entry,
   type Style,
-} from '../lib/flow-core';
+} from '../lib/scribe-core';
 import { useRecorder } from '../hooks/use-recorder';
 import { isDesktop, runtime } from '../lib/desktop-runtime';
 import { WorkspacePanel, type WorkspacePage } from '../components/workspace-panel';
 type Page = 'studio' | 'history' | 'vocabulary' | 'snippets' | 'models' | 'settings' | WorkspacePage;
-const STORAGE = 'flow-workspace-v2';
+const STORAGE = 'aeka-scribe-workspace-v2',
+  LEGACY_STORAGE = 'flow-workspace-v2'; // read once from releases before the rename
 const languages = [
   ['en-IN', 'English · India'],
   ['en-US', 'English · US'],
@@ -185,7 +186,7 @@ export default function AekaScribe() {
       try {
         const saved = isDesktop()
           ? await runtime('profile.get')
-          : JSON.parse(localStorage.getItem(STORAGE) || 'null');
+          : JSON.parse(localStorage.getItem(STORAGE) || localStorage.getItem(LEGACY_STORAGE) || 'null');
         if (!alive) return;
         if (saved) {
           const data = validateBackup(saved);
@@ -299,7 +300,7 @@ export default function AekaScribe() {
     return () => window.removeEventListener('keydown', keydown);
   }, []);
   useEffect(() => {
-    return window.flowDesktop?.on((e) => {
+    return window.aekaScribe?.on((e) => {
       if (e.type === 'dictation-start' && !actions.current.busy) {
         nativeInsert.current = true;
         actions.current.start(e.style as Style | undefined);

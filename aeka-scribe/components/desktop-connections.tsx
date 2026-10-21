@@ -44,7 +44,7 @@ export function DesktopConnections() {
   };
   useEffect(() => {
     void load().catch((e) => setError(e.message));
-    const off = window.flowDesktop?.on((e) => {
+    const off = window.aekaScribe?.on((e) => {
       if (e.type === 'briefs-changed' || e.type === 'brief-ready')
         void runtime('briefs.status')
           .then(setBrief)
@@ -353,7 +353,7 @@ export function SemanticSettings() {
   const load = () => runtime('semantic.status').then(setState);
   useEffect(() => {
     void load().catch((e) => setError(e.message));
-    const off = window.flowDesktop?.on((e) => {
+    const off = window.aekaScribe?.on((e) => {
       if (e.type === 'semantic-progress') void load().catch(() => {});
     });
     return () => off?.();

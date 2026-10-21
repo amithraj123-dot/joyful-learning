@@ -14,7 +14,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { runtime, isDesktop } from '../lib/desktop-runtime';
-import { newId } from '../lib/flow-core';
+import { newId } from '../lib/scribe-core';
 import { type Note, citationsFromAnswer } from '../lib/workspace-core';
 import { noteDetails, noteFolders, isTrashed, type NoteDetails } from '../lib/note-details';
 import {
@@ -1124,7 +1124,7 @@ export function MeetingChat({
           duration: 0,
         },
       });
-      window.dispatchEvent(new Event('flow-notes-changed'));
+      window.dispatchEvent(new Event('aeka-scribe-notes-changed'));
       notify('Conversation saved as a scratchpad');
     } catch (e) {
       setError(errorText(e));

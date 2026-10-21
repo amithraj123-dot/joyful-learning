@@ -4,7 +4,7 @@ import { Trash2 } from 'lucide-react';
 import { runtime } from '../lib/desktop-runtime';
 import { extractDocument, imageForExtraction } from '../lib/document-context';
 import type { NoteDetails } from '../lib/note-details';
-import { newId } from '../lib/flow-core';
+import { newId } from '../lib/scribe-core';
 export function ContextAttachments({
   noteId,
   context,

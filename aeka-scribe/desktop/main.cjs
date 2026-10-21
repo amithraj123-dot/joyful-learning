@@ -67,7 +67,7 @@ const emit = (type, payload = {}) => {
     window.showInactive();
     toast('Scheduled recording', 'Recording starts in 20 seconds. Open Aeka Scribe to cancel.');
   }
-  if (window && !window.isDestroyed()) window.webContents.send('flow-event', { type, ...payload });
+  if (window && !window.isDestroyed()) window.webContents.send('aeka-scribe-event', { type, ...payload });
 };
 const show = () => {
   window.show();
@@ -207,7 +207,7 @@ function overlayState(state) {
     overlay.hide();
     return;
   }
-  overlay.webContents.send('flow-event', { type: 'overlay-state', state });
+  overlay.webContents.send('aeka-scribe-event', { type: 'overlay-state', state });
   const bounds = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   overlay.setPosition(Math.round(bounds.x + bounds.width / 2 - 150), bounds.y + bounds.height - 100);
   overlay.showInactive();
@@ -266,6 +266,7 @@ function openCloudWindow() {
     height: 820,
     title: 'Connect Aeka Scribe web workspace',
     webPreferences: {
+      // Partition name kept from 0.5 so the web sign-in survives the upgrade.
       partition: 'persist:flow-web-account',
       contextIsolation: true,
       sandbox: true,
@@ -909,7 +910,7 @@ else {
           callback({});
         }
       });
-      ipcMain.handle('flow', async (event, action, payload) => {
+      ipcMain.handle('aeka-scribe', async (event, action, payload) => {
         if (
           event.sender !== window.webContents ||
           event.senderFrame !== window.webContents.mainFrame ||
