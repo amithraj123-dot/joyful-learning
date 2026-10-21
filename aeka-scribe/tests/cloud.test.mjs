@@ -181,3 +181,32 @@ test('team dictionaries use scoped access, strict validation and revision checks
   assert.ok(events.some((e) => e.action === 'dictionary.updated'));
   assert.ok(events.every((e) => !JSON.stringify(e).includes('replacement')));
 });
+test('editors cannot change a shared note’s status, kind or creation time', async () => {
+  const db = database(),
+    n = await value(await call(db, owner, 'sync.save', { note }));
+  await call(db, owner, 'shares.grant', { id: n.id, email: viewer.email, role: 'editor' });
+  const saved = await value(
+    await call(db, viewer, 'shared.save', {
+      owner: owner.userId,
+      note: { ...n, body: 'Edited', status: 'recording', kind: 'scratchpad', createdAt: 99 },
+      baseUpdatedAt: n.updatedAt,
+    }),
+  );
+  assert.equal(saved.body, 'Edited');
+  assert.equal(saved.status, 'complete');
+  assert.equal(saved.kind, 'meeting');
+  assert.equal(saved.createdAt, 1);
+});
+test('internal errors are not echoed to the client', async () => {
+  const r = await cloudRequest(
+    new Request('https://flow.example/api/cloud', {
+      method: 'POST',
+      headers: { Origin: 'https://flow.example' },
+      body: 'null',
+    }),
+    database(),
+    owner,
+  );
+  const body = await r.json();
+  assert.doesNotMatch(JSON.stringify(body), /Cannot read properties/);
+});

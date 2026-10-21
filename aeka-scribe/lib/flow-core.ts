@@ -45,8 +45,9 @@ export const seedSnippets: Snippet[] = [
   },
 ];
 const escapeRE = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const boundary = (s: string) =>
-  new RegExp(`(?<![\\p{L}\\p{M}\\p{N}_])${escapeRE(s)}(?![\\p{L}\\p{M}\\p{N}_])`, 'giu');
+const HESITATION = /(^|[\s,;])(?:[Uu]m+|[Uu]h+)(?![\p{L}\p{M}\p{N}_])[,.;]?(?=\s|$)/gu;
+const PLACEHOLDER_END = '\u0000';
+const placeholder = (i: number) => `\u0000S${i}\u0000`;
 
 // One pass over the original text: replacement text can never trigger another rule.
 export function replacePhrases(text: string, rules: { from: string; to: string }[]) {
@@ -76,6 +77,17 @@ export function formatText(
   if (settings.style === 'verbatim') return { text: raw, changes: [] as string[] };
   let text = raw.trim();
   const changes: string[] = [];
+  // Snippets expand first, into placeholders, so vocabulary rules cannot break a trigger and the
+  // cleanup/casing/bullet passes below never rewrite the user's stored snippet text.
+  const expansions: string[] = [];
+  if (settings.expandSnippets) {
+    const r = replacePhrases(
+      text,
+      snippets.map((t) => ({ from: t.trigger, to: placeholder(expansions.push(t.text) - 1) })),
+    );
+    text = r.text;
+    if (r.count) changes.push(`${r.count} snippet${r.count === 1 ? '' : 's'} expanded`);
+  }
   if (settings.useVocabulary) {
     const r = replacePhrases(
       text,
@@ -84,27 +96,20 @@ export function formatText(
     text = r.text;
     if (r.count) changes.push(`${r.count} vocabulary match${r.count === 1 ? '' : 'es'}`);
   }
-  if (settings.expandSnippets) {
-    const r = replacePhrases(
-      text,
-      snippets.map((t) => ({ from: t.trigger, to: t.text })),
-    );
-    text = r.text;
-    if (r.count) changes.push(`${r.count} snippet${r.count === 1 ? '' : 's'} expanded`);
-  }
-  // Only isolated hesitation sounds; never delete repeated words, negation, or numbers.
+  // Only isolated lowercase/sentence-case hesitation sounds (so the acronym "UM" survives), together
+  // with their own trailing comma or full stop; never repeated words, negation or numbers.
   const clean = text
-    .replace(boundary('um'), '')
-    .replace(boundary('uh'), '')
+    .replace(HESITATION, '$1')
+    .replace(/,\s*,/g, ',')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/ +([,.;!?])/g, '$1')
-    .replace(/(^|\n)[ \t]+/g, '$1')
+    .replace(/(^|\n)[ \t,;]+/g, '$1')
     .trim();
   if (clean !== text) changes.push('Hesitations and spacing cleaned');
   text = clean;
   if (settings.style === 'sentences' || settings.style === 'notes') {
     text = text.replace(/(^|[.!?]\s+)(\p{Ll})/gu, (_, a, b) => a + b.toLocaleUpperCase());
-    if (text && !/[.!?:;]$/.test(text)) text += '.';
+    if (text && !/[.!?:;]$/.test(text) && !text.endsWith(PLACEHOLDER_END)) text += '.';
     if (settings.style === 'notes')
       text = text
         .split(/\n+|(?<=[.!?])\s+(?=\p{Lu})/u)
@@ -113,6 +118,7 @@ export function formatText(
         .join('\n');
     changes.push(settings.style === 'notes' ? 'Bullet layout applied' : 'Sentence casing applied');
   }
+  text = text.replace(/\u0000S(\d+)\u0000/g, (_, i) => expansions[Number(i)] ?? '');
   return { text, changes };
 }
 

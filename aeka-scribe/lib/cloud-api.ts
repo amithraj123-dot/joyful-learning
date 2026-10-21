@@ -1,6 +1,8 @@
 import { isTrashed, inFolder } from './note-details.ts';
 import {
   CloudError,
+  clientError,
+  declaredTooLarge,
   policyDefaults,
   policyFor,
   audit,
@@ -36,6 +38,7 @@ export async function cloudRequest(request: Request, db: D1Database | undefined,
     return reply('Use your workspace to make this request.', 403);
   if (!db) return reply('Workspace storage is unavailable.', 503);
   try {
+    if (declaredTooLarge(request, 1800000)) throw new CloudError('Request is too large.', 413);
     const body = await request.text();
     if (body.length > 1800000) throw new CloudError('Request is too large.', 413);
     const p = JSON.parse(body),
@@ -243,7 +246,13 @@ export async function cloudRequest(request: Request, db: D1Database | undefined,
       )
         throw new CloudError('Only the owner can change folder membership.', 403);
       if (isTrashed(p.note)) throw new CloudError('Only the owner can move this note to trash.', 403);
-      return reply(await saveNote(db, owner, p.note, p.baseUpdatedAt, myEmail));
+      // Editors change content only. Status, kind and creation time stay the owner's, so an editor cannot
+      // mark a note as "recording" to exempt it from retention or block the owner from trashing it.
+      const note =
+        owner === me
+          ? p.note
+          : { ...p.note, status: original.status, kind: original.kind, createdAt: original.createdAt };
+      return reply(await saveNote(db, owner, note, p.baseUpdatedAt, myEmail));
     }
     if (p.action === 'comments.list' || p.action === 'comments.add' || p.action === 'comments.delete') {
       const owner = ownerId(p.owner || me),
@@ -320,9 +329,7 @@ export async function cloudRequest(request: Request, db: D1Database | undefined,
     }
     throw new CloudError('Unknown cloud action.');
   } catch (e) {
-    return reply(
-      e instanceof Error ? e.message : 'Workspace action failed.',
-      e instanceof CloudError ? e.status : 400,
-    );
+    const { message, status } = clientError(e, 'Workspace action failed.');
+    return reply(message, status);
   }
 }

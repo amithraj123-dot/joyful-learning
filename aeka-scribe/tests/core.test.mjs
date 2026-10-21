@@ -155,3 +155,23 @@ test('Unsupported upload format rejected before provider call', async () => {
   assert.equal(r.status, 400);
   assert.equal(called, false);
 });
+test('Hesitation cleanup leaves no stray punctuation and keeps acronyms', () => {
+  const clean = (raw, style = 'clean') => formatText(raw, { ...defaults, style }, [], []).text;
+  assert.equal(clean('So, um, we agreed'), 'So, we agreed');
+  assert.equal(clean("Um, let's start"), "let's start");
+  assert.equal(clean('Uh. Okay so'), 'Okay so');
+  assert.equal(clean('the UM team met'), 'the UM team met');
+  assert.equal(clean('umm the museum, uh, opens'), 'the museum, opens');
+  assert.equal(clean('Uh. Okay so', 'notes'), '• Okay so.');
+});
+test('Snippets expand before vocabulary and keep their exact text', () => {
+  const terms = [{ id: 't', phrase: 'sign off', replacement: 'sign-off' }];
+  const snippets = [{ id: 's', trigger: 'insert my sign off', text: 'Kind regards,\nAmith' }];
+  const opts = { ...defaults, useVocabulary: true, expandSnippets: true };
+  assert.equal(formatText('insert my sign off', opts, terms, snippets).text, 'Kind regards,\nAmith');
+  assert.equal(
+    formatText('thanks for the sign off insert my sign off', { ...opts, style: 'notes' }, terms, snippets)
+      .text,
+    '• Thanks for the sign-off Kind regards,\nAmith',
+  );
+});

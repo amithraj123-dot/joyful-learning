@@ -269,13 +269,23 @@ export default function AekaScribe() {
     }
     void recorder.start(settings, terms);
   };
-  const actions = useRef({ start, stop: recorder.stop, cancel: recorder.cancel, busy: recorder.busy });
-  actions.current = { start, stop: recorder.stop, cancel: recorder.cancel, busy: recorder.busy };
+  const capturing = ['requesting', 'recording'].includes(recorder.state);
+  const actions = useRef({
+    start,
+    stop: recorder.stop,
+    cancel: recorder.cancel,
+    busy: recorder.busy,
+    capturing,
+  });
+  actions.current = { start, stop: recorder.stop, cancel: recorder.cancel, busy: recorder.busy, capturing };
   useEffect(() => {
     if (isDesktop()) return;
     const keydown = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      if (e.key === 'Escape' && actions.current.busy) {
+      // Escape cancels capture only. Once audio is being transcribed it must not be discarded by an
+      // Escape meant for a menu, dialog or input method.
+      const inField = (e.target as HTMLElement | null)?.closest?.('input,textarea,select,[role=dialog]');
+      if (e.key === 'Escape' && actions.current.capturing && !inField) {
         e.preventDefault();
         actions.current.cancel();
       }
@@ -758,6 +768,7 @@ export default function AekaScribe() {
                       <button
                         disabled={recorder.busy}
                         className={settings.style === key ? 'selected' : ''}
+                        aria-pressed={settings.style === key}
                         key={key}
                         onClick={() => {
                           const next = { ...settings, style: key as Style };
@@ -1409,7 +1420,7 @@ export default function AekaScribe() {
                             ? 'Desktop settings determine whether speech uses local Whisper or OpenAI.'
                             : 'Your API key stays on the server. Audio is sent to OpenAI for requested transcription.'
                           : native
-                            ? 'Open Desktop & calendars to save your own API key.'
+                            ? 'Open Desktop setup to save your own API key.'
                             : 'Ask Codex to configure OpenAI through the OpenAI Developers connection. Browser dictation and text editing remain available.'}
                       </p>
                     </div>
@@ -1602,7 +1613,7 @@ export default function AekaScribe() {
                   <p className="small-print">
                     The Windows package adds system-wide shortcuts, guarded text insertion, optional
                     selected-text context, system audio capture, calendar reminders and a tray overlay. Open
-                    Desktop & calendars for setup and feature status.
+                    Desktop setup for setup and feature status.
                   </p>
                   <button className="text-link" onClick={() => choosePage('desktop')}>
                     Desktop setup & feature status <ArrowUpRight size={15} />

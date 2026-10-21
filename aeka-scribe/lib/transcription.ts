@@ -30,7 +30,9 @@ export async function transcribe(
   const now = Date.now();
   for (const [id, l] of limits) if (now - l.start > 60000) limits.delete(id);
   const limit = limits.get(userId) ?? { start: now, count: 0 };
-  if (limit.count >= 6) return json({ error: 'Too many requests. Wait a minute and try again.' }, 429);
+  // Meeting capture uploads a chunk every 8 to 20 seconds (up to about 8 a minute) on top of dictation, so
+  // 6 a minute stalled the meeting queue. This per-isolate counter is a courtesy brake, not abuse control.
+  if (limit.count >= 20) return json({ error: 'Too many requests. Wait a minute and try again.' }, 429);
   limit.count++;
   limits.set(userId, limit);
   let data: FormData;

@@ -82,10 +82,10 @@ export function useMeetingRecorder(onEnd: (noteId: string, duration: number) => 
         await runtime('queue.add', item);
       })
       .catch((e) => {
-        setRecovery((old) => [
-          ...old,
-          { buffer: item.audioBuffer, name: 'Aeka-Scribe-unsaved-' + item.id + '.wav' },
-        ]);
+        // Keep at most the latest 20 unsaved chunks (about 20 MB) in memory.
+        setRecovery((old) =>
+          [...old, { buffer: item.audioBuffer, name: 'Aeka-Scribe-unsaved-' + item.id + '.wav' }].slice(-20),
+        );
         failRef.current(e instanceof Error ? e.message : 'Audio could not be saved.');
         throw e;
       });

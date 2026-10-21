@@ -1,5 +1,5 @@
 import { isTrashed } from './note-details.ts';
-import { enforceRetention, getNote, policyFor } from './cloud-store.ts';
+import { declaredTooLarge, enforceRetention, getNote, policyFor } from './cloud-store.ts';
 import { exportNote, type Note } from './workspace-core.ts';
 const tools = [
   {
@@ -36,6 +36,7 @@ export async function notesMCP(request: Request, db: D1Database | undefined, use
   const result = (value: unknown) =>
     Response.json({ jsonrpc: '2.0', id: rpc?.id ?? null, result: value }, { headers });
   try {
+    if (declaredTooLarge(request, 10000)) throw Error('Request too large.');
     const text = await request.text();
     if (text.length > 10000) throw Error('Request too large.');
     rpc = JSON.parse(text);
@@ -70,7 +71,13 @@ export async function notesMCP(request: Request, db: D1Database | undefined, use
       const q = '%' + args.query.toLowerCase().replace(/[\\%_]/g, '\\$&') + '%',
         rows = await db
           .prepare(
-            "SELECT value FROM workspace_notes WHERE owner = ? AND coalesce(json_extract(value,'$.details.trashedAt'),0) = 0 AND lower(value) LIKE ? ESCAPE '\\' ORDER BY updated_at DESC LIMIT ?",
+            // Match note content only: the raw JSON also holds keys and fixed values ("kind":"meeting",
+            // "status":"complete") that would make common words match every note.
+            `SELECT value FROM workspace_notes WHERE owner = ? AND coalesce(json_extract(value,'$.details.trashedAt'),0) = 0
+             AND lower(coalesce(json_extract(value,'$.title'),'') || ' ' || coalesce(json_extract(value,'$.body'),'') || ' ' ||
+               coalesce(json_extract(value,'$.summary'),'') || ' ' ||
+               coalesce((SELECT group_concat(json_extract(s.value,'$.text'),' ') FROM json_each(value,'$.segments') s),''))
+             LIKE ? ESCAPE '\\' ORDER BY updated_at DESC LIMIT ?`,
           )
           .bind(userId, q, args.limit || 10)
           .all<{ value: string }>();

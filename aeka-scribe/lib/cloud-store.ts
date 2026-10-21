@@ -7,6 +7,26 @@ export class CloudError extends Error {
     this.status = status;
   }
 }
+// Messages from CloudError and from the note validators are written for users. Built-in runtime errors
+// and database errors can carry SQL fragments or internals, so those are logged and replaced.
+export function clientError(e: unknown, fallback: string) {
+  if (e instanceof CloudError) return { message: e.message, status: e.status };
+  const internal =
+    !(e instanceof Error) ||
+    e instanceof TypeError ||
+    e instanceof SyntaxError ||
+    e instanceof RangeError ||
+    e instanceof ReferenceError ||
+    /D1_|SQLITE|no such (table|column)|constraint failed/i.test(e.message);
+  if (internal) {
+    console.error(fallback, e);
+    return { message: fallback, status: e instanceof SyntaxError ? 400 : 500 };
+  }
+  return { message: e.message, status: 400 };
+}
+// Reject an oversized body from its declared length before buffering it.
+export const declaredTooLarge = (request: Request, max: number) =>
+  Number(request.headers.get('content-length') || 0) > max;
 export const policyDefaults = { sharing: true, cloudAI: true, retentionDays: 0 };
 export async function policyFor(db: D1Database, owner: string) {
   const r = await db

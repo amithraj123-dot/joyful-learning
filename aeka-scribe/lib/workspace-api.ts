@@ -1,4 +1,12 @@
-import { saveNote, deleteNote, CloudError, enforceRetention, policyFor } from './cloud-store.ts';
+import {
+  saveNote,
+  deleteNote,
+  CloudError,
+  clientError,
+  declaredTooLarge,
+  enforceRetention,
+  policyFor,
+} from './cloud-store.ts';
 import { validNote, type Note } from './workspace-core.ts';
 import { extractImageText } from './image-context.ts';
 import { generateText } from './ai-workspace.ts';
@@ -20,6 +28,7 @@ export async function workspaceRequest(
   if (request.headers.get('Origin') !== new URL(request.url).origin)
     return response('This request must come from your workspace.', 403);
   if (!db) return response('Note storage is not available yet. Try again after deployment.', 503);
+  if (declaredTooLarge(request, 1800000)) return response('This note exceeds the storage limit.', 413);
   const text = await request.text();
   if (text.length > 1800000) return response('This note exceeds the storage limit.', 413);
   try {
@@ -90,9 +99,7 @@ export async function workspaceRequest(
     }
     return response('Unknown workspace action.', 400);
   } catch (e) {
-    return response(
-      e instanceof Error ? e.message : 'Workspace request failed.',
-      e instanceof CloudError ? e.status : 400,
-    );
+    const { message, status } = clientError(e, 'Workspace request failed.');
+    return response(message, status);
   }
 }

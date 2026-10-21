@@ -44,6 +44,13 @@ test('MCP search and retrieval enforce ownership, literal queries and the cloud-
   const search = await call('owner', 'search_notes', { query: 'GST' });
   assert.equal(JSON.parse(search.content[0].text)[0].id, note.id);
   assert.deepEqual(JSON.parse((await call('owner', 'search_notes', { query: '%' })).content[0].text), []);
+  // Only note content matches, not JSON keys or fixed values such as "kind" or "scratchpad".
+  for (const query of ['scratchpad', 'segments', 'draft'])
+    assert.deepEqual(JSON.parse((await call('owner', 'search_notes', { query })).content[0].text), []);
+  assert.equal(
+    JSON.parse((await call('owner', 'search_notes', { query: 'owner-only' })).content[0].text).length,
+    1,
+  );
   assert.deepEqual(JSON.parse((await call('other', 'search_notes', { query: '' })).content[0].text), []);
   assert.equal((await call('other', 'get_note', { id: note.id })).isError, true);
   assert.match((await call('owner', 'get_note', { id: note.id })).content[0].text, /Owner-only details/);
