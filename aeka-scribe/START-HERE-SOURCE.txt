@@ -1,0 +1,65 @@
+FLOW 0.5.0 — COMPLETE SOURCE EXPORT
+Export date: 21 October 2026
+Source commit: 5a506abb9dce7bae557e878216bf1568e5041cdf
+
+This archive contains every tracked source file at the saved Flow 0.5.0 commit,
+including the Windows Electron application, web workspace, server API routes,
+database schema/migrations, tests, interface components, assets, dependency
+lockfiles, configuration and build/package scripts.
+
+START HERE
+The current setup and feature-status guide is public/desktop-guide.html.
+Desktop administrator and signing instructions are in desktop/admin/.
+SETUP.txt and the administrator document retain historical version headings;
+use public/desktop-guide.html for the current 0.5.0 feature status.
+
+WINDOWS DESKTOP DEVELOPMENT
+The release was built with Node.js 24. The root project pins pnpm 11.25.0.
+Install that pnpm version and run these commands from this extracted folder:
+
+  pnpm install --frozen-lockfile
+  npm --prefix desktop ci
+  npm --prefix desktop run build:ui
+  npm --prefix desktop start
+
+Tests and checks, after dependency installation:
+
+  npm test
+  npm --prefix desktop test
+  node node_modules/typescript/bin/tsc --noEmit
+
+To package the Windows x64 ZIP and NSIS installer:
+
+  npm --prefix desktop run build:ui
+  npm --prefix desktop run package:win
+
+Build output is written to desktop/release. Internet access is required to
+install dependencies and obtain Electron/packaging dependencies. Local Whisper
+executables and models are separate optional downloads and are not bundled.
+
+WEB WORKSPACE
+The web app uses the Sites/Vinext/Cloudflare Workers stack. Its normal entry
+commands are pnpm dev and pnpm build. Hosted operation also requires database
+bindings/migrations, runtime configuration and the platform sign-in context.
+A source download alone does not provision those hosted services. Existing Site
+identity is retained in .openai/hosting.json. Deployment should use the supported
+Sites workflow. Review the configuration before deploying to another account.
+
+CREDENTIALS AND DATA
+No API credentials, OAuth tokens, signing private keys, user notes, recordings,
+installed node_modules, compiled installers, local runtime state or .git history
+are included. Dependency manifests/lockfiles are included so dependencies can
+be installed. Configure your own OpenAI key and required service connections.
+This is the independently developed Flow codebase; it is not vendor source.
+
+VERIFICATION SCOPE
+All 112 automated tests, TypeScript checks, web build and desktop UI build passed
+in the last audit on 20 October 2026. This export does not claim a new test run.
+Real Windows installation/audio/insertion, live-account integrations and code
+signing still require verification/setup. Current unfinished features and limits
+are documented in public/desktop-guide.html.
+
+ARCHIVE INTEGRITY
+SOURCE-MANIFEST.json identifies the source commit and includes a SHA-256 digest
+for every original source file. The original source files are unmodified.
+START-HERE-SOURCE.txt and SOURCE-MANIFEST.json are added export documentation.

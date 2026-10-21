@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1792377204568,
+      "tag": "0000_brown_tomorrow_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792388288075,
+      "tag": "0001_damp_yellow_claw",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792454058427,
+      "tag": "0002_lying_sauron",
+      "breakpoints": true
+    }
+  ]
+}

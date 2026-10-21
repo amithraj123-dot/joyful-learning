@@ -1,0 +1,11 @@
+{
+  "allowRecording": true,
+  "allowCloudAI": true,
+  "allowSync": true,
+  "allowExports": true,
+  "allowCalendar": true,
+  "allowLocalASR": true,
+  "allowAudioRetention": true,
+  "retentionDays": 0,
+  "allowIntegrations": true
+}
