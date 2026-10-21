@@ -9,7 +9,7 @@
         background: #fff;
       }
       body {
-        font-family: "Mulish", "Muli", "Segoe UI", sans-serif;
+        font-family: 'Mulish', 'Muli', 'Segoe UI', sans-serif;
         font-size: 15px;
         line-height: 1.7;
         color: #000;
@@ -20,7 +20,7 @@
         text-align: left;
       }
       body::before {
-        content: "";
+        content: '';
         position: fixed;
         top: 0;
         bottom: 0;
@@ -31,7 +31,7 @@
       h1,
       h2,
       h3 {
-        font-family: "Mulish", "Muli", "Segoe UI", sans-serif;
+        font-family: 'Mulish', 'Muli', 'Segoe UI', sans-serif;
         font-weight: 700;
         color: #991b1e;
         line-height: 1.3;
@@ -104,7 +104,7 @@
         font-weight: 700;
       }
       code {
-        font-family: Consolas, "Courier New", monospace;
+        font-family: Consolas, 'Courier New', monospace;
         font-size: 13px;
         background: #f2f2f2;
         padding: 1px 4px;
@@ -202,7 +202,7 @@
         <strong>Aeka Scribe.exe</strong>. Keep its resource files beside it. Windows 10/ 11 x64 is required.
       </li>
       <li>
-        Open <strong>Desktop &amp; calendars</strong> and add your OpenAI API key. The key is encrypted for
+        Open <strong>Desktop setup</strong> and add your OpenAI API key. The key is encrypted for
         your Windows account; do not paste it into a chat or note. API usage is billed to your own provider
         account.
       </li>
@@ -224,16 +224,16 @@
       <li>
         Completed audio chunks are saved before transcription. Keep Aeka Scribe open to process pending audio.
         If the device is offline or no API key is configured, the queue remains on this device. For offline
-        transcription, configure a trusted whisper.cpp executable and ggml model, select Local Whisper and save
-        preferences. Models and binaries are not bundled.
+        transcription, configure a trusted whisper.cpp executable and ggml model, select Local Whisper and
+        save preferences. Models and binaries are not bundled.
       </li>
     </ol>
     <div class="callout">
       <p>
         <strong>Upgrading from an earlier release:</strong> On first launch, Aeka Scribe automatically copies
-        app data from an earlier Flow Desktop installation. New backups use the <code>.aekabackup</code>
-        extension; <code>.flowbackup</code> files from earlier releases can still be imported. The policy file
-        location is set out under Administration and updates.
+        app data from an earlier Flow Desktop installation. New backups use the
+        <code>.aekabackup</code> extension; <code>.flowbackup</code> files from earlier releases can still be
+        imported. The policy file location is set out under Administration and updates.
       </p>
     </div>
     <p class="caption">
@@ -367,8 +367,8 @@
               selected text, per-process cleanup style
             </td>
             <td>
-              Some applications, elevated windows or inaccessible fields require manual copy. No screen-reading
-              context or browser-domain style rules
+              Some applications, elevated windows or inaccessible fields require manual copy. No
+              screen-reading context or browser-domain style rules
             </td>
           </tr>
           <tr>
@@ -382,16 +382,16 @@
           <tr>
             <td>Dictionary and snippets</td>
             <td>
-              Personal vocabulary/ snippets, exact expansion, profile backup, shared versioned team dictionaries
-              and explicit imports
+              Personal vocabulary/ snippets, exact expansion, profile backup, shared versioned team
+              dictionaries and explicit imports
             </td>
             <td>No automatic learning of corrections or organisation-wide identity management</td>
           </tr>
           <tr>
             <td>Transforms and commands</td>
             <td>
-              Polish, concise, email, bullets, prompt editing, self-correction, translation, eight saved custom
-              instructions, before/ after review, undo, number/ negation warnings
+              Polish, concise, email, bullets, prompt editing, self-correction, translation, eight saved
+              custom instructions, before/ after review, undo, number/ negation warnings
             </td>
             <td>
               Your own AI key; no web-search assistant or automatic replacement of another application's
@@ -412,8 +412,8 @@
           <tr>
             <td>Meeting capture</td>
             <td>
-              Microphone plus Windows loopback, visible recording, pause/ resume, four-hour limit, durable chunk
-              queue, device interruption recovery
+              Microphone plus Windows loopback, visible recording, pause/ resume, four-hour limit, durable
+              chunk queue, device interruption recovery
             </td>
             <td>Real audio-path verification; the current unfinished chunk is not crash-proof</td>
           </tr>
@@ -424,8 +424,8 @@
               controls
             </td>
             <td>
-              Selected calendar meetings can record automatically, open their call link and stop at the end plus
-              a grace period. No authoritative call-state integration or meeting bot
+              Selected calendar meetings can record automatically, open their call link and stop at the end
+              plus a grace period. No authoritative call-state integration or meeting bot
             </td>
           </tr>
           <tr>
@@ -442,8 +442,8 @@
           <tr>
             <td>Meeting intelligence</td>
             <td>
-              Editable summaries, optional automatic drafts after transcription, decisions/ actions, scoped chat
-              over up to 2,000 notes, with up to 24 selected source notes and citations
+              Editable summaries, optional automatic drafts after transcription, decisions/ actions, scoped
+              chat over up to 2,000 notes, with up to 24 selected source notes and citations
             </td>
             <td>Your own AI key; review inferred summaries. No independent task completion tracking</td>
           </tr>
@@ -483,13 +483,13 @@
           <tr>
             <td>Sharing, teams and integrations</td>
             <td>
-              Viewer/ editor grants, expiring/ revocable access, comments, shared dictionaries, optimistic edits
-              and a bounded metadata audit trail
+              Viewer/ editor grants, expiring/ revocable access, comments, shared dictionaries, optimistic
+              edits and a bounded metadata audit trail
             </td>
             <td>
-              Site audience still controls access; no invitations or public links. Read-only account-scoped MCP
-              search/ retrieval is available through the private Aeka Scribe plugin. No Slack connector, SSO,
-              SCIM or MDM enrolment. The audit trail is not a tamper-proof compliance archive
+              Site audience still controls access; no invitations or public links. Read-only account-scoped
+              MCP search/ retrieval is available through the private Aeka Scribe plugin. No Slack connector,
+              SSO, SCIM or MDM enrolment. The audit trail is not a tamper-proof compliance archive
             </td>
           </tr>
           <tr>
@@ -555,8 +555,8 @@
             <td>
               Keyword ranking and recency select up to 24 meetings from up to 2,000 saved notes. Long evidence
               is excerpted and coverage disclosed. Desktop also supports an opt-in semantic index using OpenAI
-              embeddings. It indexes the first 6,000 characters per note, requires explicit refresh, and is not
-              an exhaustive search.
+              embeddings. It indexes the first 6,000 characters per note, requires explicit refresh, and is
+              not an exhaustive search.
             </td>
           </tr>
           <tr>
@@ -573,13 +573,13 @@
           <tr>
             <td>Pre-meeting briefs</td>
             <td>
-              Prepare a note from a calendar event; generate a brief using prior notes matching people, company
-              domain or title.
+              Prepare a note from a calendar event; generate a brief using prior notes matching people,
+              company domain or title.
             </td>
             <td>
               On demand, or on a local daily schedule while Aeka Scribe is open and Windows is awake. No
-              always-on cloud service or automatic inbox/ web research. Existing briefs and concurrent edits are
-              preserved.
+              always-on cloud service or automatic inbox/ web research. Existing briefs and concurrent edits
+              are preserved.
             </td>
           </tr>
           <tr>
@@ -601,9 +601,9 @@
               explicit OpenAI request. Preview and edit before attaching.
             </td>
             <td>
-              10 files per note; 30,000 characters each, 100,000 in total. Only extracted text is saved. Maximum
-              input 10 MB; PDF extraction is capped at 100 pages. Password-protected PDFs are unsupported;
-              attach page images for scanned PDFs.
+              10 files per note; 30,000 characters each, 100,000 in total. Only extracted text is saved.
+              Maximum input 10 MB; PDF extraction is capped at 100 pages. Password-protected PDFs are
+              unsupported; attach page images for scanned PDFs.
             </td>
           </tr>
           <tr>
@@ -622,8 +622,8 @@
           <tr>
             <td>Transcript corrections and deletion</td>
             <td>
-              Search, correct or remove transcript segments; highlight evidence; rename speakers. Editing waits
-              for pending transcription.
+              Search, correct or remove transcript segments; highlight evidence; rename speakers. Editing
+              waits for pending transcription.
             </td>
             <td>
               Removing text does not erase retained audio, previously generated summaries or independent
@@ -633,8 +633,8 @@
           <tr>
             <td>Trash and restoration</td>
             <td>
-              Restore for 30 days; permanent deletion; expiry cleanup on access/ maintenance. Trashed notes are
-              excluded from sharing, chat and MCP.
+              Restore for 30 days; permanent deletion; expiry cleanup on access/ maintenance. Trashed notes
+              are excluded from sharing, chat and MCP.
             </td>
             <td>
               Shorter retention policies take precedence. Independent backups remain separate. Existing grants
@@ -657,7 +657,8 @@
             <td>Integrations and enterprise services</td>
             <td>
               Read-only MCP, Google/ Microsoft OAuth with optional email/ calendar actions, Slack, Notion,
-              Zapier, HubSpot, Attio and Affinity reviewed exports; encrypted credentials and delivery history.
+              Zapier, HubSpot, Attio and Affinity reviewed exports; encrypted credentials and delivery
+              history.
             </td>
             <td>
               Native adapters require your provider registrations/ tokens and live verification. Hosted
@@ -676,27 +677,27 @@
       when needed. A cancelled or interrupted start is never silently retried.
     </p>
     <p>
-      <strong>Document context:</strong> Open a saved note, then Meeting toolkit, then Attached context. PDF and
-      Word text is parsed locally. Images are resized locally; choosing Extract text with OpenAI sends that
-      image to your configured API account. Inspect names, amounts and unclear passages before adding the text.
-      Original files/ images are not stored. The attached text follows note sync, sharing and retention.
+      <strong>Document context:</strong> Open a saved note, then Meeting toolkit, then Attached context. PDF
+      and Word text is parsed locally. Images are resized locally; choosing Extract text with OpenAI sends
+      that image to your configured API account. Inspect names, amounts and unclear passages before adding the
+      text. Original files/ images are not stored. The attached text follows note sync, sharing and retention.
     </p>
     <p>
-      <strong>Automatic briefs:</strong> In Desktop settings, enable the schedule and choose a local hour, a 12/
-      24/ 48-hour lookahead and a daily limit of 5/ 10/ 20. One eligible meeting with invitees or a call link is
-      prepared per minute after that hour, using prior related saved notes. New notes go into your chosen
-      folder. Keep Aeka Scribe running, Windows awake, calendar access fresh and OpenAI configured. After sleep
-      or shutdown, only future meetings are considered. The schedule does not automatically join calls, read
-      email, send messages or run while the machine is off. Failed/ interrupted generations require an
-      explicit retry.
+      <strong>Automatic briefs:</strong> In Desktop settings, enable the schedule and choose a local hour, a
+      12/ 24/ 48-hour lookahead and a daily limit of 5/ 10/ 20. One eligible meeting with invitees or a call
+      link is prepared per minute after that hour, using prior related saved notes. New notes go into your
+      chosen folder. Keep Aeka Scribe running, Windows awake, calendar access fresh and OpenAI configured.
+      After sleep or shutdown, only future meetings are considered. The schedule does not automatically join
+      calls, read email, send messages or run while the machine is off. Failed/ interrupted generations
+      require an explicit retry.
     </p>
     <p>
       <strong>Semantic search:</strong> Explicitly build/ refresh the local index, then enable it. OpenAI
       text-embedding-3-small produces encrypted local vectors; each question is embedded and semantic matches
       are combined with keywords inside your chosen scope. New/ edited notes require a refresh. Trash, deleted
-      notes and active recordings are excluded; changed/ deleted notes lose their old vectors. Index content is
-      limited to the first 6,000 characters per note. Indexing and questions incur API usage; the index is not
-      backed up or synced.
+      notes and active recordings are excluded; changed/ deleted notes lose their old vectors. Index content
+      is limited to the first 6,000 characters per note. Indexing and questions incur API usage; the index is
+      not backed up or synced.
     </p>
 
     <h2 id="workflows">6. Connected workflows</h2>
@@ -706,8 +707,8 @@
       destination, edit the title/ text, and choose Verify destination &amp; preview. Aeka Scribe reads the
       destination record before showing the final review. For token connections, the account label is supplied
       by you; check the returned destination carefully. Google/ Microsoft email accounts are verified during
-      OAuth sign-in. Calendar previews check for overlapping events. The final checkbox and send/ create button
-      are required. No service is called to send during setup.
+      OAuth sign-in. Calendar previews check for overlapping events. The final checkbox and send/ create
+      button are required. No service is called to send during setup.
     </p>
     <div class="table-wrap">
       <table>
@@ -722,32 +723,32 @@
           <tr>
             <td>Gmail</td>
             <td>
-              Enable the Gmail API in your Google project. Save the desktop OAuth registration; choose mailSend
-              and optionally mailRead, then reconnect. Google consent/ verification and test-user restrictions
-              may apply.
+              Enable the Gmail API in your Google project. Save the desktop OAuth registration; choose
+              mailSend and optionally mailRead, then reconnect. Google consent/ verification and test-user
+              restrictions may apply.
             </td>
             <td>
-              Send reviewed plain-text email; optionally import selected snippets from up to 10 recent messages
-              involving up to five addresses.
+              Send reviewed plain-text email; optionally import selected snippets from up to 10 recent
+              messages involving up to five addresses.
             </td>
           </tr>
           <tr>
             <td>Outlook</td>
             <td>
-              Microsoft delegated Mail.Send, optional Mail.Read; reconnect. Tenant administrator consent may be
-              required.
+              Microsoft delegated Mail.Send, optional Mail.Read; reconnect. Tenant administrator consent may
+              be required.
             </td>
             <td>
-              Send reviewed email and retain it in Sent Items. Optional context reads received message previews
-              from selected senders.
+              Send reviewed email and retain it in Sent Items. Optional context reads received message
+              previews from selected senders.
             </td>
           </tr>
           <tr>
             <td>Google/ Outlook Calendar</td>
             <td>Choose calendarWrite and reconnect; the provider consent screen must grant it.</td>
             <td>
-              Create a reviewed event, with attendee invitations when addresses are entered. The conflict check
-              covers the connected primary/ default calendar only.
+              Create a reviewed event, with attendee invitations when addresses are entered. The conflict
+              check covers the connected primary/ default calendar only.
             </td>
           </tr>
           <tr>
@@ -757,7 +758,8 @@
               the channel.
             </td>
             <td>
-              Post plain text to an exact channel ID. No broadcast mentions, link unfurls or automatic posting.
+              Post plain text to an exact channel ID. No broadcast mentions, link unfurls or automatic
+              posting.
             </td>
           </tr>
           <tr>
@@ -810,9 +812,9 @@
     </p>
     <p>
       <strong>Sharing and controls:</strong> Choose a synced note or published team dictionary and grant
-      viewer/ editor access to an exact sign-in email, with optional expiry. Viewers can read/ comment; editors
-      can also revise. Grants do not invite people or change the owner's private site audience. The owner must
-      separately enable appropriate site access before another account can participate. Unsaved or
+      viewer/ editor access to an exact sign-in email, with optional expiry. Viewers can read/ comment;
+      editors can also revise. Grants do not invite people or change the owner's private site audience. The
+      owner must separately enable appropriate site access before another account can participate. Unsaved or
       simultaneous edits use revision checks. Comments and transcript text render as text. Dictionary imports
       preserve existing local phrases/ triggers; items beyond 500 terms/ 200 snippets are not imported.
     </p>
@@ -827,8 +829,8 @@
     <h2 id="storage">7. Storage and recovery</h2>
     <p>
       Native notes, profile, tokens and saved meeting audio are encrypted in the local Windows user-data
-      directory of Aeka Scribe. A random vault key is wrapped by Windows DPAPI through Electron safeStorage. If
-      another Windows account cannot unlock the key, the app does not silently replace it.
+      directory of Aeka Scribe. A random vault key is wrapped by Windows DPAPI through Electron safeStorage.
+      If another Windows account cannot unlock the key, the app does not silently replace it.
     </p>
     <p>
       Portable snapshots use a separate password and authenticated encryption, and are saved with the
@@ -840,20 +842,20 @@
     </p>
     <p>
       <strong>Continuous sync:</strong> Open Desktop settings, opt in to copying notes to your web account,
-      then choose Connect account &amp; enable sync. Sign in through the separate sandboxed web window and close
-      it. Aeka Scribe uses the existing sign-in of the hosted site, not an embedded service token. It pins the
-      first account to this vault and refuses a different account. Notes, folders, summaries and transcripts
-      sync; raw audio, history, API keys and calendar tokens do not. Conflicts are retained as separate notes.
-      Recording/ pending-audio notes wait. Web note pages refresh every 15 seconds while visible. Continuous
-      sync propagates deletions; a local edit to a deleted note becomes a separate conflict copy. Independent
-      backups are unaffected. If embedded sign-in is rejected, sync remains disconnected and local capture
-      still works; there is no authentication bypass.
+      then choose Connect account &amp; enable sync. Sign in through the separate sandboxed web window and
+      close it. Aeka Scribe uses the existing sign-in of the hosted site, not an embedded service token. It
+      pins the first account to this vault and refuses a different account. Notes, folders, summaries and
+      transcripts sync; raw audio, history, API keys and calendar tokens do not. Conflicts are retained as
+      separate notes. Recording/ pending-audio notes wait. Web note pages refresh every 15 seconds while
+      visible. Continuous sync propagates deletions; a local edit to a deleted note becomes a separate
+      conflict copy. Independent backups are unaffected. If embedded sign-in is rejected, sync remains
+      disconnected and local capture still works; there is no authentication bypass.
     </p>
     <p>
-      Browser dictation profile/ history remains in browser storage. Hosted scratchpads/ meeting text are saved
-      under your authenticated site identity. Browser meeting audio waits locally in IndexedDB and is removed
-      after successful transcription. Clearing browser data can erase pending audio. Raw audio is not stored in
-      the hosted database.
+      Browser dictation profile/ history remains in browser storage. Hosted scratchpads/ meeting text are
+      saved under your authenticated site identity. Browser meeting audio waits locally in IndexedDB and is
+      removed after successful transcription. Clearing browser data can erase pending audio. Raw audio is not
+      stored in the hosted database.
     </p>
 
     <h2 id="models">8. Models</h2>
@@ -861,8 +863,8 @@
       The default speech model is <code>gpt-transcribe</code>. Speaker-separated audio import uses
       <code>gpt-4o-transcribe-diarize</code>. Summaries, Ask and text transformations default to
       <code>gpt-4.1-mini</code>, configurable in the native app. Speech recognition and text rewriting are
-      distinct steps. Compare representative Indian English, Hindi/ code-switching, names, amounts and negation
-      before choosing a model for production use.
+      distinct steps. Compare representative Indian English, Hindi/ code-switching, names, amounts and
+      negation before choosing a model for production use.
     </p>
     <p>
       <a href="https://developers.openai.com/api/docs/guides/speech-to-text">OpenAI speech documentation</a> ·
@@ -873,27 +875,30 @@
     <p>
       <strong>Policies:</strong> Hosted sharing and cloud-AI controls are enforced on server requests. Hosted
       note retention runs on access, up to 100 expired notes per request; local note retention runs while Aeka
-      Scribe is open. Active recordings and pending native audio are protected. The audit stores event metadata
-      only, up to 1,000 events per owner (the latest 200 are shown). It is not an immutable compliance archive.
+      Scribe is open. Active recordings and pending native audio are protected. The audit stores event
+      metadata only, up to 1,000 events per owner (the latest 200 are shown). It is not an immutable
+      compliance archive.
     </p>
     <p>
       Administrators can install the supplied <code>Admin/policy.example.json</code> at
       <code>%ProgramData%\Aeka Scribe\policy.json</code> with administrator-only write permissions. A policy
-      file at the earlier location, <code>%ProgramData%\Flow Desktop\policy.json</code>, is still honoured as a
-      fallback.
+      file at the earlier location, <code>%ProgramData%\Flow Desktop\policy.json</code>, is still honoured as
+      a fallback.
     </p>
     <p>
       <strong>Updates:</strong> Publisher setup accepts only a public release-signing key, HTTPS feed and
       Windows publisher certificate thumbprint. A compatible, unexpired signed manifest, an exact byte count/
       hash and a valid Windows publisher signature are all required. Optional automatic downloads check every
-      six hours. Installation requires a click and waits for recordings/ transcription to finish. No production
-      signing certificate or feed is included, and the delivered unsigned build cannot pass this production
-      update check. See <code>Admin/ADMIN-SETUP.txt</code>.
+      six hours. Installation requires a click and waits for recordings/ transcription to finish. No
+      production signing certificate or feed is included, and the delivered unsigned build cannot pass this
+      production update check. See <code>Admin/ADMIN-SETUP.txt</code>.
     </p>
 
     <h2 id="verification">10. Windows verification checklist</h2>
     <ol>
-      <li>Confirm launch, tray reopen and quit. Confirm shortcuts register and F8 release stops recording.</li>
+      <li>
+        Confirm launch, tray reopen and quit. Confirm shortcuts register and F8 release stops recording.
+      </li>
       <li>
         Dictate the reported test phrase "hello, how is the weather today?" once and confirm that a single
         final sentence results. Repeat a word deliberately and confirm it remains.
@@ -907,8 +912,8 @@
         microphone, and reconnect.
       </li>
       <li>
-        Disconnect the network, record two chunks, restart Aeka Scribe, reconnect and retry. Confirm each chunk
-        appears once and no unsaved recording is falsely shown as complete.
+        Disconnect the network, record two chunks, restart Aeka Scribe, reconnect and retry. Confirm each
+        chunk appears once and no unsaved recording is falsely shown as complete.
       </li>
       <li>
         Connect each calendar using your client registrations; verify event time zone, refresh, reminders,
@@ -927,8 +932,8 @@
         missed/ locked/ overlapping starts are skipped.
       </li>
       <li>
-        With separately authorised site access, verify viewer/ editor permissions, comments, revocation, expiry
-        and team dictionary import. Do not use real sensitive notes for the first test.
+        With separately authorised site access, verify viewer/ editor permissions, comments, revocation,
+        expiry and team dictionary import. Do not use real sensitive notes for the first test.
       </li>
       <li>
         Select your trusted local Whisper executable/ model, transcribe offline and compare names/ amounts
@@ -941,23 +946,23 @@
     </ol>
     <p>
       <strong>Automated verification:</strong> 112 automated tests pass. They cover permission separation,
-      frozen review payloads, duplicate and uncertain sends, provider response contracts, scheduler idempotence/
-      concurrent edits, document safety and semantic scope isolation. PDF and DOCX extraction and the
-      reviewed-send interface were checked with local test fixtures; those fixtures are not included in the
-      release. No live messages, invitations, CRM notes or paid AI requests were sent during testing.
+      frozen review payloads, duplicate and uncertain sends, provider response contracts, scheduler
+      idempotence/ concurrent edits, document safety and semantic scope isolation. PDF and DOCX extraction and
+      the reviewed-send interface were checked with local test fixtures; those fixtures are not included in
+      the release. No live messages, invitations, CRM notes or paid AI requests were sent during testing.
     </p>
     <p>
       <strong>Reliability:</strong> The fix for repeated dictation text remains covered by a regression test.
       Queue processing can be awaited safely during retries, note completion handles concurrent transcription
-      updates, and dictation profiles retain their version marker. Unversioned native profiles from release 0.2
-      migrate on load.
+      updates, and dictation profiles retain their version marker. Unversioned native profiles from release
+      0.2 migrate on load.
     </p>
     <p class="caption">
       The 112 automated checks exercise sync/ deletion conflicts, account pinning, sharing authorisation,
       retention, automation cancellation/ recovery, update integrity/ publisher checks, profile migration and
       provider contracts with mock responses, encryption integrity, OAuth state rejection, transcript retry
-      idempotence, final-frame flushing, user isolation and conflict handling. They do not establish microphone
-      accuracy, hosted visitor consent or live provider connectivity.
+      idempotence, final-frame flushing, user isolation and conflict handling. They do not establish
+      microphone accuracy, hosted visitor consent or live provider connectivity.
     </p>
 
     <footer class="footer">Aeka Advisors India LLP</footer>
