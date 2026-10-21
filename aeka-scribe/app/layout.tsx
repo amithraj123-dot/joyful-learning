@@ -1,12 +1,12 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "Flow — Voice workspace",
-  description: "Your personal dictation workspace: speak, refine, and keep the words that matter.",
+  title: 'Flow — Voice workspace',
+  description: 'Your personal dictation workspace: speak, refine, and keep the words that matter.',
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
   },
 };
 

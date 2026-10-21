@@ -1,39 +1,589 @@
-<div style="padding:18px 24px;background:#edf2e6;border-bottom:1px solid #cfdbc4;font:14px system-ui;color:#365d45"><strong>Updated 19 October 2026:</strong> A Windows development package and meeting workspace are now available. <a href="/desktop-guide.html">See the current setup guide, implemented features and remaining gaps.</a> The analysis below describes the earlier audit.</div><!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wispr Windows analysis · Flow workspace</title><style>body{font:15px/1.75 system-ui,sans-serif;max-width:1060px;margin:50px auto;padding:0 26px;color:#293c2d;background:#f9faf6}h1,h2{font-family:Georgia,serif;font-weight:400;line-height:1.2}h1{font-size:39px}h2{font-size:28px;margin-top:44px}a{color:#446a39}small{color:#74856c}code{font:12px/1.5 ui-monospace,monospace;background:#eef2e8;padding:3px 5px;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse;font-size:12px;background:white}th,td{padding:13px 15px;border:1px solid #dce5d3;text-align:left;vertical-align:top}th{background:#edf3e5}td:first-child{width:19%;font-weight:600}.callout{background:#eaf2df;border:1px solid #d6e4c5;border-radius:10px;padding:20px 24px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:26px}li{margin:9px 0}.muted{color:#788a6c}.table-scroll{overflow-x:auto}@media(max-width:650px){.columns{display:block}h1{font-size:31px}table{min-width:670px}body{margin:30px auto}}@media print{body{font-size:11px;background:white;margin:0}table{font-size:9px}a{color:inherit}h2{break-after:avoid}tr{break-inside:avoid}}</style>
-<a href="/">← Back to Flow</a><p><small>STATIC CLIENT ANALYSIS · 18 OCTOBER 2026</small></p><h1>What the Windows package reveals.<br>What Flow now implements.</h1>
-<div class="callout"><strong>Scope:</strong> this is an evidence-based analysis of the official Wispr Flow Windows fallback release <strong>1.6.531</strong>, plus an independent implementation of selected behavior. It is not a recovery of Wispr’s complete original source repository, a complete native decompilation, or a runtime audit. Server-only models, prompts, training data and business logic remain unknown.</div>
-<h2>Package and method</h2><p>The official Windows bootstrap exposed the vendor’s last-known-good manifest. The full installer’s size and SHA-256 match that manifest. The latest manifest returned HTTP 403 in the earlier download session; version 1.6.531 is therefore described as a fallback release, not the newest release.</p><ul><li>Installer: <code>Wispr_Flow_Setup_v1.6.531.exe</code>, 354,514,304 bytes.</li><li>SHA-256: <code>4d19fa3456a834a0fff86ca5368e893d54fe934bc7336795ec8ac28ccd10215e</code>.</li><li>The PE DATA resource contains an outer ZIP and <code>WisprFlow-1.6.531-full.nupkg</code>. That package has 1,084 entries.</li><li><code>resources/app.asar</code> contains 731 file entries, including minified JavaScript and package metadata. No source-map files were found. The main bundle is 8,335,305 bytes.</li><li>The package also contains 139 JavaScript database migrations and a 15,248,248-byte native helper.</li></ul><p>The analysis inspected archive structure, selected JavaScript functions and message schemas, database definitions, and native PE metadata/imports. Neither installer nor extracted executable was run. No Wispr account, private backend endpoint, user audio, or credentials were used. Vendor implementation code and binaries are not included in this project.</p>
-<h2>The architecture that emerges</h2><p>The client is an Electron/React application with separate hub, overlay, status, scratchpad, context-menu and meeting-recorder bundles. The main process coordinates dictation, local storage and a native helper. The capture path uses an AudioWorklet and has an Opus worker. Client networking includes gRPC/protobuf and HTTP paths. SQLite/Sequelize migrations describe local history, dictionary, formatting, notes and meetings.</p><p>The native helper is an x64 PE with a zero-size CLR directory and NativeAOT/CoreLib markers. This strongly indicates .NET NativeAOT, not an ordinary managed assembly. Its imports include Windows process/window APIs and COM. The shared helper message contract includes keyboard events, focus storage, textbox information, paste outcomes and verification. A message in that shared contract does not prove the operation is implemented on Windows. Native behavior still needs controlled Windows testing and, where necessary, Ghidra or Binary Ninja analysis.</p>
-<h2>Feature map and implementation status</h2><p><strong>Code</strong> means relevant packaged client logic was inspected. <strong>Schema</strong> means a data model, message contract, component or flag is present; full runtime behavior is not established. The last column describes this independently built browser workspace, not Wispr itself.</p>
-<div class="table-scroll"><table><thead><tr><th>Area</th><th>Evidence in the downloaded client</th><th>Flow workspace today</th></tr></thead><tbody>
-<tr><td>Application shell</td><td>Package identifies Electron, React and separate UI bundles. Code/package.</td><td>Browser workspace with dictation, history, vocabulary, snippets, model guidance and settings. No native installer.</td></tr>
-<tr><td>Audio capture</td><td>Worklet buffers 640-sample chunks, handles start/stop, flushes a partial final buffer and acknowledges completion. Code.</td><td>Browser speech recognition, or MediaRecorder for cloud transcription. Microphone selection for cloud recording. Five-minute recording cap.</td></tr>
-<tr><td>Compression</td><td>Opus worker and selectable WAV/Opus packet paths. Code.</td><td>Uses supported browser WebM/Opus or MP4 recording. Does not reproduce Wispr’s proprietary transport.</td></tr>
-<tr><td>Recording lifecycle</td><td>Explicit setup, start, chunk, stop, completion, abort and acquisition-failure messages. Code/schema.</td><td>Requesting, recording, stopping, transcribing, error and idle states; Escape cancellation and resource cleanup.</td></tr>
-<tr><td>Stale-session protection</td><td>Audio packets have a transcript UUID and index. Mismatched UUIDs are dropped; index gaps are counted. Code.</td><td>Session generation guards ignore late callbacks and cancelled upload responses; final browser results are rebuilt by result index.</td></tr>
-<tr><td>Cloud speech pipeline</td><td>The request names TRANSCRIBE and ALIGN steps; FORMAT is conditional. Requests carry prior ASR/LLM text and language state. Code.</td><td>Secure server adapter for <code>gpt-transcribe</code>, vocabulary/language hints, optional context, and file uploads up to 20 MB. Requires a configured API credential.</td></tr>
-<tr><td>Fallbacks and retries</td><td>A Baseten-related path and OpenAI fallback route are present. Client fallback checks cancellation and records timing/outcomes. Code.</td><td>Explicit retry of a failed cloud request, save-audio option, cancellation, useful errors. No hidden switch of provider.</td></tr>
-<tr><td>Live text</td><td>Streaming text state and protocol fields. Code/schema.</td><td>Live browser speech interim text. OpenAI cloud integration returns a final transcript after recording; <code>gpt-live-transcribe</code> is recommended but not integrated.</td></tr>
-<tr><td>Keyboard gestures</td><td>Tap, hold-start/hold-end and double-tap dispatch machinery. Code.</td><td>In-tab toggle shortcut and Escape cancellation. No global Windows hook or hold-to-talk gesture.</td></tr>
-<tr><td>Text insertion</td><td>PasteText carries text, optional HTML and a transcript ID; helper outcomes/verification are modeled. Code/schema.</td><td>Explicit copy/export. No automatic insertion into Word, Outlook, terminals or the Windows cursor.</td></tr>
-<tr><td>Focus/context</td><td>Focused app, textbox before/selected/after text, accessibility and OCR words appear in request construction. Context preference is checked. Code.</td><td>Only user-entered context and enabled vocabulary go to the cloud route. No screen, clipboard, active-window or document-context collection.</td></tr>
-<tr><td>Dictionary</td><td>Phrase, replacement, usage counts, starred and sync-related columns. Schema; request includes dictionary hints.</td><td>Editable preferred spellings and complete-phrase replacements; longest phrase wins; replacement output does not cascade through the same rule set.</td></tr>
-<tr><td>Snippets</td><td>Dictionary’s isSnippet flag, replacement content and unique phrase migration. Schema.</td><td>Editable trigger/text pairs, manual insertion and optional exact-trigger expansion, off by default.</td></tr>
-<tr><td>Text formatting</td><td>Raw/formatted statuses, conditional formatting pipeline, per-app personalization settings. Code/schema.</td><td>Verbatim, clean, sentence and bullet modes. Local deterministic cleanup; no claimed semantic rewrite parity.</td></tr>
-<tr><td>Voice commands / polish</td><td>Polish history/provider fields, selected-text acquisition and cancellation paths, instruct UI and model enums. Code/schema.</td><td>Manual draft editing and original restore. Selection-aware rewriting, command mode and tool execution are not implemented.</td></tr>
-<tr><td>History and recovery</td><td>ASR, formatted, edited text, timestamps, audio/context and status fields; separate metrics and revision columns. Schema.</td><td>Raw and edited text retained separately; search, reopen, copy, export and delete. No audio stored in history.</td></tr>
-<tr><td>Retention / sharing</td><td>NeverStore and DeleteAfter24h behavior; distinct data-sharing, cloud-sync and privacy preferences. Code.</td><td>Off, 24-hour, 7-day, 30-day or until-deleted local retention. Purges while open/on return. JSON backup/restore. No cross-device sync.</td></tr>
-<tr><td>Telemetry</td><td>Sentry/PostHog dependencies and client latency/fallback/correction metrics. Package/code/schema.</td><td>No added analytics SDK. Saved duration/word statistics are calculated locally. Server code does not log transcripts or audio.</td></tr>
-<tr><td>Meetings</td><td>Recorder bundle; meeting, transcript, speaker-map, refinement, retry and summary migrations. Mostly schema.</td><td>Not implemented. No claim of meeting diarization, loopback audio capture or meeting summaries.</td></tr>
-<tr><td>Notes, links, tasks</td><td>Notes/version/image/link/todo migrations. Schema.</td><td>Draft editor and snippets only; no equivalent workspace knowledge store or task manager.</td></tr>
-<tr><td>Calendar and imports</td><td>Calendar event metadata, participant names and import-state migrations. Schema.</td><td>Not implemented.</td></tr>
-<tr><td>Headset / external hardware</td><td>Jabra integration dependency and BLE/audio/control helper messages. Package/schema.</td><td>System microphone selection only; no BLE ring or headset-button integration.</td></tr>
-<tr><td>Account / enterprise</td><td>Auth dependencies, team/enterprise settings, local policy enforcement and preferences sync. Package/code.</td><td>Existing owner-private Sites audience preserved; cloud transcription requires signed-in identity. No Wispr account integration.</td></tr>
-<tr><td>Updater / installation</td><td>Squirrel package, updater and startup dependencies. Package.</td><td>Hosted web deployment. No Windows auto-updater, installer signing or tray process.</td></tr>
-<tr><td>Offline capability</td><td>Some meeting offline flags are present. This does not establish offline dictation inference.</td><td>Typed-text editing/cleanup runs locally after load. Browser speech can depend on a remote service; cloud transcription requires network access.</td></tr>
-</tbody></table></div>
-<h2>What can be said about Wispr’s models?</h2><p>The client implements a request path associated with Baseten and an OpenAI fallback. It distinguishes external ASR and LLM timing. It also contains model/provider enums for other modes. None of that proves the default ASR checkpoint, provider traffic share, server-side prompt, model weights or production routing for a particular user. A transcription fallback is not evidence that the entire product uses that model.</p><p>The implementation clue is the separation of responsibilities: audio recognition, alignment/context, optional formatting, then insertion. To reproduce the experience, optimize the complete loop—including latency, error recovery, custom terms and insertion—not only a general-purpose chat LLM.</p>
-<h2>Transcription recommendation</h2><div class="columns"><div><h3>Default: gpt-transcribe</h3><p>Use for press-to-record, release/finish, final transcript. Current OpenAI documentation recommends it for completed recordings and bounded turns. It accepts keyword, language and contextual hints. Published transcription price: $0.0045/minute, or $0.27 per audio hour.</p></div><div><h3>Live: gpt-live-transcribe</h3><p>Use when incremental text during speech is a product requirement. Current published price: $0.017/minute, or $1.02 per audio hour. Its streaming audio path is distinct from streaming the response to an already completed file.</p></div></div><p>These are starting recommendations, not a measured winner for your voice. Benchmark Indian English, names, GST/Ind AS terminology, section references, lakh/crore amounts, negation and language mixing. Deepgram Nova-3 and ElevenLabs Scribe v2 are useful comparisons. An optional text-cleanup model should be a separate step with a raw-transcript recovery path; it must not silently rewrite numbers, intent or technical terms.</p><p>For offline inference, NVIDIA Parakeet TDT 0.6B v3 is an option to evaluate for supported languages, including English. Its published 25-language set is European; it is not an appropriate blanket recommendation for Hindi or Kannada. Local latency and accuracy depend on your Windows hardware and require benchmarking. This workspace does not bundle an offline model.</p>
-<h2>Evidence locators</h2><p>Locators below refer to the unmodified <code>.webpack/main/index.js</code> inside the extracted ASAR, SHA-256 <code>40b041eff53faf3675a078ac16da5f97118d2a1a4b4a3d48176b0e0902bf3744</code>. Offsets are zero-based decoded Unicode character positions from Python <code>read_text()</code>, not byte addresses. Search symbols are more portable across releases.</p><ul><li><code>serializeFlowRequest</code> around 3,345,830: context, languages, previous transcript and session metadata.</li><li><code>static pipelineSteps</code> around 3,352,168: transcription/alignment and conditional format steps.</li><li><code>transcribeOpenAIAudioChunks</code> around 3,294,627; fallback dispatch around 3,354,551.</li><li><code>transcriptionEntityUuid</code> around 3,880,427: stale audio rejection and subsequent packet-index checks.</li><li><code>PasteTextPayload</code> around 2,451,860; helper invocation around 4,105,526.</li><li><code>holdThresholdMs</code> around 4,736,602: hold/double-tap machinery.</li><li><code>privacy_mode</code> around 5,472,676 and <code>localDataPolicy</code> around 5,468,776: preference serialization and local purge behavior.</li><li><code>.webpack/renderer/dist/recorderWorklet.js</code>: capture buffer, start/stop and tail flush.</li><li>Migrations: <code>20240510213006-create-history.js</code>, <code>20240510212733-create-dictionary.js</code>, <code>20250805200011-snippets.js</code>, <code>20250724172342-add-external-asr-tracking.js</code>, <code>20250902124200-add-personalization-style.js</code>, <code>20260304180000-add-polish-used-provider.js</code>.</li></ul>
-<h2>Remaining work for a Windows desktop equivalent</h2><ol><li>Build a separate native companion with a documented, narrow IPC contract, global hotkey handling, focus snapshots and a status overlay.</li><li>Implement insertion with focus-change detection, clipboard restoration and explicit fallback copy. Test Word, Outlook, Chrome, Teams, editors, terminals, password fields and elevated applications on Windows.</li><li>Add true streaming ASR with turn IDs, cancellation, backpressure, final-result reconciliation and measured time to first/final text.</li><li>Benchmark at least 30 representative recordings against manually checked references. Measure word errors, critical term/amount/negation errors, latency and cost. Do not use a language model’s self-scoring as the sole accuracy measure.</li><li>Decide whether meeting transcription, note sync, team settings and offline inference are desired; these are separate subsystems, not completed features in this workspace.</li></ol>
-<h2>Validation and limits</h2><p>The implementation includes automated tests for vocabulary boundaries (including Indic combining marks), literal replacement text, non-cascading rules, preservation of amounts/negation, verbatim mode, history retention, repeated speech events, backup validation and cloud-request authentication/validation. Provider requests are tested with mock responses. Browser checks cover draft cleanup, saving, vocabulary, snippets and unavailable-cloud behavior. No paid transcription request or controlled Windows dictation test has been performed.</p><p>The earlier Flow project record was recovered, but its connected source repository had no saved commits and it had no published version. This version was reconstructed under that same project identity from the recorded feature scope and the static findings above. It is not presented as a diff against recovered earlier source. Browser data uses its own versioned storage key.</p>
-<h2>Primary references</h2><ul><li><a href="https://dl.wisprflow.com/wispr-flow/win32/last-known-good.json">Wispr official fallback manifest</a></li><li><a href="https://wisprflow.ai/privacy">Wispr privacy information</a></li><li><a href="https://developers.openai.com/api/docs/guides/transcription">OpenAI transcription model selection</a> · <a href="https://developers.openai.com/api/docs/guides/speech-to-text">File transcription and request hints</a></li><li><a href="https://developers.openai.com/api/docs/models/gpt-transcribe">gpt-transcribe</a> · <a href="https://developers.openai.com/api/docs/models/gpt-live-transcribe">gpt-live-transcribe</a> · <a href="https://developers.openai.com/api/docs/pricing">Pricing</a></li><li><a href="https://developers.deepgram.com/docs/keyterm">Deepgram keyword prompting</a> · <a href="https://elevenlabs.io/docs/overview/capabilities/speech-to-text">ElevenLabs speech recognition</a></li><li><a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3">NVIDIA Parakeet official model card</a></li></ul><p class="muted">Prepared for the Flow workspace. Conclusions apply to the inspected package and reviewed code paths, not every version or server-side feature of Wispr Flow.</p></html>
+<div
+  style="
+    padding: 18px 24px;
+    background: #edf2e6;
+    border-bottom: 1px solid #cfdbc4;
+    font: 14px system-ui;
+    color: #365d45;
+  "
+>
+  <strong>Updated 19 October 2026:</strong> A Windows development package and meeting workspace are now
+  available.
+  <a href="/desktop-guide.html">See the current setup guide, implemented features and remaining gaps.</a> The
+  analysis below describes the earlier audit.
+</div>
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>
+    Wispr Windows analysis · Flow workspace</title
+  ><style>
+    body {
+      font:
+        15px/1.75 system-ui,
+        sans-serif;
+      max-width: 1060px;
+      margin: 50px auto;
+      padding: 0 26px;
+      color: #293c2d;
+      background: #f9faf6;
+    }
+    h1,
+    h2 {
+      font-family: Georgia, serif;
+      font-weight: 400;
+      line-height: 1.2;
+    }
+    h1 {
+      font-size: 39px;
+    }
+    h2 {
+      font-size: 28px;
+      margin-top: 44px;
+    }
+    a {
+      color: #446a39;
+    }
+    small {
+      color: #74856c;
+    }
+    code {
+      font:
+        12px/1.5 ui-monospace,
+        monospace;
+      background: #eef2e8;
+      padding: 3px 5px;
+      overflow-wrap: anywhere;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      background: white;
+    }
+    th,
+    td {
+      padding: 13px 15px;
+      border: 1px solid #dce5d3;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #edf3e5;
+    }
+    td:first-child {
+      width: 19%;
+      font-weight: 600;
+    }
+    .callout {
+      background: #eaf2df;
+      border: 1px solid #d6e4c5;
+      border-radius: 10px;
+      padding: 20px 24px;
+    }
+    .columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 26px;
+    }
+    li {
+      margin: 9px 0;
+    }
+    .muted {
+      color: #788a6c;
+    }
+    .table-scroll {
+      overflow-x: auto;
+    }
+    @media (max-width: 650px) {
+      .columns {
+        display: block;
+      }
+      h1 {
+        font-size: 31px;
+      }
+      table {
+        min-width: 670px;
+      }
+      body {
+        margin: 30px auto;
+      }
+    }
+    @media print {
+      body {
+        font-size: 11px;
+        background: white;
+        margin: 0;
+      }
+      table {
+        font-size: 9px;
+      }
+      a {
+        color: inherit;
+      }
+      h2 {
+        break-after: avoid;
+      }
+      tr {
+        break-inside: avoid;
+      }
+    }
+  </style>
+  <a href="/">← Back to Flow</a>
+  <p><small>STATIC CLIENT ANALYSIS · 18 OCTOBER 2026</small></p>
+  <h1>What the Windows package reveals.<br />What Flow now implements.</h1>
+  <div class="callout">
+    <strong>Scope:</strong> this is an evidence-based analysis of the official Wispr Flow Windows fallback
+    release <strong>1.6.531</strong>, plus an independent implementation of selected behavior. It is not a
+    recovery of Wispr’s complete original source repository, a complete native decompilation, or a runtime
+    audit. Server-only models, prompts, training data and business logic remain unknown.
+  </div>
+  <h2>Package and method</h2>
+  <p>
+    The official Windows bootstrap exposed the vendor’s last-known-good manifest. The full installer’s size
+    and SHA-256 match that manifest. The latest manifest returned HTTP 403 in the earlier download session;
+    version 1.6.531 is therefore described as a fallback release, not the newest release.
+  </p>
+  <ul>
+    <li>Installer: <code>Wispr_Flow_Setup_v1.6.531.exe</code>, 354,514,304 bytes.</li>
+    <li>SHA-256: <code>4d19fa3456a834a0fff86ca5368e893d54fe934bc7336795ec8ac28ccd10215e</code>.</li>
+    <li>
+      The PE DATA resource contains an outer ZIP and <code>WisprFlow-1.6.531-full.nupkg</code>. That package
+      has 1,084 entries.
+    </li>
+    <li>
+      <code>resources/app.asar</code> contains 731 file entries, including minified JavaScript and package
+      metadata. No source-map files were found. The main bundle is 8,335,305 bytes.
+    </li>
+    <li>The package also contains 139 JavaScript database migrations and a 15,248,248-byte native helper.</li>
+  </ul>
+  <p>
+    The analysis inspected archive structure, selected JavaScript functions and message schemas, database
+    definitions, and native PE metadata/imports. Neither installer nor extracted executable was run. No Wispr
+    account, private backend endpoint, user audio, or credentials were used. Vendor implementation code and
+    binaries are not included in this project.
+  </p>
+  <h2>The architecture that emerges</h2>
+  <p>
+    The client is an Electron/React application with separate hub, overlay, status, scratchpad, context-menu
+    and meeting-recorder bundles. The main process coordinates dictation, local storage and a native helper.
+    The capture path uses an AudioWorklet and has an Opus worker. Client networking includes gRPC/protobuf and
+    HTTP paths. SQLite/Sequelize migrations describe local history, dictionary, formatting, notes and
+    meetings.
+  </p>
+  <p>
+    The native helper is an x64 PE with a zero-size CLR directory and NativeAOT/CoreLib markers. This strongly
+    indicates .NET NativeAOT, not an ordinary managed assembly. Its imports include Windows process/window
+    APIs and COM. The shared helper message contract includes keyboard events, focus storage, textbox
+    information, paste outcomes and verification. A message in that shared contract does not prove the
+    operation is implemented on Windows. Native behavior still needs controlled Windows testing and, where
+    necessary, Ghidra or Binary Ninja analysis.
+  </p>
+  <h2>Feature map and implementation status</h2>
+  <p>
+    <strong>Code</strong> means relevant packaged client logic was inspected. <strong>Schema</strong> means a
+    data model, message contract, component or flag is present; full runtime behavior is not established. The
+    last column describes this independently built browser workspace, not Wispr itself.
+  </p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Area</th>
+          <th>Evidence in the downloaded client</th>
+          <th>Flow workspace today</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Application shell</td>
+          <td>Package identifies Electron, React and separate UI bundles. Code/package.</td>
+          <td>
+            Browser workspace with dictation, history, vocabulary, snippets, model guidance and settings. No
+            native installer.
+          </td>
+        </tr>
+        <tr>
+          <td>Audio capture</td>
+          <td>
+            Worklet buffers 640-sample chunks, handles start/stop, flushes a partial final buffer and
+            acknowledges completion. Code.
+          </td>
+          <td>
+            Browser speech recognition, or MediaRecorder for cloud transcription. Microphone selection for
+            cloud recording. Five-minute recording cap.
+          </td>
+        </tr>
+        <tr>
+          <td>Compression</td>
+          <td>Opus worker and selectable WAV/Opus packet paths. Code.</td>
+          <td>
+            Uses supported browser WebM/Opus or MP4 recording. Does not reproduce Wispr’s proprietary
+            transport.
+          </td>
+        </tr>
+        <tr>
+          <td>Recording lifecycle</td>
+          <td>
+            Explicit setup, start, chunk, stop, completion, abort and acquisition-failure messages.
+            Code/schema.
+          </td>
+          <td>
+            Requesting, recording, stopping, transcribing, error and idle states; Escape cancellation and
+            resource cleanup.
+          </td>
+        </tr>
+        <tr>
+          <td>Stale-session protection</td>
+          <td>
+            Audio packets have a transcript UUID and index. Mismatched UUIDs are dropped; index gaps are
+            counted. Code.
+          </td>
+          <td>
+            Session generation guards ignore late callbacks and cancelled upload responses; final browser
+            results are rebuilt by result index.
+          </td>
+        </tr>
+        <tr>
+          <td>Cloud speech pipeline</td>
+          <td>
+            The request names TRANSCRIBE and ALIGN steps; FORMAT is conditional. Requests carry prior ASR/LLM
+            text and language state. Code.
+          </td>
+          <td>
+            Secure server adapter for <code>gpt-transcribe</code>, vocabulary/language hints, optional
+            context, and file uploads up to 20 MB. Requires a configured API credential.
+          </td>
+        </tr>
+        <tr>
+          <td>Fallbacks and retries</td>
+          <td>
+            A Baseten-related path and OpenAI fallback route are present. Client fallback checks cancellation
+            and records timing/outcomes. Code.
+          </td>
+          <td>
+            Explicit retry of a failed cloud request, save-audio option, cancellation, useful errors. No
+            hidden switch of provider.
+          </td>
+        </tr>
+        <tr>
+          <td>Live text</td>
+          <td>Streaming text state and protocol fields. Code/schema.</td>
+          <td>
+            Live browser speech interim text. OpenAI cloud integration returns a final transcript after
+            recording; <code>gpt-live-transcribe</code> is recommended but not integrated.
+          </td>
+        </tr>
+        <tr>
+          <td>Keyboard gestures</td>
+          <td>Tap, hold-start/hold-end and double-tap dispatch machinery. Code.</td>
+          <td>
+            In-tab toggle shortcut and Escape cancellation. No global Windows hook or hold-to-talk gesture.
+          </td>
+        </tr>
+        <tr>
+          <td>Text insertion</td>
+          <td>
+            PasteText carries text, optional HTML and a transcript ID; helper outcomes/verification are
+            modeled. Code/schema.
+          </td>
+          <td>
+            Explicit copy/export. No automatic insertion into Word, Outlook, terminals or the Windows cursor.
+          </td>
+        </tr>
+        <tr>
+          <td>Focus/context</td>
+          <td>
+            Focused app, textbox before/selected/after text, accessibility and OCR words appear in request
+            construction. Context preference is checked. Code.
+          </td>
+          <td>
+            Only user-entered context and enabled vocabulary go to the cloud route. No screen, clipboard,
+            active-window or document-context collection.
+          </td>
+        </tr>
+        <tr>
+          <td>Dictionary</td>
+          <td>
+            Phrase, replacement, usage counts, starred and sync-related columns. Schema; request includes
+            dictionary hints.
+          </td>
+          <td>
+            Editable preferred spellings and complete-phrase replacements; longest phrase wins; replacement
+            output does not cascade through the same rule set.
+          </td>
+        </tr>
+        <tr>
+          <td>Snippets</td>
+          <td>Dictionary’s isSnippet flag, replacement content and unique phrase migration. Schema.</td>
+          <td>
+            Editable trigger/text pairs, manual insertion and optional exact-trigger expansion, off by
+            default.
+          </td>
+        </tr>
+        <tr>
+          <td>Text formatting</td>
+          <td>
+            Raw/formatted statuses, conditional formatting pipeline, per-app personalization settings.
+            Code/schema.
+          </td>
+          <td>
+            Verbatim, clean, sentence and bullet modes. Local deterministic cleanup; no claimed semantic
+            rewrite parity.
+          </td>
+        </tr>
+        <tr>
+          <td>Voice commands / polish</td>
+          <td>
+            Polish history/provider fields, selected-text acquisition and cancellation paths, instruct UI and
+            model enums. Code/schema.
+          </td>
+          <td>
+            Manual draft editing and original restore. Selection-aware rewriting, command mode and tool
+            execution are not implemented.
+          </td>
+        </tr>
+        <tr>
+          <td>History and recovery</td>
+          <td>
+            ASR, formatted, edited text, timestamps, audio/context and status fields; separate metrics and
+            revision columns. Schema.
+          </td>
+          <td>
+            Raw and edited text retained separately; search, reopen, copy, export and delete. No audio stored
+            in history.
+          </td>
+        </tr>
+        <tr>
+          <td>Retention / sharing</td>
+          <td>
+            NeverStore and DeleteAfter24h behavior; distinct data-sharing, cloud-sync and privacy preferences.
+            Code.
+          </td>
+          <td>
+            Off, 24-hour, 7-day, 30-day or until-deleted local retention. Purges while open/on return. JSON
+            backup/restore. No cross-device sync.
+          </td>
+        </tr>
+        <tr>
+          <td>Telemetry</td>
+          <td>
+            Sentry/PostHog dependencies and client latency/fallback/correction metrics. Package/code/schema.
+          </td>
+          <td>
+            No added analytics SDK. Saved duration/word statistics are calculated locally. Server code does
+            not log transcripts or audio.
+          </td>
+        </tr>
+        <tr>
+          <td>Meetings</td>
+          <td>
+            Recorder bundle; meeting, transcript, speaker-map, refinement, retry and summary migrations.
+            Mostly schema.
+          </td>
+          <td>
+            Not implemented. No claim of meeting diarization, loopback audio capture or meeting summaries.
+          </td>
+        </tr>
+        <tr>
+          <td>Notes, links, tasks</td>
+          <td>Notes/version/image/link/todo migrations. Schema.</td>
+          <td>Draft editor and snippets only; no equivalent workspace knowledge store or task manager.</td>
+        </tr>
+        <tr>
+          <td>Calendar and imports</td>
+          <td>Calendar event metadata, participant names and import-state migrations. Schema.</td>
+          <td>Not implemented.</td>
+        </tr>
+        <tr>
+          <td>Headset / external hardware</td>
+          <td>Jabra integration dependency and BLE/audio/control helper messages. Package/schema.</td>
+          <td>System microphone selection only; no BLE ring or headset-button integration.</td>
+        </tr>
+        <tr>
+          <td>Account / enterprise</td>
+          <td>
+            Auth dependencies, team/enterprise settings, local policy enforcement and preferences sync.
+            Package/code.
+          </td>
+          <td>
+            Existing owner-private Sites audience preserved; cloud transcription requires signed-in identity.
+            No Wispr account integration.
+          </td>
+        </tr>
+        <tr>
+          <td>Updater / installation</td>
+          <td>Squirrel package, updater and startup dependencies. Package.</td>
+          <td>Hosted web deployment. No Windows auto-updater, installer signing or tray process.</td>
+        </tr>
+        <tr>
+          <td>Offline capability</td>
+          <td>
+            Some meeting offline flags are present. This does not establish offline dictation inference.
+          </td>
+          <td>
+            Typed-text editing/cleanup runs locally after load. Browser speech can depend on a remote service;
+            cloud transcription requires network access.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <h2>What can be said about Wispr’s models?</h2>
+  <p>
+    The client implements a request path associated with Baseten and an OpenAI fallback. It distinguishes
+    external ASR and LLM timing. It also contains model/provider enums for other modes. None of that proves
+    the default ASR checkpoint, provider traffic share, server-side prompt, model weights or production
+    routing for a particular user. A transcription fallback is not evidence that the entire product uses that
+    model.
+  </p>
+  <p>
+    The implementation clue is the separation of responsibilities: audio recognition, alignment/context,
+    optional formatting, then insertion. To reproduce the experience, optimize the complete loop—including
+    latency, error recovery, custom terms and insertion—not only a general-purpose chat LLM.
+  </p>
+  <h2>Transcription recommendation</h2>
+  <div class="columns">
+    <div>
+      <h3>Default: gpt-transcribe</h3>
+      <p>
+        Use for press-to-record, release/finish, final transcript. Current OpenAI documentation recommends it
+        for completed recordings and bounded turns. It accepts keyword, language and contextual hints.
+        Published transcription price: $0.0045/minute, or $0.27 per audio hour.
+      </p>
+    </div>
+    <div>
+      <h3>Live: gpt-live-transcribe</h3>
+      <p>
+        Use when incremental text during speech is a product requirement. Current published price:
+        $0.017/minute, or $1.02 per audio hour. Its streaming audio path is distinct from streaming the
+        response to an already completed file.
+      </p>
+    </div>
+  </div>
+  <p>
+    These are starting recommendations, not a measured winner for your voice. Benchmark Indian English, names,
+    GST/Ind AS terminology, section references, lakh/crore amounts, negation and language mixing. Deepgram
+    Nova-3 and ElevenLabs Scribe v2 are useful comparisons. An optional text-cleanup model should be a
+    separate step with a raw-transcript recovery path; it must not silently rewrite numbers, intent or
+    technical terms.
+  </p>
+  <p>
+    For offline inference, NVIDIA Parakeet TDT 0.6B v3 is an option to evaluate for supported languages,
+    including English. Its published 25-language set is European; it is not an appropriate blanket
+    recommendation for Hindi or Kannada. Local latency and accuracy depend on your Windows hardware and
+    require benchmarking. This workspace does not bundle an offline model.
+  </p>
+  <h2>Evidence locators</h2>
+  <p>
+    Locators below refer to the unmodified <code>.webpack/main/index.js</code> inside the extracted ASAR,
+    SHA-256 <code>40b041eff53faf3675a078ac16da5f97118d2a1a4b4a3d48176b0e0902bf3744</code>. Offsets are
+    zero-based decoded Unicode character positions from Python <code>read_text()</code>, not byte addresses.
+    Search symbols are more portable across releases.
+  </p>
+  <ul>
+    <li>
+      <code>serializeFlowRequest</code> around 3,345,830: context, languages, previous transcript and session
+      metadata.
+    </li>
+    <li>
+      <code>static pipelineSteps</code> around 3,352,168: transcription/alignment and conditional format
+      steps.
+    </li>
+    <li><code>transcribeOpenAIAudioChunks</code> around 3,294,627; fallback dispatch around 3,354,551.</li>
+    <li>
+      <code>transcriptionEntityUuid</code> around 3,880,427: stale audio rejection and subsequent packet-index
+      checks.
+    </li>
+    <li><code>PasteTextPayload</code> around 2,451,860; helper invocation around 4,105,526.</li>
+    <li><code>holdThresholdMs</code> around 4,736,602: hold/double-tap machinery.</li>
+    <li>
+      <code>privacy_mode</code> around 5,472,676 and <code>localDataPolicy</code> around 5,468,776: preference
+      serialization and local purge behavior.
+    </li>
+    <li>
+      <code>.webpack/renderer/dist/recorderWorklet.js</code>: capture buffer, start/stop and tail flush.
+    </li>
+    <li>
+      Migrations: <code>20240510213006-create-history.js</code>,
+      <code>20240510212733-create-dictionary.js</code>, <code>20250805200011-snippets.js</code>,
+      <code>20250724172342-add-external-asr-tracking.js</code>,
+      <code>20250902124200-add-personalization-style.js</code>,
+      <code>20260304180000-add-polish-used-provider.js</code>.
+    </li>
+  </ul>
+  <h2>Remaining work for a Windows desktop equivalent</h2>
+  <ol>
+    <li>
+      Build a separate native companion with a documented, narrow IPC contract, global hotkey handling, focus
+      snapshots and a status overlay.
+    </li>
+    <li>
+      Implement insertion with focus-change detection, clipboard restoration and explicit fallback copy. Test
+      Word, Outlook, Chrome, Teams, editors, terminals, password fields and elevated applications on Windows.
+    </li>
+    <li>
+      Add true streaming ASR with turn IDs, cancellation, backpressure, final-result reconciliation and
+      measured time to first/final text.
+    </li>
+    <li>
+      Benchmark at least 30 representative recordings against manually checked references. Measure word
+      errors, critical term/amount/negation errors, latency and cost. Do not use a language model’s
+      self-scoring as the sole accuracy measure.
+    </li>
+    <li>
+      Decide whether meeting transcription, note sync, team settings and offline inference are desired; these
+      are separate subsystems, not completed features in this workspace.
+    </li>
+  </ol>
+  <h2>Validation and limits</h2>
+  <p>
+    The implementation includes automated tests for vocabulary boundaries (including Indic combining marks),
+    literal replacement text, non-cascading rules, preservation of amounts/negation, verbatim mode, history
+    retention, repeated speech events, backup validation and cloud-request authentication/validation. Provider
+    requests are tested with mock responses. Browser checks cover draft cleanup, saving, vocabulary, snippets
+    and unavailable-cloud behavior. No paid transcription request or controlled Windows dictation test has
+    been performed.
+  </p>
+  <p>
+    The earlier Flow project record was recovered, but its connected source repository had no saved commits
+    and it had no published version. This version was reconstructed under that same project identity from the
+    recorded feature scope and the static findings above. It is not presented as a diff against recovered
+    earlier source. Browser data uses its own versioned storage key.
+  </p>
+  <h2>Primary references</h2>
+  <ul>
+    <li>
+      <a href="https://dl.wisprflow.com/wispr-flow/win32/last-known-good.json"
+        >Wispr official fallback manifest</a
+      >
+    </li>
+    <li><a href="https://wisprflow.ai/privacy">Wispr privacy information</a></li>
+    <li>
+      <a href="https://developers.openai.com/api/docs/guides/transcription"
+        >OpenAI transcription model selection</a
+      >
+      ·
+      <a href="https://developers.openai.com/api/docs/guides/speech-to-text"
+        >File transcription and request hints</a
+      >
+    </li>
+    <li>
+      <a href="https://developers.openai.com/api/docs/models/gpt-transcribe">gpt-transcribe</a> ·
+      <a href="https://developers.openai.com/api/docs/models/gpt-live-transcribe">gpt-live-transcribe</a> ·
+      <a href="https://developers.openai.com/api/docs/pricing">Pricing</a>
+    </li>
+    <li>
+      <a href="https://developers.deepgram.com/docs/keyterm">Deepgram keyword prompting</a> ·
+      <a href="https://elevenlabs.io/docs/overview/capabilities/speech-to-text"
+        >ElevenLabs speech recognition</a
+      >
+    </li>
+    <li>
+      <a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3">NVIDIA Parakeet official model card</a>
+    </li>
+  </ul>
+  <p class="muted">
+    Prepared for the Flow workspace. Conclusions apply to the inspected package and reviewed code paths, not
+    every version or server-side feature of Wispr Flow.
+  </p>
+</html>

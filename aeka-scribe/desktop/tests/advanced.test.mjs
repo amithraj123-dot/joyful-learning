@@ -4,28 +4,287 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {createAutomation} from '../services/automation.mjs';
-import {createSync,noteHash,syncDecision} from '../services/sync.mjs';
-import {createWorkspace} from '../services/workspace.mjs';
-import {verifyManifest,createUpdates} from '../services/updates.mjs';
-import {mono16kWav} from '../services/local-asr.mjs';
-import {validatePolicy,enforcePolicy,managedDefaults} from '../services/policy.mjs';
-import {encodeWav} from '../generated/workspace-core.mjs';
-import {defaults,validateBackup} from '../generated/flow-core.mjs';
-import {cloudRequest} from '../../lib/cloud-api.ts';
-import {database} from '../../tests/helpers/database.mjs';
-const vault=(initial={})=>{const values=new Map(Object.entries(initial));return {read:async(k,d=null)=>structuredClone(values.has(k)?values.get(k):d),write:async(k,v)=>{values.set(k,structuredClone(v));},remove:async k=>{values.delete(k);}};};
-const note={id:'n1',title:'Notes',kind:'scratchpad',createdAt:1,updatedAt:1,folder:'',body:'First',summary:'',segments:[],speakers:{},eventId:'',status:'draft',duration:0};
-test('automation requires consent, waits for its countdown, starts once and stops at the selected end',async()=>{let now=1000000;const events=[],v=vault(),a=createAutomation({vault:v,emit:(type,p)=>events.push({type,...structuredClone(p)}),now:()=>now});const e={id:'event1',title:'Call',start:new Date(now).toISOString(),end:new Date(now+60000).toISOString(),participantsInformed:true,grace:0};await assert.rejects(a.arm({...e,participantsInformed:false}));await a.arm(e);await a.tick({events:[e],fresh:true});assert.equal(events.filter(x=>x.type==='automation-start').length,0);now+=20000;await a.tick({events:[e],fresh:true});await a.tick({events:[e],fresh:true});assert.equal(events.filter(x=>x.type==='automation-start').length,1);await a.started(e.id,'note1',true);now+=40001;await a.tick({events:[e],fresh:true,busy:true});assert.equal(events.filter(x=>x.type==='automation-stop').length,1);});
-test('cancelled, stale, locked, overlapping and recovered schedules cannot start recording',async()=>{for(const mode of ['cancel','stale','locked','busy','restart']){let now=1000000;const sent=[],a=createAutomation({vault:vault(),emit:t=>sent.push(t),now:()=>now}),e={id:'event1',title:'Call',start:new Date(now).toISOString(),end:new Date(now+60000).toISOString(),participantsInformed:true};await a.arm(e);await a.tick({events:[e],fresh:mode!=='stale',locked:mode==='locked',busy:mode==='busy'});if(mode==='cancel')await a.cancel(e.id);if(mode==='restart')await a.recover();now+=20001;await a.tick({events:[e],fresh:true});assert.ok(!sent.includes('automation-start'),mode);}});
-test('cancelling a start also requests capture shutdown and prevents a late start acknowledgment',async()=>{let now=1000000;const sent=[],a=createAutomation({vault:vault(),emit:t=>sent.push(t),now:()=>now}),e={id:'event1',title:'Call',start:new Date(now).toISOString(),end:new Date(now+60000).toISOString(),participantsInformed:true};await a.arm(e);await a.tick({events:[e],fresh:true});now+=20000;await a.tick({events:[e],fresh:true});await a.cancel(e.id);assert.ok(sent.includes('automation-stop'));await assert.rejects(a.started(e.id,'note',true),/cancelled/);});
-test('sync fingerprints ignore property order but preserve intentional repeated speech',()=>{assert.equal(noteHash(note),noteHash({...note,segments:[],updatedAt:9}));assert.notEqual(noteHash(note),noteHash({...note,body:'First First'}));assert.equal(syncDecision({...note,body:'Edited'},undefined,{hash:noteHash(note),remote:1}),'conflict-deleted');});
-test('continuous sync survives conflicts, server deletion, retry and a changed account without losing local edits',async()=>{const db=database(),v=vault(),ws=createWorkspace({vault:v,emit:()=>{}});let account='owner';const request=async p=>{const r=await cloudRequest(new Request('https://flow.example/api/cloud',{method:'POST',headers:{Origin:'https://flow.example'},body:JSON.stringify(p)}),db,{userId:account,email:account+'@example.com'}),d=await r.json();if(!r.ok)throw Object.assign(Error(d.error),{status:r.status});return d.value;};const sync=createSync({vault:v,workspace:ws,request,emit:()=>{}});await ws.save(note);await sync.enable();await sync.tick();const first=(await ws.list())[0];await ws.save({...first,body:'Local change'},first.updatedAt);const remote=await request({action:'sync.get',id:note.id});await request({action:'sync.save',note:{...remote,body:'Web change'},baseUpdatedAt:remote.updatedAt});await sync.tick();let all=await ws.list();assert.equal(all.find(n=>n.id===note.id).body,'Web change');assert.ok(all.some(n=>n.id.startsWith('conflict_')&&n.body==='Local change'));await sync.tick();assert.equal((await request({action:'sync.index'})).length,2);const current=await request({action:'sync.get',id:note.id});await request({action:'sync.delete',id:note.id,baseUpdatedAt:current.updatedAt});await sync.tick();assert.ok(!(await ws.list()).some(n=>n.id===note.id));const before=await ws.list();account='someone-else';await sync.tick();assert.match((await sync.status()).error,/different account/);assert.deepEqual(await ws.list(),before);});
-test('sync cannot overwrite an edit made while a network request was in flight',async()=>{const v=vault(),ws=createWorkspace({vault:v,emit:()=>{}}),old=await ws.save(note);await ws.save({...old,body:'Typing while syncing'},old.updatedAt);assert.equal(await ws.syncApply({...old,body:'Remote'},old.updatedAt,old.id),false);assert.equal((await ws.list())[0].body,'Typing while syncing');});
-test('local PCM conversion produces a valid 16 kHz file and rejects arbitrary/truncated input',()=>{const input=encodeWav(new Float32Array(24000).fill(.25),24000),out=mono16kWav(input);assert.equal(out.readUInt32LE(24),16000);assert.equal(out.length,32044);assert.ok(Math.abs(out.readInt16LE(44)-8192)<=1);assert.throws(()=>mono16kWav(Buffer.from('not audio')));assert.throws(()=>mono16kWav(Buffer.from(input).subarray(0,80)));});
-test('managed policy rejects malformed values and enforces cloud, recording and export restrictions',()=>{assert.throws(()=>validatePolicy({allowCloudAI:'true'}));const p=validatePolicy({allowCloudAI:false,allowRecording:false,allowExports:false});for(const action of ['ai','queue.add','backup.export'])assert.throws(()=>enforcePolicy(p,action));assert.doesNotThrow(()=>enforcePolicy(p,'notes.list'));});
-test('cloud-disabled policy prevents transcription provider calls',async()=>{let sent=0;const ws=createWorkspace({vault:vault({credentials:{openaiKey:'sk-test'}}),emit:()=>{},policy:()=>({...managedDefaults,allowCloudAI:false}),fetcher:()=>{sent++;throw Error('Provider must not be called');}});await assert.rejects(ws.transcribe({audioBuffer:Buffer.alloc(50)}),/policy/);assert.equal(sent,0);assert.equal((await ws.status()).speechConfigured,false);});
-test('native dictation profiles retain their version and migrate the earlier unversioned vault format',async()=>{const profile={version:2,terms:[],snippets:[],history:[],settings:defaults},v=vault(),ws=createWorkspace({vault:v,emit:()=>{}});await ws.profileSave(profile);assert.ok(validateBackup(await ws.profileGet()));const {version,...old}=profile;await v.write('profile',old);assert.equal((await ws.profileGet()).version,2);const backup=await ws.backup();assert.ok(validateBackup(backup.profile));});
-function release(bytes=Buffer.alloc(1000000)){const keys=crypto.generateKeyPairSync('ed25519'),publicKey=keys.publicKey.export({type:'spki',format:'pem'}).toString(),feed='https://releases.example/flow.json',m={product:'com.flowworkspace.desktop',platform:'win32-x64',version:'0.4.0',url:'https://releases.example/Flow.exe',bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),expiresAt:new Date(Date.now()+3600000).toISOString()};const sign=value=>{const payload=JSON.stringify(value);return {payload,signature:crypto.sign(null,Buffer.from(payload),keys.privateKey).toString('base64')};};return {publicKey,feed,m,envelope:sign(m),sign,bytes};}
-test('updater rejects tampered, expired, cross-origin and incompatible signed manifests',()=>{const r=release();assert.equal(verifyManifest(r.envelope,r.publicKey,r.feed,'0.3.0').available,true);assert.throws(()=>verifyManifest({...r.envelope,payload:r.envelope.payload+' '},r.publicKey,r.feed,'0.3.0'));for(const m of [{...r.m,url:'https://attacker.example/Flow.exe'},{...r.m,expiresAt:new Date(0).toISOString()},{...r.m,platform:'linux-x64'}])assert.throws(()=>verifyManifest(r.sign(m),r.publicKey,r.feed,'0.3.0'));assert.equal(verifyManifest(r.sign({...r.m,version:'0.2.0'}),r.publicKey,r.feed,'0.3.0').available,false);});
-test('installer download and install require matching content, trusted publisher and an idle app',async t=>{const cacheDir=await fs.mkdtemp(path.join(os.tmpdir(),'flow-update-test-'));t.after(()=>fs.rm(cacheDir,{recursive:true,force:true}));const r=release(),thumbprint='A'.repeat(40);let idle=false,launched=false,publisher=thumbprint;const u=createUpdates({vault:vault(),cacheDir,current:'0.3.0',fetcher:async url=>url===r.feed?Response.json(r.envelope):new Response(r.bytes),verifyInstaller:async()=>({valid:true,thumbprint:publisher}),canInstall:()=>idle,launch:async()=>{launched=true;}});await u.configure({feed:r.feed,publicKey:r.publicKey,publisherThumbprint:thumbprint});publisher='B'.repeat(40);await assert.rejects(u.download(),/publisher/);publisher=thumbprint;await u.download();await assert.rejects(u.install(),/Finish/);assert.equal(launched,false);idle=true;await fs.writeFile(path.join(cacheDir,'Flow-update.exe'),'tampered');await assert.rejects(u.install(),/changed/);await u.download();await u.install();assert.equal(launched,true);});
+import { createAutomation } from '../services/automation.mjs';
+import { createSync, noteHash, syncDecision } from '../services/sync.mjs';
+import { createWorkspace } from '../services/workspace.mjs';
+import { verifyManifest, createUpdates } from '../services/updates.mjs';
+import { mono16kWav } from '../services/local-asr.mjs';
+import { validatePolicy, enforcePolicy, managedDefaults } from '../services/policy.mjs';
+import { encodeWav } from '../generated/workspace-core.mjs';
+import { defaults, validateBackup } from '../generated/flow-core.mjs';
+import { cloudRequest } from '../../lib/cloud-api.ts';
+import { database } from '../../tests/helpers/database.mjs';
+const vault = (initial = {}) => {
+  const values = new Map(Object.entries(initial));
+  return {
+    read: async (k, d = null) => structuredClone(values.has(k) ? values.get(k) : d),
+    write: async (k, v) => {
+      values.set(k, structuredClone(v));
+    },
+    remove: async (k) => {
+      values.delete(k);
+    },
+  };
+};
+const note = {
+  id: 'n1',
+  title: 'Notes',
+  kind: 'scratchpad',
+  createdAt: 1,
+  updatedAt: 1,
+  folder: '',
+  body: 'First',
+  summary: '',
+  segments: [],
+  speakers: {},
+  eventId: '',
+  status: 'draft',
+  duration: 0,
+};
+test('automation requires consent, waits for its countdown, starts once and stops at the selected end', async () => {
+  let now = 1000000;
+  const events = [],
+    v = vault(),
+    a = createAutomation({
+      vault: v,
+      emit: (type, p) => events.push({ type, ...structuredClone(p) }),
+      now: () => now,
+    });
+  const e = {
+    id: 'event1',
+    title: 'Call',
+    start: new Date(now).toISOString(),
+    end: new Date(now + 60000).toISOString(),
+    participantsInformed: true,
+    grace: 0,
+  };
+  await assert.rejects(a.arm({ ...e, participantsInformed: false }));
+  await a.arm(e);
+  await a.tick({ events: [e], fresh: true });
+  assert.equal(events.filter((x) => x.type === 'automation-start').length, 0);
+  now += 20000;
+  await a.tick({ events: [e], fresh: true });
+  await a.tick({ events: [e], fresh: true });
+  assert.equal(events.filter((x) => x.type === 'automation-start').length, 1);
+  await a.started(e.id, 'note1', true);
+  now += 40001;
+  await a.tick({ events: [e], fresh: true, busy: true });
+  assert.equal(events.filter((x) => x.type === 'automation-stop').length, 1);
+});
+test('cancelled, stale, locked, overlapping and recovered schedules cannot start recording', async () => {
+  for (const mode of ['cancel', 'stale', 'locked', 'busy', 'restart']) {
+    let now = 1000000;
+    const sent = [],
+      a = createAutomation({ vault: vault(), emit: (t) => sent.push(t), now: () => now }),
+      e = {
+        id: 'event1',
+        title: 'Call',
+        start: new Date(now).toISOString(),
+        end: new Date(now + 60000).toISOString(),
+        participantsInformed: true,
+      };
+    await a.arm(e);
+    await a.tick({ events: [e], fresh: mode !== 'stale', locked: mode === 'locked', busy: mode === 'busy' });
+    if (mode === 'cancel') await a.cancel(e.id);
+    if (mode === 'restart') await a.recover();
+    now += 20001;
+    await a.tick({ events: [e], fresh: true });
+    assert.ok(!sent.includes('automation-start'), mode);
+  }
+});
+test('cancelling a start also requests capture shutdown and prevents a late start acknowledgment', async () => {
+  let now = 1000000;
+  const sent = [],
+    a = createAutomation({ vault: vault(), emit: (t) => sent.push(t), now: () => now }),
+    e = {
+      id: 'event1',
+      title: 'Call',
+      start: new Date(now).toISOString(),
+      end: new Date(now + 60000).toISOString(),
+      participantsInformed: true,
+    };
+  await a.arm(e);
+  await a.tick({ events: [e], fresh: true });
+  now += 20000;
+  await a.tick({ events: [e], fresh: true });
+  await a.cancel(e.id);
+  assert.ok(sent.includes('automation-stop'));
+  await assert.rejects(a.started(e.id, 'note', true), /cancelled/);
+});
+test('sync fingerprints ignore property order but preserve intentional repeated speech', () => {
+  assert.equal(noteHash(note), noteHash({ ...note, segments: [], updatedAt: 9 }));
+  assert.notEqual(noteHash(note), noteHash({ ...note, body: 'First First' }));
+  assert.equal(
+    syncDecision({ ...note, body: 'Edited' }, undefined, { hash: noteHash(note), remote: 1 }),
+    'conflict-deleted',
+  );
+});
+test('continuous sync survives conflicts, server deletion, retry and a changed account without losing local edits', async () => {
+  const db = database(),
+    v = vault(),
+    ws = createWorkspace({ vault: v, emit: () => {} });
+  let account = 'owner';
+  const request = async (p) => {
+    const r = await cloudRequest(
+        new Request('https://flow.example/api/cloud', {
+          method: 'POST',
+          headers: { Origin: 'https://flow.example' },
+          body: JSON.stringify(p),
+        }),
+        db,
+        { userId: account, email: account + '@example.com' },
+      ),
+      d = await r.json();
+    if (!r.ok) throw Object.assign(Error(d.error), { status: r.status });
+    return d.value;
+  };
+  const sync = createSync({ vault: v, workspace: ws, request, emit: () => {} });
+  await ws.save(note);
+  await sync.enable();
+  await sync.tick();
+  const first = (await ws.list())[0];
+  await ws.save({ ...first, body: 'Local change' }, first.updatedAt);
+  const remote = await request({ action: 'sync.get', id: note.id });
+  await request({
+    action: 'sync.save',
+    note: { ...remote, body: 'Web change' },
+    baseUpdatedAt: remote.updatedAt,
+  });
+  await sync.tick();
+  let all = await ws.list();
+  assert.equal(all.find((n) => n.id === note.id).body, 'Web change');
+  assert.ok(all.some((n) => n.id.startsWith('conflict_') && n.body === 'Local change'));
+  await sync.tick();
+  assert.equal((await request({ action: 'sync.index' })).length, 2);
+  const current = await request({ action: 'sync.get', id: note.id });
+  await request({ action: 'sync.delete', id: note.id, baseUpdatedAt: current.updatedAt });
+  await sync.tick();
+  assert.ok(!(await ws.list()).some((n) => n.id === note.id));
+  const before = await ws.list();
+  account = 'someone-else';
+  await sync.tick();
+  assert.match((await sync.status()).error, /different account/);
+  assert.deepEqual(await ws.list(), before);
+});
+test('sync cannot overwrite an edit made while a network request was in flight', async () => {
+  const v = vault(),
+    ws = createWorkspace({ vault: v, emit: () => {} }),
+    old = await ws.save(note);
+  await ws.save({ ...old, body: 'Typing while syncing' }, old.updatedAt);
+  assert.equal(await ws.syncApply({ ...old, body: 'Remote' }, old.updatedAt, old.id), false);
+  assert.equal((await ws.list())[0].body, 'Typing while syncing');
+});
+test('local PCM conversion produces a valid 16 kHz file and rejects arbitrary/truncated input', () => {
+  const input = encodeWav(new Float32Array(24000).fill(0.25), 24000),
+    out = mono16kWav(input);
+  assert.equal(out.readUInt32LE(24), 16000);
+  assert.equal(out.length, 32044);
+  assert.ok(Math.abs(out.readInt16LE(44) - 8192) <= 1);
+  assert.throws(() => mono16kWav(Buffer.from('not audio')));
+  assert.throws(() => mono16kWav(Buffer.from(input).subarray(0, 80)));
+});
+test('managed policy rejects malformed values and enforces cloud, recording and export restrictions', () => {
+  assert.throws(() => validatePolicy({ allowCloudAI: 'true' }));
+  const p = validatePolicy({ allowCloudAI: false, allowRecording: false, allowExports: false });
+  for (const action of ['ai', 'queue.add', 'backup.export']) assert.throws(() => enforcePolicy(p, action));
+  assert.doesNotThrow(() => enforcePolicy(p, 'notes.list'));
+});
+test('cloud-disabled policy prevents transcription provider calls', async () => {
+  let sent = 0;
+  const ws = createWorkspace({
+    vault: vault({ credentials: { openaiKey: 'sk-test' } }),
+    emit: () => {},
+    policy: () => ({ ...managedDefaults, allowCloudAI: false }),
+    fetcher: () => {
+      sent++;
+      throw Error('Provider must not be called');
+    },
+  });
+  await assert.rejects(ws.transcribe({ audioBuffer: Buffer.alloc(50) }), /policy/);
+  assert.equal(sent, 0);
+  assert.equal((await ws.status()).speechConfigured, false);
+});
+test('native dictation profiles retain their version and migrate the earlier unversioned vault format', async () => {
+  const profile = { version: 2, terms: [], snippets: [], history: [], settings: defaults },
+    v = vault(),
+    ws = createWorkspace({ vault: v, emit: () => {} });
+  await ws.profileSave(profile);
+  assert.ok(validateBackup(await ws.profileGet()));
+  const { version, ...old } = profile;
+  await v.write('profile', old);
+  assert.equal((await ws.profileGet()).version, 2);
+  const backup = await ws.backup();
+  assert.ok(validateBackup(backup.profile));
+});
+function release(bytes = Buffer.alloc(1000000)) {
+  const keys = crypto.generateKeyPairSync('ed25519'),
+    publicKey = keys.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+    feed = 'https://releases.example/flow.json',
+    m = {
+      product: 'com.flowworkspace.desktop',
+      platform: 'win32-x64',
+      version: '0.4.0',
+      url: 'https://releases.example/Flow.exe',
+      bytes: bytes.length,
+      sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+    };
+  const sign = (value) => {
+    const payload = JSON.stringify(value);
+    return {
+      payload,
+      signature: crypto.sign(null, Buffer.from(payload), keys.privateKey).toString('base64'),
+    };
+  };
+  return { publicKey, feed, m, envelope: sign(m), sign, bytes };
+}
+test('updater rejects tampered, expired, cross-origin and incompatible signed manifests', () => {
+  const r = release();
+  assert.equal(verifyManifest(r.envelope, r.publicKey, r.feed, '0.3.0').available, true);
+  assert.throws(() =>
+    verifyManifest({ ...r.envelope, payload: r.envelope.payload + ' ' }, r.publicKey, r.feed, '0.3.0'),
+  );
+  for (const m of [
+    { ...r.m, url: 'https://attacker.example/Flow.exe' },
+    { ...r.m, expiresAt: new Date(0).toISOString() },
+    { ...r.m, platform: 'linux-x64' },
+  ])
+    assert.throws(() => verifyManifest(r.sign(m), r.publicKey, r.feed, '0.3.0'));
+  assert.equal(
+    verifyManifest(r.sign({ ...r.m, version: '0.2.0' }), r.publicKey, r.feed, '0.3.0').available,
+    false,
+  );
+});
+test('installer download and install require matching content, trusted publisher and an idle app', async (t) => {
+  const cacheDir = await fs.mkdtemp(path.join(os.tmpdir(), 'flow-update-test-'));
+  t.after(() => fs.rm(cacheDir, { recursive: true, force: true }));
+  const r = release(),
+    thumbprint = 'A'.repeat(40);
+  let idle = false,
+    launched = false,
+    publisher = thumbprint;
+  const u = createUpdates({
+    vault: vault(),
+    cacheDir,
+    current: '0.3.0',
+    fetcher: async (url) => (url === r.feed ? Response.json(r.envelope) : new Response(r.bytes)),
+    verifyInstaller: async () => ({ valid: true, thumbprint: publisher }),
+    canInstall: () => idle,
+    launch: async () => {
+      launched = true;
+    },
+  });
+  await u.configure({ feed: r.feed, publicKey: r.publicKey, publisherThumbprint: thumbprint });
+  publisher = 'B'.repeat(40);
+  await assert.rejects(u.download(), /publisher/);
+  publisher = thumbprint;
+  await u.download();
+  await assert.rejects(u.install(), /Finish/);
+  assert.equal(launched, false);
+  idle = true;
+  await fs.writeFile(path.join(cacheDir, 'Flow-update.exe'), 'tampered');
+  await assert.rejects(u.install(), /changed/);
+  await u.download();
+  await u.install();
+  assert.equal(launched, true);
+});

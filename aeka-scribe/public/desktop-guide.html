@@ -1,71 +1,833 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Flow Desktop · Setup and feature status</title><style>body{font:15px/1.8 system-ui,sans-serif;color:#294234;background:#f6f8f2;max-width:1050px;margin:50px auto;padding:0 25px}h1,h2{font-family:Georgia,serif;font-weight:400;line-height:1.3}h1{font-size:38px}h2{font-size:26px;margin-top:40px}a{color:#356b44}table{border-collapse:collapse;width:100%;background:white;font-size:13px}th,td{padding:13px 16px;text-align:left;border:1px solid #dce5d4;vertical-align:top}th{background:#eaf0e3}code{font-size:13px;background:#e9efe1;padding:2px 5px;border-radius:4px}.callout{padding:20px;background:#edf2e6;border:1px solid #d3e0c7;border-radius:10px}.warning{background:#fff7e8;border-color:#ecdbb6}.muted{color:#73866a;font-size:13px}li{margin:9px 0}@media(max-width:650px){body{margin:25px auto;padding:0 16px}table{font-size:11px}th,td{padding:9px}h1{font-size:30px}}</style></head><body>
-<p class="muted">FLOW WORKSPACE · VERSION 0.5.0 · 20 OCTOBER 2026</p><h1>Your voice, across Windows.</h1><p>An independent dictation and meeting workspace inspired by publicly documented Wispr Flow and Granola features. It implements its own functionality and does not contain either vendor’s source code, credentials, branding or proprietary service access.</p>
-<div class="callout warning"><strong>Build status:</strong> Windows x64 package built from Linux. Source checks, 112 automated tests and isolated interface checks passed. Windows execution, real microphone/system audio, cursor insertion, calendar consent and paid AI calls still need a real Windows smoke test. The executable is unsigned. This is a development release, not a claim of full Wispr Flow parity.</div>
-<h2>Start on Windows</h2><ol><li>Download the Windows ZIP supplied with this workspace. Use the NSIS installer for a normal per-user installation, or extract the <strong>entire ZIP folder</strong> to a location you control, then open <strong>Flow Desktop.exe</strong>. Keep its resource files beside it. Windows 10/11 x64 is required.</li><li>Open <strong>Desktop &amp; calendars</strong>. Add your OpenAI API key there. The key is encrypted for your Windows account; do not paste it into a chat or note. API usage is billed to your own provider account.</li><li>Choose your microphone and language under <strong>Settings</strong>. Make a short dictation in Flow first. Then focus a normal text field in another app and use <code>Ctrl+Shift+Space</code> to start and finish.</li><li>Automatic insertion checks the original foreground window and the focused field. If focus changes, a password field is detected, or Windows blocks access, use Copy. Your previous clipboard is restored if it was not changed in the meantime.</li><li>For a meeting, open <strong>Meetings</strong>, confirm that participants know you are recording, and choose microphone plus system audio or microphone only. Start, pause, resume and finish from the recording controls.</li><li>Completed audio chunks are saved before transcription. Keep Flow open to process pending audio. If offline or missing an API key, the queue remains on this device. For offline transcription, configure a trusted whisper.cpp executable and ggml model, select Local Whisper and save preferences. Models and binaries are not bundled.</li></ol>
-<p class="muted">Closing the main window keeps Flow in its tray. Use the tray to reopen or quit. Normal Quit offers to finish an active recording before closing. Forced termination still cannot flush unsaved audio. A power failure or forced termination may lose the current unsaved chunk (up to approximately 20 seconds); previously saved chunks are recovered on restart. Windows policies may block the bundled PowerShell helper. Flow reports that failure; do not disable organization security controls.</p>
-<h2>Shortcuts</h2><table><tr><th>Action</th><th>Default</th></tr><tr><td>Start / finish dictation</td><td>Ctrl + Shift + Space</td></tr><tr><td>Cancel dictation</td><td>Ctrl + Shift + Escape</td></tr><tr><td>Paste last completed dictation</td><td>Ctrl + Shift + V</td></tr><tr><td>Bring selected text into Transforms</td><td>Ctrl + Shift + E; selected-text access must be enabled</td></tr><tr><td>Hold-to-talk</td><td>Hold F8, release to finish; enable this option first</td></tr></table><p>Shortcuts can conflict with other applications. Save another combination in Desktop settings if registration fails. App styles use process names such as <code>WINWORD</code> or <code>OUTLOOK</code>.</p>
-<h2>Connect Google Calendar or Outlook</h2><p>The ChatGPT Google Calendar plugin and the independent Windows executable use separate connections. The ChatGPT plugin being connected does not give this executable account credentials.</p><ol><li>Register an OAuth client you control. For Google, enable the Calendar API, configure consent/testing users and create a <strong>Desktop app</strong> client. For Microsoft, register a public desktop application with supported account types, read-only delegated Calendar access, and a <strong>Mobile and desktop application</strong> redirect of <code>http://localhost/callback</code>. The app chooses a local ephemeral port.</li><li>In Desktop settings, expand <strong>Calendar app registration</strong>. Save the provider's client ID. If Google's desktop registration provides a client secret, save that too. Do not use a web-app client or an unrelated secret.</li><li>Choose <strong>Connect</strong>. Complete sign-in and consent in your system browser. Flow uses PKCE and a short-lived local callback. Calendar access is read-only by default. Optional email-read, email-send and calendar-write permissions are requested only after you select them under Email, collaboration &amp; CRM and reconnect.</li><li>Refresh Meetings. The app reads the next 14 days from the primary Google calendar or default Outlook calendar, up to 250 events per account. A failed refresh keeps prior events with an error message. Disconnect removes local access and refresh tokens. Revoke the grant in your provider account to remove provider-side consent as well.</li></ol><p><a href="https://developers.google.com/identity/protocols/oauth2/native-app">Google desktop OAuth documentation</a> · <a href="https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app">Microsoft app registration</a></p><p><strong>Joining a call opens its supported HTTPS meeting link.</strong> Your browser or calling application handles login, admission, microphone and camera access. Flow does not bypass call login and does not join as a meeting bot. Reviewed calendar workflows can separately create events and send invitations after explicit confirmation.</p>
-<h2>Feature status</h2><table><tr><th>Area</th><th>Implemented in this build</th><th>Limit / setup still required</th></tr>
-<tr><td>Desktop shell</td><td>Tray, launch at login, non-focusing recording overlay, global shortcuts, optional F8 hold-to-talk, single-instance launch</td><td>Real Windows verification; Portable ZIP and per-user NSIS installer are supplied; both are unsigned</td></tr>
-<tr><td>Dictation</td><td>Microphone selection, languages, cloud transcription, cancellation, failed-recording retry/download, five-minute recording limit</td><td>Own OpenAI key, or your own trusted whisper.cpp executable and ggml model</td></tr>
-<tr><td>Insertion &amp; context</td><td>Guarded paste, clipboard restoration, password-field checks, excluded apps, optional selected text, per-process cleanup style</td><td>Some apps, elevated windows or inaccessible fields require manual copy. No screen-reading context or browser-domain style rules</td></tr>
-<tr><td>Cleanup &amp; correction</td><td>Verbatim, light local cleanup, sentences/bullets, vocabulary and snippets, original recovery; explicit self-corrections can use an AI transform</td><td>AI changes require review; no claim of vendor Smart Formatting equivalence</td></tr>
-<tr><td>Dictionary &amp; snippets</td><td>Personal vocabulary/snippets, exact expansion, profile backup, shared versioned team dictionaries and explicit imports</td><td>No automatic learning of corrections or organization-wide identity management</td></tr>
-<tr><td>Transforms / command</td><td>Polish, concise, email, bullets, prompt editing, self-correction, translation, eight saved custom instructions, before/after review, undo, number/negation warnings</td><td>Own AI key; no web-search assistant or automatic replacement of another app's selection</td></tr>
-<tr><td>Calendar</td><td>Google and Microsoft OAuth, refresh/disconnect, events, invitees, meeting links, reminders and snooze</td><td>Own OAuth client registration and live consent. ChatGPT-hosted calendar binding unavailable in this environment</td></tr>
-<tr><td>Meeting capture</td><td>Microphone + Windows loopback, visible recording, pause/resume, four-hour limit, durable chunk queue, device interruption recovery</td><td>Real audio-path verification; current unfinished chunk is not crash-proof</td></tr>
-<tr><td>Call detection</td><td>Call-window suggestions; explicit per-meeting scheduling; 20-second countdown; cancel and extend controls</td><td>Selected calendar meetings can auto-record, open their call link and stop at end plus grace. No authoritative call-state integration or meeting bot</td></tr>
-<tr><td>Transcripts</td><td>Timestamped chunks, retry by stable ID, optional cloud diarization for chunks/imports, editable speaker names</td><td>Speaker labels are scoped to each chunk/import. Cross-chunk speaker identity is not inferred. Import limit: 20 MB</td></tr>
-<tr><td>Meeting intelligence</td><td>Editable summaries, optional automatic drafts after transcription, decisions/actions, Scoped chat over up to 2,000 notes, with up to 24 selected source notes and citations</td><td>Own AI key; review inferred summaries. No independent task completion tracking</td></tr>
-<tr><td>Scratchpads</td><td>Editable notes, search across notes/transcripts, folders, Markdown export, conflict protection</td><td>Explicit Save for text edits; up to 2,000 notes, 1.75 MB per note and 16 MB of notes per workspace</td></tr>
-<tr><td>Storage &amp; sync</td><td>Encrypted Windows vault, backups, manual folder snapshots, opt-in continuous desktop/web note sync with conflict copies and deletions</td><td>Web sign-in required. Sync checks every 15 seconds, up to 25 changes per pass. Native sign-in/cookie handling still needs a Windows smoke test. Audio, keys, calendar tokens, history and preferences are excluded</td></tr>
-<tr><td>Privacy</td><td>History/note retention, audio deletion, removal after transcription, managed device policy and hosted sharing/AI controls</td><td>Windows encryption does not protect against every process running as the same Windows user. Provider data policies remain separate</td></tr>
-<tr><td>Sharing, teams &amp; integrations</td><td>Viewer/editor grants, expiring/revocable access, comments, shared dictionaries, optimistic edits and a bounded metadata audit trail</td><td>Site audience still controls access; no invitations or public links. Read-only account-scoped MCP search/retrieval is available through the private Flow plugin. No Slack connector, SSO, SCIM or MDM enrollment. Audit is not a tamper-proof compliance archive</td></tr>
-<tr><td>Usage &amp; updates</td><td>Personal usage counts; signed-manifest update checks, verified downloads, explicit installation and NSIS packaging</td><td>Publisher feed, Ed25519 public key and Windows certificate are required for updates. No vendor Voice Profile model or compliance certification</td></tr></table>
-<h2>New in 0.3: automation, sync and collaboration</h2>
-<p><strong>Meeting automation:</strong> Refresh your calendar, choose a meeting under Schedule a recording, confirm participant notification and select system audio, optional call-link opening and a stop grace period. Keep Flow open and Windows unlocked. A visible countdown offers Cancel. Stale calendars, missed starts and overlapping recordings are skipped. Extend a running scheduled recording by 15 minutes when needed. A cancelled or interrupted start is never silently retried.</p>
-<p><strong>Continuous sync:</strong> Open Desktop settings, opt in to copying notes to your web account, then choose Connect account &amp; enable sync. Sign in in the separate sandboxed web window and close it. Flow uses the hosted site's existing sign-in, not an embedded service token. It pins the first account to this vault and refuses a different account. Notes, folders, summaries and transcripts sync; raw audio, history, API keys and calendar tokens do not. Conflicts are retained as separate notes. Recording/pending-audio notes wait. Web note pages refresh every 15 seconds while visible. If embedded sign-in is rejected, sync remains disconnected and local capture still works; there is no authentication bypass.</p>
-<p><strong>Sharing &amp; controls:</strong> Choose a synced note or published team dictionary and grant viewer/editor access to an exact sign-in email, with optional expiry. Viewers can read/comment; editors can also revise. Grants do not invite people or change this owner's private site audience. The owner must separately enable appropriate site access before another account can participate. Unsaved or simultaneous edits use revision checks. Comments and transcript text render as text. Dictionary imports preserve existing local phrases/triggers; excess items beyond 500 terms/200 snippets are not imported.</p>
-<p><strong>ChatGPT integration:</strong> The hosted workspace publishes read-only MCP tools for note search and retrieval. Connect the Flow workspace plugin in ChatGPT under Plugins → Personal → Created by you. Each caller can read only their own notes; raw audio, shared notes, credentials and dictation history are excluded. Turning off hosted cloud AI disables these note tools. No separate local MCP configuration is needed.</p><p><strong>Policies:</strong> Hosted sharing and cloud-AI controls are enforced on server requests. Hosted note retention runs on access, up to 100 expired notes per request; local note retention runs while Flow is open. Active recordings and pending native audio are protected. The audit stores event metadata only, up to 1,000 events per owner (latest 200 shown). It is not an immutable compliance archive. Administrators can install the supplied Admin/policy.example.json at <code>%ProgramData%\Flow Desktop\policy.json</code> with administrator-only write permissions.</p>
-<p><strong>Updates:</strong> Publisher setup accepts only a public release-signing key, HTTPS feed and Windows publisher certificate thumbprint. A compatible, unexpired signed manifest, exact byte count/hash and valid Windows publisher signature are all required. Optional automatic downloads check every six hours. Installation requires a click and waits for recordings/transcription to finish. No production signing certificate or feed is included, and the delivered unsigned build cannot pass this production update check. See Admin/ADMIN-SETUP.txt.</p>
-<p><strong>Reliability:</strong> The dictation repetition regression is preserved. Queue processing can be awaited safely during retries, note completion handles concurrent transcription updates, and dictation profiles retain their version marker. Existing unversioned native profiles from 0.2 migrate on load.</p>
-<h2>New in 0.4: a meeting workspace inspired by Granola</h2>
-<p>This comparison uses Granola’s public desktop documentation, checked on 20 October 2026. It is a feature-by-feature implementation record, not a claim of complete service parity.</p>
-<table><tr><th>Granola capability</th><th>Flow 0.5 equivalent</th><th>Boundaries</th></tr>
-<tr><td>Bot-free recording and enhanced notes</td><td>Existing mic/system-audio recording, durable transcription queue, separate handwritten notes and reviewed AI summaries.</td><td>System audio, device permissions and provider quality still need a real Windows call test.</td></tr>
-<tr><td>Custom templates</td><td>Six original defaults, custom instructions and headings, default template, output language and user context. Preview before applying; keep eight prior summary revisions.</td><td>Templates are independent implementations, not copied vendor prompts. Configure AI first.</td></tr>
-<tr><td>Recipes and cross-meeting chat</td><td>Saved prompts with one/many-meeting scope, remix/search, / shortcut, threaded chat, folder/person/company/date/individual selection, source inspection and saved conversation notes.</td><td>Keyword ranking and recency select up to 24 meetings from up to 2,000 saved notes. Long evidence is excerpted and coverage disclosed. Desktop also supports an opt-in semantic index using OpenAI embeddings. It indexes the first 6,000 characters per note, requires explicit refresh, and is not an exhaustive search.</td></tr>
-<tr><td>People and companies</td><td>Directories, meeting history and scoped chat from saved attendee emails; calendar note preparation captures attendees and times.</td><td>Companies are grouped by email domain. No automatic external profiles, role/photo enrichment or CRM identity matching. Explicit CRM action previews resolve the record ID you enter.</td></tr>
-<tr><td>Pre-meeting briefs</td><td>Prepare a note from a calendar event; generate a brief using prior notes matching people, company domain or title.</td><td>On demand or a local daily schedule while Flow is open and Windows awake. No always-on cloud service or automatic inbox/web research. Existing briefs and concurrent edits are preserved.</td></tr>
-<tr><td>Follow-up drafts and actions</td><td>Reviewed email draft, copy/.eml handoff, extract or manually add action items with owner, due date and completion; export dated VTODO tasks.</td><td>Native reviewed workflows send Gmail/Outlook mail, post to Slack, publish to Notion/CRMs and create Google/Outlook invitations. Provider configuration and scopes are required. No automatic sending.</td></tr>
-<tr><td>Attached chat context</td><td>Extract PDF, DOCX, text, Markdown, CSV and JSON locally; extract JPEG/PNG/WebP text through an explicit OpenAI request. Preview and edit before attaching.</td><td>10 files per note; 30,000 characters each, 100,000 total. Only extracted text is saved. Maximum input 10 MB, PDF extraction capped at 100 pages. Password-protected PDFs unsupported; attach page images for scanned PDFs.</td></tr>
-<tr><td>Folders, sharing and organisation</td><td>Multiple folders, slash-delimited subfolders, tags, stars, text search, note/folder grants with viewer/editor roles, expiry, comments and revocation. Folder grants include future notes; owner controls membership.</td><td>Hosted workspace remains owner-private until its audience is explicitly expanded. Named team spaces, group roles and organisation administration are not implemented. Playbooks transfer by JSON export/import rather than live team sync.</td></tr>
-<tr><td>Transcript corrections and deletion</td><td>Search, correct or remove transcript segments; highlight evidence; rename speakers. Editing waits for pending transcription.</td><td>Removing text does not erase retained audio, previously generated summaries or independent exports. Delete raw audio separately in Desktop settings.</td></tr>
-<tr><td>Trash and restoration</td><td>Restore for 30 days; permanent deletion; expiry cleanup on access/maintenance. Trashed notes excluded from sharing, chat and MCP.</td><td>Shorter retention policies take precedence. Independent backups remain separate. Existing grants resume if a note is restored.</td></tr>
-<tr><td>Speaker identification</td><td>Existing optional cloud diarization and manual labels.</td><td>Labels are chunk-local; no browser companion for Zoom/Meet/Teams participant-name matching.</td></tr>
-<tr><td>Shared-screen snapshots</td><td>No automatic capture added.</td><td>Granola documents this feature as Mac-only (macOS 14+), not Windows. Flow image text extraction can attach manually captured context.</td></tr>
-<tr><td>Integrations and enterprise services</td><td>Read-only MCP, Google/Microsoft OAuth with optional email/calendar actions, Slack, Notion, Zapier, HubSpot, Attio and Affinity reviewed exports; encrypted credentials and delivery history.</td><td>Native adapters require your provider registrations/tokens and live verification. Hosted connectors, a public webhook receiver, external SSO/SCIM, organisation-wide legal holds and vendor compliance certifications remain unavailable. Hosted sign-in stays with ChatGPT.</td></tr>
-</table>
-<p>Sources: <a href="https://docs.granola.ai/help-center/taking-notes/ai-enhanced-notes">Enhanced notes</a> · <a href="https://docs.granola.ai/help-center/taking-notes/customise-notes-with-templates">Templates</a> · <a href="https://docs.granola.ai/help-center/getting-more-from-your-notes/recipes">Recipes</a> · <a href="https://docs.granola.ai/help-center/getting-more-from-your-notes/chatting-with-your-meetings">Chat</a> · <a href="https://docs.granola.ai/help-center/people-and-companies">People &amp; companies</a> · <a href="https://docs.granola.ai/help-center/taking-notes/pre-meeting-briefs">Briefs</a> · <a href="https://docs.granola.ai/help-center/sharing/folders/spaces-and-folders">Folders</a> · <a href="https://docs.granola.ai/help-center/taking-notes/capture-shared-screens">Screen capture</a> · <a href="https://docs.granola.ai/help-center/taking-notes/deleting-notes">Trash</a> · <a href="https://docs.granola.ai/help-center/taking-notes/follow-up-emails">Follow-ups</a> · <a href="https://docs.granola.ai/help-center/getting-more-from-your-notes/workflows-in-chat">Workflows</a>.</p>
-<h2>New in 0.5: connected workflows and preparation</h2>
-<p><strong>Document context:</strong> Open a saved note → Meeting toolkit → Attached context. PDF and Word text is parsed locally. Images are resized locally; clicking Extract text with OpenAI sends that image to your configured API account. Inspect names, amounts and unclear passages before adding the text. Original files/images are not stored. The attached text follows note sync, sharing and retention.</p>
-<p><strong>Reviewed actions:</strong> Desktop settings now has encrypted connections for Slack, Notion, HubSpot, Attio, Affinity and Zapier. In a note, open Send, publish or schedule, enter an exact destination, edit the title/text, and choose Verify destination &amp; preview. Flow reads the destination record before showing the final review. For token connections, the account label is supplied by you; check the returned destination carefully. Google/Microsoft email accounts are verified during OAuth sign-in. Calendar previews check for overlapping events. The final checkbox and send/create button are required. No service is called to send during setup.</p>
-<table><tr><th>Provider</th><th>Setup</th><th>Action</th></tr>
-<tr><td>Gmail</td><td>Enable Gmail API in your Google project. Save desktop OAuth registration; choose mailSend and optionally mailRead, then reconnect. Google consent/verification and test-user restrictions may apply.</td><td>Send reviewed plain-text email; optionally import selected snippets from up to 10 recent messages involving up to five addresses.</td></tr>
-<tr><td>Outlook</td><td>Microsoft delegated Mail.Send, optional Mail.Read; reconnect. Tenant admin consent may be required.</td><td>Send reviewed email and retain it in Sent Items. Optional context reads received message previews from selected senders.</td></tr>
-<tr><td>Google / Outlook Calendar</td><td>Choose calendarWrite and reconnect; the provider consent screen must grant it.</td><td>Create a reviewed event, with attendee invitations when addresses are entered. Conflict check covers the connected primary/default calendar only.</td></tr>
-<tr><td>Slack</td><td>Bot token with chat:write and channels:read; groups:read for private channels. Invite the bot to the channel.</td><td>Post plain text to an exact channel ID. No broadcast mentions, link unfurls or automatic posting.</td></tr>
-<tr><td>Notion</td><td>Internal integration token with Read content and Insert content; add the integration to the parent page.</td><td>Create a child page under the verified parent page ID. Database/data-source properties are not managed.</td></tr>
-<tr><td>HubSpot</td><td>Private app token with access to notes and the selected contact/company/deal records.</td><td>Create a note associated with the exact verified CRM record.</td></tr>
-<tr><td>Attio</td><td>Workspace token with note:read-write, record_permission:read and object_configuration:read.</td><td>Create a plain-text note on a people/company/deal record.</td></tr>
-<tr><td>Affinity</td><td>API key owned by the account that should create the note.</td><td>Add a plain-text note to a person, organization or opportunity.</td></tr>
-<tr><td>Zapier</td><td>An HTTPS hooks.zapier.com Catch Hook URL. Review your Zap’s downstream steps.</td><td>Send the reviewed title/body and a delivery ID. Hook acceptance does not confirm downstream actions.</td></tr></table>
-<p><strong>Delivery safeguards:</strong> Previews expire after 15 minutes and become invalid when their source note or account changes. Duplicate submissions are blocked within the retained 100-entry history. Timeouts, server failures and unreadable receipts are marked uncertain; check the destination before attempting another action. There is no automatic replay. Accepted email requests do not prove recipient delivery. Completed/expired preview bodies are cleared; deleted or trashed source notes remove their local delivery records during maintenance. API credentials and connection state are excluded from backups and note sync.</p>
-<p><strong>Automatic briefs:</strong> In Desktop settings, enable the schedule, choose a local hour, a 12/24/48-hour lookahead and a daily limit of 5/10/20. One eligible meeting with invitees or a call link is prepared per minute after that hour, using prior related saved notes. New notes go into your chosen folder. Keep Flow running, Windows awake, calendar access fresh and OpenAI configured. After sleep or shutdown, only future meetings are considered. It does not automatically join calls, read email, send messages or run while the machine is off. Failed/interrupted generations require an explicit retry.</p>
-<p><strong>Semantic search:</strong> Explicitly build/refresh the local index, then enable it. OpenAI text-embedding-3-small produces encrypted local vectors; each ask embeds the question and combines semantic matches with keywords inside your chosen scope. New/edited notes require refresh. Trash, deleted notes and active recordings are excluded; changed/deleted notes lose old vectors. Index content is limited to the first 6,000 characters per note. Indexing and questions incur API usage; the index is not backed up or synced.</p>
-<p><strong>Still outside this release:</strong> External SSO/SCIM and hosted connector access depend on platform support that is not exposed here. Team spaces/groups, live shared-playbook synchronization, automatic CRM profile enrichment, participant-name browser extensions, public webhook receiving and always-on cloud briefing remain unimplemented. This build does not reproduce vendor certifications, proprietary prompts or service infrastructure.</p>
-<p><strong>Verification:</strong> 112 automated tests pass. New tests cover permission separation, frozen review payloads, duplicate and uncertain sends, provider response contracts, scheduler idempotence/concurrent edits, document safety and semantic scope isolation. PDF and DOCX extraction and the reviewed-send UI were checked with local test fixtures; those fixtures are not included in the release. No live messages, invitations, CRM notes or paid AI requests were sent during testing.</p>
-<h2>Storage and recovery</h2><p>Native notes, profile, tokens and saved meeting audio are encrypted in Flow's local Windows user-data directory. A random vault key is wrapped by Windows DPAPI through Electron safeStorage. If another Windows account cannot unlock the key, the app does not silently replace it.</p><p>Portable snapshots use a separate password and authenticated encryption. They include notes, templates/recipes, dictation profile and preferences, but exclude API keys, calendar tokens and audio. Imports preserve conflicting notes as separate copies. Keep your password; it cannot be recovered. Manually saving a snapshot to a synced folder replaces the previous snapshot, so use your cloud provider's version history or dated exports for backups. Manual snapshots do not propagate deletions. Continuous web sync does; a local edit to a deleted note becomes a separate conflict copy. Independent backups are unaffected.</p><p>Browser dictation profile/history remains in browser storage. Hosted scratchpads/meeting text are saved under your authenticated site identity. Browser meeting audio waits locally in IndexedDB and is removed after successful transcription. Clearing browser data can erase pending audio. Raw audio is not stored in the hosted database.</p>
-<h2>Models</h2><p>The default speech model is <code>gpt-transcribe</code>. Speaker-separated audio import uses <code>gpt-4o-transcribe-diarize</code>. Summaries, Ask and text transformations default to <code>gpt-4.1-mini</code>, configurable in the native app. Speech recognition and text rewriting are distinct steps. Compare representative Indian English, Hindi/code-switching, names, amounts and negation before choosing a model for production use.</p><p><a href="https://developers.openai.com/api/docs/guides/speech-to-text">OpenAI speech documentation</a> · <a href="https://developers.openai.com/api/docs/models/gpt-4.1-mini">Text model documentation</a></p>
-<h2>Windows smoke test</h2><ol><li>Confirm launch, tray reopen and quit. Confirm shortcuts register and F8 release stops recording.</li><li>Dictate the reported “hello, how is the weather today?” example once; ensure one final sentence. Repeat a word deliberately and confirm it remains.</li><li>Check insertion in Notepad, Word and Outlook. Change focus during dictation; confirm automatic insertion is refused. Check password and elevated fields. Confirm clipboard restoration.</li><li>Record microphone only, then a test call with headphones and system audio. Pause/resume, unplug the microphone, and reconnect.</li><li>Disconnect the network, record two chunks, restart Flow, reconnect and retry. Confirm each chunk appears once and no unsaved recording is falsely shown as complete.</li><li>Connect each calendar using your client registrations; verify event timezone, refresh, reminders, meeting link and disconnect.</li><li>Generate a summary, Ask and a transform with your configured key. Check amounts, names, decisions and cited notes.</li><li>Enable sync with a test note, edit it on web/desktop, test a concurrent conflict and deletion, then disconnect. Confirm another signed-in account is refused.</li><li>Schedule and cancel a test recording, check the countdown and stop/extend controls, and verify missed/locked/overlapping starts are skipped.</li><li>With separately authorized site access, verify viewer/edit permissions, comments, revocation, expiry and team dictionary import. Do not use real sensitive notes for the first test.</li><li>Select your trusted local Whisper executable/model, transcribe offline and compare names/amounts against cloud output.</li><li>Export an encrypted snapshot and import it into another Windows account/device. Verify password rejection and conflict copies. Keep an ordinary dated backup before relying on sync-folder snapshots.</li></ol>
-<p class="muted">The 112 automated checks exercise sync/deletion conflicts, account pinning, sharing authorization, retention, automation cancellation/recovery, update integrity/publisher checks, profile migration and provider contracts with mock responses, encryption integrity, OAuth state rejection, transcript retry idempotence, final-frame flushing, user isolation and conflict handling. They do not establish microphone accuracy, hosted visitor consent or live provider connectivity.</p><p><a href="https://flow-voice-workspace.amithraj123.chatgpt.site">Open the hosted Flow workspace</a></p></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Flow Desktop · Setup and feature status</title>
+    <style>
+      body {
+        font:
+          15px/1.8 system-ui,
+          sans-serif;
+        color: #294234;
+        background: #f6f8f2;
+        max-width: 1050px;
+        margin: 50px auto;
+        padding: 0 25px;
+      }
+      h1,
+      h2 {
+        font-family: Georgia, serif;
+        font-weight: 400;
+        line-height: 1.3;
+      }
+      h1 {
+        font-size: 38px;
+      }
+      h2 {
+        font-size: 26px;
+        margin-top: 40px;
+      }
+      a {
+        color: #356b44;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        background: white;
+        font-size: 13px;
+      }
+      th,
+      td {
+        padding: 13px 16px;
+        text-align: left;
+        border: 1px solid #dce5d4;
+        vertical-align: top;
+      }
+      th {
+        background: #eaf0e3;
+      }
+      code {
+        font-size: 13px;
+        background: #e9efe1;
+        padding: 2px 5px;
+        border-radius: 4px;
+      }
+      .callout {
+        padding: 20px;
+        background: #edf2e6;
+        border: 1px solid #d3e0c7;
+        border-radius: 10px;
+      }
+      .warning {
+        background: #fff7e8;
+        border-color: #ecdbb6;
+      }
+      .muted {
+        color: #73866a;
+        font-size: 13px;
+      }
+      li {
+        margin: 9px 0;
+      }
+      @media (max-width: 650px) {
+        body {
+          margin: 25px auto;
+          padding: 0 16px;
+        }
+        table {
+          font-size: 11px;
+        }
+        th,
+        td {
+          padding: 9px;
+        }
+        h1 {
+          font-size: 30px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <p class="muted">FLOW WORKSPACE · VERSION 0.5.0 · 20 OCTOBER 2026</p>
+    <h1>Your voice, across Windows.</h1>
+    <p>
+      An independent dictation and meeting workspace inspired by publicly documented Wispr Flow and Granola
+      features. It implements its own functionality and does not contain either vendor’s source code,
+      credentials, branding or proprietary service access.
+    </p>
+    <div class="callout warning">
+      <strong>Build status:</strong> Windows x64 package built from Linux. Source checks, 112 automated tests
+      and isolated interface checks passed. Windows execution, real microphone/system audio, cursor insertion,
+      calendar consent and paid AI calls still need a real Windows smoke test. The executable is unsigned.
+      This is a development release, not a claim of full Wispr Flow parity.
+    </div>
+    <h2>Start on Windows</h2>
+    <ol>
+      <li>
+        Download the Windows ZIP supplied with this workspace. Use the NSIS installer for a normal per-user
+        installation, or extract the <strong>entire ZIP folder</strong> to a location you control, then open
+        <strong>Flow Desktop.exe</strong>. Keep its resource files beside it. Windows 10/11 x64 is required.
+      </li>
+      <li>
+        Open <strong>Desktop &amp; calendars</strong>. Add your OpenAI API key there. The key is encrypted for
+        your Windows account; do not paste it into a chat or note. API usage is billed to your own provider
+        account.
+      </li>
+      <li>
+        Choose your microphone and language under <strong>Settings</strong>. Make a short dictation in Flow
+        first. Then focus a normal text field in another app and use <code>Ctrl+Shift+Space</code> to start
+        and finish.
+      </li>
+      <li>
+        Automatic insertion checks the original foreground window and the focused field. If focus changes, a
+        password field is detected, or Windows blocks access, use Copy. Your previous clipboard is restored if
+        it was not changed in the meantime.
+      </li>
+      <li>
+        For a meeting, open <strong>Meetings</strong>, confirm that participants know you are recording, and
+        choose microphone plus system audio or microphone only. Start, pause, resume and finish from the
+        recording controls.
+      </li>
+      <li>
+        Completed audio chunks are saved before transcription. Keep Flow open to process pending audio. If
+        offline or missing an API key, the queue remains on this device. For offline transcription, configure
+        a trusted whisper.cpp executable and ggml model, select Local Whisper and save preferences. Models and
+        binaries are not bundled.
+      </li>
+    </ol>
+    <p class="muted">
+      Closing the main window keeps Flow in its tray. Use the tray to reopen or quit. Normal Quit offers to
+      finish an active recording before closing. Forced termination still cannot flush unsaved audio. A power
+      failure or forced termination may lose the current unsaved chunk (up to approximately 20 seconds);
+      previously saved chunks are recovered on restart. Windows policies may block the bundled PowerShell
+      helper. Flow reports that failure; do not disable organization security controls.
+    </p>
+    <h2>Shortcuts</h2>
+    <table>
+      <tr>
+        <th>Action</th>
+        <th>Default</th>
+      </tr>
+      <tr>
+        <td>Start / finish dictation</td>
+        <td>Ctrl + Shift + Space</td>
+      </tr>
+      <tr>
+        <td>Cancel dictation</td>
+        <td>Ctrl + Shift + Escape</td>
+      </tr>
+      <tr>
+        <td>Paste last completed dictation</td>
+        <td>Ctrl + Shift + V</td>
+      </tr>
+      <tr>
+        <td>Bring selected text into Transforms</td>
+        <td>Ctrl + Shift + E; selected-text access must be enabled</td>
+      </tr>
+      <tr>
+        <td>Hold-to-talk</td>
+        <td>Hold F8, release to finish; enable this option first</td>
+      </tr>
+    </table>
+    <p>
+      Shortcuts can conflict with other applications. Save another combination in Desktop settings if
+      registration fails. App styles use process names such as <code>WINWORD</code> or <code>OUTLOOK</code>.
+    </p>
+    <h2>Connect Google Calendar or Outlook</h2>
+    <p>
+      The ChatGPT Google Calendar plugin and the independent Windows executable use separate connections. The
+      ChatGPT plugin being connected does not give this executable account credentials.
+    </p>
+    <ol>
+      <li>
+        Register an OAuth client you control. For Google, enable the Calendar API, configure consent/testing
+        users and create a <strong>Desktop app</strong> client. For Microsoft, register a public desktop
+        application with supported account types, read-only delegated Calendar access, and a
+        <strong>Mobile and desktop application</strong> redirect of <code>http://localhost/callback</code>.
+        The app chooses a local ephemeral port.
+      </li>
+      <li>
+        In Desktop settings, expand <strong>Calendar app registration</strong>. Save the provider's client ID.
+        If Google's desktop registration provides a client secret, save that too. Do not use a web-app client
+        or an unrelated secret.
+      </li>
+      <li>
+        Choose <strong>Connect</strong>. Complete sign-in and consent in your system browser. Flow uses PKCE
+        and a short-lived local callback. Calendar access is read-only by default. Optional email-read,
+        email-send and calendar-write permissions are requested only after you select them under Email,
+        collaboration &amp; CRM and reconnect.
+      </li>
+      <li>
+        Refresh Meetings. The app reads the next 14 days from the primary Google calendar or default Outlook
+        calendar, up to 250 events per account. A failed refresh keeps prior events with an error message.
+        Disconnect removes local access and refresh tokens. Revoke the grant in your provider account to
+        remove provider-side consent as well.
+      </li>
+    </ol>
+    <p>
+      <a href="https://developers.google.com/identity/protocols/oauth2/native-app"
+        >Google desktop OAuth documentation</a
+      >
+      ·
+      <a href="https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app"
+        >Microsoft app registration</a
+      >
+    </p>
+    <p>
+      <strong>Joining a call opens its supported HTTPS meeting link.</strong> Your browser or calling
+      application handles login, admission, microphone and camera access. Flow does not bypass call login and
+      does not join as a meeting bot. Reviewed calendar workflows can separately create events and send
+      invitations after explicit confirmation.
+    </p>
+    <h2>Feature status</h2>
+    <table>
+      <tr>
+        <th>Area</th>
+        <th>Implemented in this build</th>
+        <th>Limit / setup still required</th>
+      </tr>
+      <tr>
+        <td>Desktop shell</td>
+        <td>
+          Tray, launch at login, non-focusing recording overlay, global shortcuts, optional F8 hold-to-talk,
+          single-instance launch
+        </td>
+        <td>
+          Real Windows verification; Portable ZIP and per-user NSIS installer are supplied; both are unsigned
+        </td>
+      </tr>
+      <tr>
+        <td>Dictation</td>
+        <td>
+          Microphone selection, languages, cloud transcription, cancellation, failed-recording retry/download,
+          five-minute recording limit
+        </td>
+        <td>Own OpenAI key, or your own trusted whisper.cpp executable and ggml model</td>
+      </tr>
+      <tr>
+        <td>Insertion &amp; context</td>
+        <td>
+          Guarded paste, clipboard restoration, password-field checks, excluded apps, optional selected text,
+          per-process cleanup style
+        </td>
+        <td>
+          Some apps, elevated windows or inaccessible fields require manual copy. No screen-reading context or
+          browser-domain style rules
+        </td>
+      </tr>
+      <tr>
+        <td>Cleanup &amp; correction</td>
+        <td>
+          Verbatim, light local cleanup, sentences/bullets, vocabulary and snippets, original recovery;
+          explicit self-corrections can use an AI transform
+        </td>
+        <td>AI changes require review; no claim of vendor Smart Formatting equivalence</td>
+      </tr>
+      <tr>
+        <td>Dictionary &amp; snippets</td>
+        <td>
+          Personal vocabulary/snippets, exact expansion, profile backup, shared versioned team dictionaries
+          and explicit imports
+        </td>
+        <td>No automatic learning of corrections or organization-wide identity management</td>
+      </tr>
+      <tr>
+        <td>Transforms / command</td>
+        <td>
+          Polish, concise, email, bullets, prompt editing, self-correction, translation, eight saved custom
+          instructions, before/after review, undo, number/negation warnings
+        </td>
+        <td>Own AI key; no web-search assistant or automatic replacement of another app's selection</td>
+      </tr>
+      <tr>
+        <td>Calendar</td>
+        <td>
+          Google and Microsoft OAuth, refresh/disconnect, events, invitees, meeting links, reminders and
+          snooze
+        </td>
+        <td>
+          Own OAuth client registration and live consent. ChatGPT-hosted calendar binding unavailable in this
+          environment
+        </td>
+      </tr>
+      <tr>
+        <td>Meeting capture</td>
+        <td>
+          Microphone + Windows loopback, visible recording, pause/resume, four-hour limit, durable chunk
+          queue, device interruption recovery
+        </td>
+        <td>Real audio-path verification; current unfinished chunk is not crash-proof</td>
+      </tr>
+      <tr>
+        <td>Call detection</td>
+        <td>
+          Call-window suggestions; explicit per-meeting scheduling; 20-second countdown; cancel and extend
+          controls
+        </td>
+        <td>
+          Selected calendar meetings can auto-record, open their call link and stop at end plus grace. No
+          authoritative call-state integration or meeting bot
+        </td>
+      </tr>
+      <tr>
+        <td>Transcripts</td>
+        <td>
+          Timestamped chunks, retry by stable ID, optional cloud diarization for chunks/imports, editable
+          speaker names
+        </td>
+        <td>
+          Speaker labels are scoped to each chunk/import. Cross-chunk speaker identity is not inferred. Import
+          limit: 20 MB
+        </td>
+      </tr>
+      <tr>
+        <td>Meeting intelligence</td>
+        <td>
+          Editable summaries, optional automatic drafts after transcription, decisions/actions, Scoped chat
+          over up to 2,000 notes, with up to 24 selected source notes and citations
+        </td>
+        <td>Own AI key; review inferred summaries. No independent task completion tracking</td>
+      </tr>
+      <tr>
+        <td>Scratchpads</td>
+        <td>
+          Editable notes, search across notes/transcripts, folders, Markdown export, conflict protection
+        </td>
+        <td>
+          Explicit Save for text edits; up to 2,000 notes, 1.75 MB per note and 16 MB of notes per workspace
+        </td>
+      </tr>
+      <tr>
+        <td>Storage &amp; sync</td>
+        <td>
+          Encrypted Windows vault, backups, manual folder snapshots, opt-in continuous desktop/web note sync
+          with conflict copies and deletions
+        </td>
+        <td>
+          Web sign-in required. Sync checks every 15 seconds, up to 25 changes per pass. Native sign-in/cookie
+          handling still needs a Windows smoke test. Audio, keys, calendar tokens, history and preferences are
+          excluded
+        </td>
+      </tr>
+      <tr>
+        <td>Privacy</td>
+        <td>
+          History/note retention, audio deletion, removal after transcription, managed device policy and
+          hosted sharing/AI controls
+        </td>
+        <td>
+          Windows encryption does not protect against every process running as the same Windows user. Provider
+          data policies remain separate
+        </td>
+      </tr>
+      <tr>
+        <td>Sharing, teams &amp; integrations</td>
+        <td>
+          Viewer/editor grants, expiring/revocable access, comments, shared dictionaries, optimistic edits and
+          a bounded metadata audit trail
+        </td>
+        <td>
+          Site audience still controls access; no invitations or public links. Read-only account-scoped MCP
+          search/retrieval is available through the private Flow plugin. No Slack connector, SSO, SCIM or MDM
+          enrollment. Audit is not a tamper-proof compliance archive
+        </td>
+      </tr>
+      <tr>
+        <td>Usage &amp; updates</td>
+        <td>
+          Personal usage counts; signed-manifest update checks, verified downloads, explicit installation and
+          NSIS packaging
+        </td>
+        <td>
+          Publisher feed, Ed25519 public key and Windows certificate are required for updates. No vendor Voice
+          Profile model or compliance certification
+        </td>
+      </tr>
+    </table>
+    <h2>New in 0.3: automation, sync and collaboration</h2>
+    <p>
+      <strong>Meeting automation:</strong> Refresh your calendar, choose a meeting under Schedule a recording,
+      confirm participant notification and select system audio, optional call-link opening and a stop grace
+      period. Keep Flow open and Windows unlocked. A visible countdown offers Cancel. Stale calendars, missed
+      starts and overlapping recordings are skipped. Extend a running scheduled recording by 15 minutes when
+      needed. A cancelled or interrupted start is never silently retried.
+    </p>
+    <p>
+      <strong>Continuous sync:</strong> Open Desktop settings, opt in to copying notes to your web account,
+      then choose Connect account &amp; enable sync. Sign in in the separate sandboxed web window and close
+      it. Flow uses the hosted site's existing sign-in, not an embedded service token. It pins the first
+      account to this vault and refuses a different account. Notes, folders, summaries and transcripts sync;
+      raw audio, history, API keys and calendar tokens do not. Conflicts are retained as separate notes.
+      Recording/pending-audio notes wait. Web note pages refresh every 15 seconds while visible. If embedded
+      sign-in is rejected, sync remains disconnected and local capture still works; there is no authentication
+      bypass.
+    </p>
+    <p>
+      <strong>Sharing &amp; controls:</strong> Choose a synced note or published team dictionary and grant
+      viewer/editor access to an exact sign-in email, with optional expiry. Viewers can read/comment; editors
+      can also revise. Grants do not invite people or change this owner's private site audience. The owner
+      must separately enable appropriate site access before another account can participate. Unsaved or
+      simultaneous edits use revision checks. Comments and transcript text render as text. Dictionary imports
+      preserve existing local phrases/triggers; excess items beyond 500 terms/200 snippets are not imported.
+    </p>
+    <p>
+      <strong>ChatGPT integration:</strong> The hosted workspace publishes read-only MCP tools for note search
+      and retrieval. Connect the Flow workspace plugin in ChatGPT under Plugins → Personal → Created by you.
+      Each caller can read only their own notes; raw audio, shared notes, credentials and dictation history
+      are excluded. Turning off hosted cloud AI disables these note tools. No separate local MCP configuration
+      is needed.
+    </p>
+    <p>
+      <strong>Policies:</strong> Hosted sharing and cloud-AI controls are enforced on server requests. Hosted
+      note retention runs on access, up to 100 expired notes per request; local note retention runs while Flow
+      is open. Active recordings and pending native audio are protected. The audit stores event metadata only,
+      up to 1,000 events per owner (latest 200 shown). It is not an immutable compliance archive.
+      Administrators can install the supplied Admin/policy.example.json at
+      <code>%ProgramData%\Flow Desktop\policy.json</code> with administrator-only write permissions.
+    </p>
+    <p>
+      <strong>Updates:</strong> Publisher setup accepts only a public release-signing key, HTTPS feed and
+      Windows publisher certificate thumbprint. A compatible, unexpired signed manifest, exact byte count/hash
+      and valid Windows publisher signature are all required. Optional automatic downloads check every six
+      hours. Installation requires a click and waits for recordings/transcription to finish. No production
+      signing certificate or feed is included, and the delivered unsigned build cannot pass this production
+      update check. See Admin/ADMIN-SETUP.txt.
+    </p>
+    <p>
+      <strong>Reliability:</strong> The dictation repetition regression is preserved. Queue processing can be
+      awaited safely during retries, note completion handles concurrent transcription updates, and dictation
+      profiles retain their version marker. Existing unversioned native profiles from 0.2 migrate on load.
+    </p>
+    <h2>New in 0.4: a meeting workspace inspired by Granola</h2>
+    <p>
+      This comparison uses Granola’s public desktop documentation, checked on 20 October 2026. It is a
+      feature-by-feature implementation record, not a claim of complete service parity.
+    </p>
+    <table>
+      <tr>
+        <th>Granola capability</th>
+        <th>Flow 0.5 equivalent</th>
+        <th>Boundaries</th>
+      </tr>
+      <tr>
+        <td>Bot-free recording and enhanced notes</td>
+        <td>
+          Existing mic/system-audio recording, durable transcription queue, separate handwritten notes and
+          reviewed AI summaries.
+        </td>
+        <td>System audio, device permissions and provider quality still need a real Windows call test.</td>
+      </tr>
+      <tr>
+        <td>Custom templates</td>
+        <td>
+          Six original defaults, custom instructions and headings, default template, output language and user
+          context. Preview before applying; keep eight prior summary revisions.
+        </td>
+        <td>Templates are independent implementations, not copied vendor prompts. Configure AI first.</td>
+      </tr>
+      <tr>
+        <td>Recipes and cross-meeting chat</td>
+        <td>
+          Saved prompts with one/many-meeting scope, remix/search, / shortcut, threaded chat,
+          folder/person/company/date/individual selection, source inspection and saved conversation notes.
+        </td>
+        <td>
+          Keyword ranking and recency select up to 24 meetings from up to 2,000 saved notes. Long evidence is
+          excerpted and coverage disclosed. Desktop also supports an opt-in semantic index using OpenAI
+          embeddings. It indexes the first 6,000 characters per note, requires explicit refresh, and is not an
+          exhaustive search.
+        </td>
+      </tr>
+      <tr>
+        <td>People and companies</td>
+        <td>
+          Directories, meeting history and scoped chat from saved attendee emails; calendar note preparation
+          captures attendees and times.
+        </td>
+        <td>
+          Companies are grouped by email domain. No automatic external profiles, role/photo enrichment or CRM
+          identity matching. Explicit CRM action previews resolve the record ID you enter.
+        </td>
+      </tr>
+      <tr>
+        <td>Pre-meeting briefs</td>
+        <td>
+          Prepare a note from a calendar event; generate a brief using prior notes matching people, company
+          domain or title.
+        </td>
+        <td>
+          On demand or a local daily schedule while Flow is open and Windows awake. No always-on cloud service
+          or automatic inbox/web research. Existing briefs and concurrent edits are preserved.
+        </td>
+      </tr>
+      <tr>
+        <td>Follow-up drafts and actions</td>
+        <td>
+          Reviewed email draft, copy/.eml handoff, extract or manually add action items with owner, due date
+          and completion; export dated VTODO tasks.
+        </td>
+        <td>
+          Native reviewed workflows send Gmail/Outlook mail, post to Slack, publish to Notion/CRMs and create
+          Google/Outlook invitations. Provider configuration and scopes are required. No automatic sending.
+        </td>
+      </tr>
+      <tr>
+        <td>Attached chat context</td>
+        <td>
+          Extract PDF, DOCX, text, Markdown, CSV and JSON locally; extract JPEG/PNG/WebP text through an
+          explicit OpenAI request. Preview and edit before attaching.
+        </td>
+        <td>
+          10 files per note; 30,000 characters each, 100,000 total. Only extracted text is saved. Maximum
+          input 10 MB, PDF extraction capped at 100 pages. Password-protected PDFs unsupported; attach page
+          images for scanned PDFs.
+        </td>
+      </tr>
+      <tr>
+        <td>Folders, sharing and organisation</td>
+        <td>
+          Multiple folders, slash-delimited subfolders, tags, stars, text search, note/folder grants with
+          viewer/editor roles, expiry, comments and revocation. Folder grants include future notes; owner
+          controls membership.
+        </td>
+        <td>
+          Hosted workspace remains owner-private until its audience is explicitly expanded. Named team spaces,
+          group roles and organisation administration are not implemented. Playbooks transfer by JSON
+          export/import rather than live team sync.
+        </td>
+      </tr>
+      <tr>
+        <td>Transcript corrections and deletion</td>
+        <td>
+          Search, correct or remove transcript segments; highlight evidence; rename speakers. Editing waits
+          for pending transcription.
+        </td>
+        <td>
+          Removing text does not erase retained audio, previously generated summaries or independent exports.
+          Delete raw audio separately in Desktop settings.
+        </td>
+      </tr>
+      <tr>
+        <td>Trash and restoration</td>
+        <td>
+          Restore for 30 days; permanent deletion; expiry cleanup on access/maintenance. Trashed notes
+          excluded from sharing, chat and MCP.
+        </td>
+        <td>
+          Shorter retention policies take precedence. Independent backups remain separate. Existing grants
+          resume if a note is restored.
+        </td>
+      </tr>
+      <tr>
+        <td>Speaker identification</td>
+        <td>Existing optional cloud diarization and manual labels.</td>
+        <td>Labels are chunk-local; no browser companion for Zoom/Meet/Teams participant-name matching.</td>
+      </tr>
+      <tr>
+        <td>Shared-screen snapshots</td>
+        <td>No automatic capture added.</td>
+        <td>
+          Granola documents this feature as Mac-only (macOS 14+), not Windows. Flow image text extraction can
+          attach manually captured context.
+        </td>
+      </tr>
+      <tr>
+        <td>Integrations and enterprise services</td>
+        <td>
+          Read-only MCP, Google/Microsoft OAuth with optional email/calendar actions, Slack, Notion, Zapier,
+          HubSpot, Attio and Affinity reviewed exports; encrypted credentials and delivery history.
+        </td>
+        <td>
+          Native adapters require your provider registrations/tokens and live verification. Hosted connectors,
+          a public webhook receiver, external SSO/SCIM, organisation-wide legal holds and vendor compliance
+          certifications remain unavailable. Hosted sign-in stays with ChatGPT.
+        </td>
+      </tr>
+    </table>
+    <p>
+      Sources:
+      <a href="https://docs.granola.ai/help-center/taking-notes/ai-enhanced-notes">Enhanced notes</a> ·
+      <a href="https://docs.granola.ai/help-center/taking-notes/customise-notes-with-templates">Templates</a>
+      · <a href="https://docs.granola.ai/help-center/getting-more-from-your-notes/recipes">Recipes</a> ·
+      <a href="https://docs.granola.ai/help-center/getting-more-from-your-notes/chatting-with-your-meetings"
+        >Chat</a
+      >
+      · <a href="https://docs.granola.ai/help-center/people-and-companies">People &amp; companies</a> ·
+      <a href="https://docs.granola.ai/help-center/taking-notes/pre-meeting-briefs">Briefs</a> ·
+      <a href="https://docs.granola.ai/help-center/sharing/folders/spaces-and-folders">Folders</a> ·
+      <a href="https://docs.granola.ai/help-center/taking-notes/capture-shared-screens">Screen capture</a> ·
+      <a href="https://docs.granola.ai/help-center/taking-notes/deleting-notes">Trash</a> ·
+      <a href="https://docs.granola.ai/help-center/taking-notes/follow-up-emails">Follow-ups</a> ·
+      <a href="https://docs.granola.ai/help-center/getting-more-from-your-notes/workflows-in-chat"
+        >Workflows</a
+      >.
+    </p>
+    <h2>New in 0.5: connected workflows and preparation</h2>
+    <p>
+      <strong>Document context:</strong> Open a saved note → Meeting toolkit → Attached context. PDF and Word
+      text is parsed locally. Images are resized locally; clicking Extract text with OpenAI sends that image
+      to your configured API account. Inspect names, amounts and unclear passages before adding the text.
+      Original files/images are not stored. The attached text follows note sync, sharing and retention.
+    </p>
+    <p>
+      <strong>Reviewed actions:</strong> Desktop settings now has encrypted connections for Slack, Notion,
+      HubSpot, Attio, Affinity and Zapier. In a note, open Send, publish or schedule, enter an exact
+      destination, edit the title/text, and choose Verify destination &amp; preview. Flow reads the
+      destination record before showing the final review. For token connections, the account label is supplied
+      by you; check the returned destination carefully. Google/Microsoft email accounts are verified during
+      OAuth sign-in. Calendar previews check for overlapping events. The final checkbox and send/create button
+      are required. No service is called to send during setup.
+    </p>
+    <table>
+      <tr>
+        <th>Provider</th>
+        <th>Setup</th>
+        <th>Action</th>
+      </tr>
+      <tr>
+        <td>Gmail</td>
+        <td>
+          Enable Gmail API in your Google project. Save desktop OAuth registration; choose mailSend and
+          optionally mailRead, then reconnect. Google consent/verification and test-user restrictions may
+          apply.
+        </td>
+        <td>
+          Send reviewed plain-text email; optionally import selected snippets from up to 10 recent messages
+          involving up to five addresses.
+        </td>
+      </tr>
+      <tr>
+        <td>Outlook</td>
+        <td>
+          Microsoft delegated Mail.Send, optional Mail.Read; reconnect. Tenant admin consent may be required.
+        </td>
+        <td>
+          Send reviewed email and retain it in Sent Items. Optional context reads received message previews
+          from selected senders.
+        </td>
+      </tr>
+      <tr>
+        <td>Google / Outlook Calendar</td>
+        <td>Choose calendarWrite and reconnect; the provider consent screen must grant it.</td>
+        <td>
+          Create a reviewed event, with attendee invitations when addresses are entered. Conflict check covers
+          the connected primary/default calendar only.
+        </td>
+      </tr>
+      <tr>
+        <td>Slack</td>
+        <td>
+          Bot token with chat:write and channels:read; groups:read for private channels. Invite the bot to the
+          channel.
+        </td>
+        <td>
+          Post plain text to an exact channel ID. No broadcast mentions, link unfurls or automatic posting.
+        </td>
+      </tr>
+      <tr>
+        <td>Notion</td>
+        <td>
+          Internal integration token with Read content and Insert content; add the integration to the parent
+          page.
+        </td>
+        <td>
+          Create a child page under the verified parent page ID. Database/data-source properties are not
+          managed.
+        </td>
+      </tr>
+      <tr>
+        <td>HubSpot</td>
+        <td>Private app token with access to notes and the selected contact/company/deal records.</td>
+        <td>Create a note associated with the exact verified CRM record.</td>
+      </tr>
+      <tr>
+        <td>Attio</td>
+        <td>Workspace token with note:read-write, record_permission:read and object_configuration:read.</td>
+        <td>Create a plain-text note on a people/company/deal record.</td>
+      </tr>
+      <tr>
+        <td>Affinity</td>
+        <td>API key owned by the account that should create the note.</td>
+        <td>Add a plain-text note to a person, organization or opportunity.</td>
+      </tr>
+      <tr>
+        <td>Zapier</td>
+        <td>An HTTPS hooks.zapier.com Catch Hook URL. Review your Zap’s downstream steps.</td>
+        <td>
+          Send the reviewed title/body and a delivery ID. Hook acceptance does not confirm downstream actions.
+        </td>
+      </tr>
+    </table>
+    <p>
+      <strong>Delivery safeguards:</strong> Previews expire after 15 minutes and become invalid when their
+      source note or account changes. Duplicate submissions are blocked within the retained 100-entry history.
+      Timeouts, server failures and unreadable receipts are marked uncertain; check the destination before
+      attempting another action. There is no automatic replay. Accepted email requests do not prove recipient
+      delivery. Completed/expired preview bodies are cleared; deleted or trashed source notes remove their
+      local delivery records during maintenance. API credentials and connection state are excluded from
+      backups and note sync.
+    </p>
+    <p>
+      <strong>Automatic briefs:</strong> In Desktop settings, enable the schedule, choose a local hour, a
+      12/24/48-hour lookahead and a daily limit of 5/10/20. One eligible meeting with invitees or a call link
+      is prepared per minute after that hour, using prior related saved notes. New notes go into your chosen
+      folder. Keep Flow running, Windows awake, calendar access fresh and OpenAI configured. After sleep or
+      shutdown, only future meetings are considered. It does not automatically join calls, read email, send
+      messages or run while the machine is off. Failed/interrupted generations require an explicit retry.
+    </p>
+    <p>
+      <strong>Semantic search:</strong> Explicitly build/refresh the local index, then enable it. OpenAI
+      text-embedding-3-small produces encrypted local vectors; each ask embeds the question and combines
+      semantic matches with keywords inside your chosen scope. New/edited notes require refresh. Trash,
+      deleted notes and active recordings are excluded; changed/deleted notes lose old vectors. Index content
+      is limited to the first 6,000 characters per note. Indexing and questions incur API usage; the index is
+      not backed up or synced.
+    </p>
+    <p>
+      <strong>Still outside this release:</strong> External SSO/SCIM and hosted connector access depend on
+      platform support that is not exposed here. Team spaces/groups, live shared-playbook synchronization,
+      automatic CRM profile enrichment, participant-name browser extensions, public webhook receiving and
+      always-on cloud briefing remain unimplemented. This build does not reproduce vendor certifications,
+      proprietary prompts or service infrastructure.
+    </p>
+    <p>
+      <strong>Verification:</strong> 112 automated tests pass. New tests cover permission separation, frozen
+      review payloads, duplicate and uncertain sends, provider response contracts, scheduler
+      idempotence/concurrent edits, document safety and semantic scope isolation. PDF and DOCX extraction and
+      the reviewed-send UI were checked with local test fixtures; those fixtures are not included in the
+      release. No live messages, invitations, CRM notes or paid AI requests were sent during testing.
+    </p>
+    <h2>Storage and recovery</h2>
+    <p>
+      Native notes, profile, tokens and saved meeting audio are encrypted in Flow's local Windows user-data
+      directory. A random vault key is wrapped by Windows DPAPI through Electron safeStorage. If another
+      Windows account cannot unlock the key, the app does not silently replace it.
+    </p>
+    <p>
+      Portable snapshots use a separate password and authenticated encryption. They include notes,
+      templates/recipes, dictation profile and preferences, but exclude API keys, calendar tokens and audio.
+      Imports preserve conflicting notes as separate copies. Keep your password; it cannot be recovered.
+      Manually saving a snapshot to a synced folder replaces the previous snapshot, so use your cloud
+      provider's version history or dated exports for backups. Manual snapshots do not propagate deletions.
+      Continuous web sync does; a local edit to a deleted note becomes a separate conflict copy. Independent
+      backups are unaffected.
+    </p>
+    <p>
+      Browser dictation profile/history remains in browser storage. Hosted scratchpads/meeting text are saved
+      under your authenticated site identity. Browser meeting audio waits locally in IndexedDB and is removed
+      after successful transcription. Clearing browser data can erase pending audio. Raw audio is not stored
+      in the hosted database.
+    </p>
+    <h2>Models</h2>
+    <p>
+      The default speech model is <code>gpt-transcribe</code>. Speaker-separated audio import uses
+      <code>gpt-4o-transcribe-diarize</code>. Summaries, Ask and text transformations default to
+      <code>gpt-4.1-mini</code>, configurable in the native app. Speech recognition and text rewriting are
+      distinct steps. Compare representative Indian English, Hindi/code-switching, names, amounts and negation
+      before choosing a model for production use.
+    </p>
+    <p>
+      <a href="https://developers.openai.com/api/docs/guides/speech-to-text">OpenAI speech documentation</a> ·
+      <a href="https://developers.openai.com/api/docs/models/gpt-4.1-mini">Text model documentation</a>
+    </p>
+    <h2>Windows smoke test</h2>
+    <ol>
+      <li>
+        Confirm launch, tray reopen and quit. Confirm shortcuts register and F8 release stops recording.
+      </li>
+      <li>
+        Dictate the reported “hello, how is the weather today?” example once; ensure one final sentence.
+        Repeat a word deliberately and confirm it remains.
+      </li>
+      <li>
+        Check insertion in Notepad, Word and Outlook. Change focus during dictation; confirm automatic
+        insertion is refused. Check password and elevated fields. Confirm clipboard restoration.
+      </li>
+      <li>
+        Record microphone only, then a test call with headphones and system audio. Pause/resume, unplug the
+        microphone, and reconnect.
+      </li>
+      <li>
+        Disconnect the network, record two chunks, restart Flow, reconnect and retry. Confirm each chunk
+        appears once and no unsaved recording is falsely shown as complete.
+      </li>
+      <li>
+        Connect each calendar using your client registrations; verify event timezone, refresh, reminders,
+        meeting link and disconnect.
+      </li>
+      <li>
+        Generate a summary, Ask and a transform with your configured key. Check amounts, names, decisions and
+        cited notes.
+      </li>
+      <li>
+        Enable sync with a test note, edit it on web/desktop, test a concurrent conflict and deletion, then
+        disconnect. Confirm another signed-in account is refused.
+      </li>
+      <li>
+        Schedule and cancel a test recording, check the countdown and stop/extend controls, and verify
+        missed/locked/overlapping starts are skipped.
+      </li>
+      <li>
+        With separately authorized site access, verify viewer/edit permissions, comments, revocation, expiry
+        and team dictionary import. Do not use real sensitive notes for the first test.
+      </li>
+      <li>
+        Select your trusted local Whisper executable/model, transcribe offline and compare names/amounts
+        against cloud output.
+      </li>
+      <li>
+        Export an encrypted snapshot and import it into another Windows account/device. Verify password
+        rejection and conflict copies. Keep an ordinary dated backup before relying on sync-folder snapshots.
+      </li>
+    </ol>
+    <p class="muted">
+      The 112 automated checks exercise sync/deletion conflicts, account pinning, sharing authorization,
+      retention, automation cancellation/recovery, update integrity/publisher checks, profile migration and
+      provider contracts with mock responses, encryption integrity, OAuth state rejection, transcript retry
+      idempotence, final-frame flushing, user isolation and conflict handling. They do not establish
+      microphone accuracy, hosted visitor consent or live provider connectivity.
+    </p>
+    <p><a href="https://flow-voice-workspace.amithraj123.chatgpt.site">Open the hosted Flow workspace</a></p>
+  </body>
+</html>

@@ -1,5 +1,5 @@
-declare module "virtual:sites-connector-preview" {
-  const binding: import("./connector-contract.mjs").ConnectorBinding;
+declare module 'virtual:sites-connector-preview' {
+  const binding: import('./connector-contract.mjs').ConnectorBinding;
   export default binding;
 }
 
@@ -7,6 +7,6 @@ declare module "virtual:sites-connector-preview" {
 // request-scoped capability through ctx.props.CONNECTORS in sites-worker.ts.
 declare namespace Cloudflare {
   interface Env {
-    CONNECTORS?: import("./connector-contract.mjs").ConnectorBinding;
+    CONNECTORS?: import('./connector-contract.mjs').ConnectorBinding;
   }
 }

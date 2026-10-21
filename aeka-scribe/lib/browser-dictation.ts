@@ -32,7 +32,8 @@ type Turn = {
 
 const messages: Record<string, string> = {
   'not-allowed': 'Microphone access was denied. Allow the microphone in your browser settings.',
-  'service-not-allowed': 'Your browser has disabled its speech service. Use another browser or cloud transcription.',
+  'service-not-allowed':
+    'Your browser has disabled its speech service. Use another browser or cloud transcription.',
   'audio-capture': 'No microphone was found. Check your input device.',
   network: 'The browser speech service could not connect. Try cloud transcription or paste text.',
   'no-speech': 'No speech was detected. Try again.',
@@ -67,7 +68,11 @@ export function createBrowserDictation(options: Options): BrowserDictation {
     recognition.onstart = recognition.onresult = recognition.onerror = recognition.onend = null;
   };
   const abortQuietly = (recognition: BrowserRecognition) => {
-    try { recognition.abort(); } catch { /* Already ended. */ }
+    try {
+      recognition.abort();
+    } catch {
+      /* Already ended. */
+    }
   };
   const finish = (warning = '') => {
     if (closed) return;
@@ -93,7 +98,12 @@ export function createBrowserDictation(options: Options): BrowserDictation {
     if (forced) abortQuietly(turn.recognition);
     if (turn.final.trim()) completed.push(turn.final.trim());
     if (stopping || turn.error || !turn.final.trim()) {
-      finish(turn.error || (turn.interim ? 'The browser stopped before confirming the last words. Please dictate those words again.' : ''));
+      finish(
+        turn.error ||
+          (turn.interim
+            ? 'The browser stopped before confirming the last words. Please dictate those words again.'
+            : ''),
+      );
       return;
     }
     // Restart only after the previous microphone session has ended, keeping
@@ -112,8 +122,12 @@ export function createBrowserDictation(options: Options): BrowserDictation {
   const beginTurn = () => {
     if (closed || stopping) return;
     let recognition: BrowserRecognition;
-    try { recognition = options.createRecognition(); }
-    catch { finish('Could not start browser dictation. Please retry.'); return; }
+    try {
+      recognition = options.createRecognition();
+    } catch {
+      finish('Could not start browser dictation. Please retry.');
+      return;
+    }
     const turn: Turn = { recognition, final: '', interim: '', error: '' };
     current = turn;
     recognition.continuous = false;
@@ -122,9 +136,12 @@ export function createBrowserDictation(options: Options): BrowserDictation {
     recognition.lang = options.language;
     recognition.onstart = () => {
       if (!isCurrent(turn)) return;
-      if (!listening) { listening = true; options.onStart(); }
+      if (!listening) {
+        listening = true;
+        options.onStart();
+      }
     };
-    recognition.onresult = event => {
+    recognition.onresult = (event) => {
       if (!isCurrent(turn)) return;
       // The result list belongs to this single utterance. Never concatenate
       // cumulative snapshots or copy previous interim words into final text.
@@ -134,18 +151,23 @@ export function createBrowserDictation(options: Options): BrowserDictation {
       if (latest?.isFinal) turn.final = text;
       options.onTranscript([...completed, turn.interim || turn.final].filter(Boolean).join(' '));
     };
-    recognition.onerror = event => {
+    recognition.onerror = (event) => {
       if (!isCurrent(turn)) return;
       stopping = true;
       // Silence after an already completed thought is a normal finish.
-      turn.error = event.error === 'no-speech' && completed.length
-        ? '' : messages[event.error] || 'Browser dictation stopped. Please try again.';
+      turn.error =
+        event.error === 'no-speech' && completed.length
+          ? ''
+          : messages[event.error] || 'Browser dictation stopped. Please try again.';
       waitForEnd(turn, turn.error || 'The browser speech service did not finish normally.');
       abortQuietly(recognition);
     };
     recognition.onend = () => endTurn(turn);
-    try { recognition.start(); }
-    catch { finish('Could not start browser dictation. Please retry.'); }
+    try {
+      recognition.start();
+    } catch {
+      finish('Could not start browser dictation. Please retry.');
+    }
   };
 
   return {
@@ -158,11 +180,17 @@ export function createBrowserDictation(options: Options): BrowserDictation {
       if (closed || stopping) return;
       stopping = true;
       const turn = current;
-      if (!turn) { finish(); return; }
+      if (!turn) {
+        finish();
+        return;
+      }
       // stop() can deliver one last corrected final result before end.
       waitForEnd(turn, 'The browser took too long to finish. Please check the completed text.');
-      try { turn.recognition.stop(); }
-      catch { endTurn(turn, true); }
+      try {
+        turn.recognition.stop();
+      } catch {
+        endTurn(turn, true);
+      }
     },
     abort() {
       if (closed) return;
@@ -171,7 +199,10 @@ export function createBrowserDictation(options: Options): BrowserDictation {
       const turn = current;
       current = null;
       completed.length = 0;
-      if (turn) { detach(turn.recognition); abortQuietly(turn.recognition); }
+      if (turn) {
+        detach(turn.recognition);
+        abortQuietly(turn.recognition);
+      }
     },
   };
 }
