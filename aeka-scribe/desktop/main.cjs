@@ -418,6 +418,10 @@ async function dispatch(action, p = {}) {
       return workspace.studioSave(p.config, p.revision);
     case 'notes.list':
       return workspace.list();
+    case 'notes.get':
+      return workspace.get(p.id);
+    case 'notes.index':
+      return workspace.index();
     case 'notes.save':
       return workspace.save(p.note, p.baseUpdatedAt);
     case 'notes.delete':
@@ -626,6 +630,36 @@ async function dispatch(action, p = {}) {
 // holds notes, settings and credentials, and the web-account partition keeps the hosted sign-in.
 // Files are staged first and the vault is moved into place last, so an interrupted copy (for example
 // while Flow Desktop is still running) is retried on the next launch instead of leaving an empty vault.
+// CI smoke launch: a throwaway profile, then exit 0 once the window has loaded and the Windows helper
+// answers, or exit 1 on any failure or after 90 seconds. Never used by an installed copy.
+const smokeTest = process.env.AEKA_SCRIBE_SMOKE_TEST === '1';
+if (smokeTest) {
+  app.setPath(
+    'userData',
+    require('node:fs').mkdtempSync(path.join(require('node:os').tmpdir(), 'aeka-scribe-smoke-')),
+  );
+  setTimeout(() => {
+    console.error('Smoke launch timed out.');
+    app.exit(1);
+  }, 90000).unref();
+  process.on('unhandledRejection', (e) => {
+    console.error('Smoke launch failed:', e);
+    app.exit(1);
+  });
+}
+async function finishSmokeTest() {
+  try {
+    if (window.webContents.isLoading())
+      await new Promise((r) => window.webContents.once('did-finish-load', r));
+    const title = await window.webContents.executeJavaScript('document.title');
+    const sequence = await windows.call('clipboardSequence');
+    console.log('AEKA_SCRIBE_SMOKE_OK', JSON.stringify({ title, sequence: typeof sequence }));
+    app.exit(0);
+  } catch (e) {
+    console.error('Smoke launch failed:', e?.message || e);
+    app.exit(1);
+  }
+}
 const { migrateLegacyData } = require('./services/migrate-legacy.cjs');
 const migrationError = migrateLegacyData(
   app.getPath('userData'),
@@ -813,6 +847,7 @@ else {
         }
       });
       window.once('ready-to-show', show);
+      if (smokeTest) window.once('ready-to-show', () => void finishSmokeTest());
       window.webContents.on('render-process-gone', (_event, details) => {
         // The renderer owned the recording; reset main-process state so quit and dictation work again.
         recording = false;
@@ -1032,6 +1067,11 @@ else {
       void workspace.processQueue().catch((e) => console.error('Queue processing failed:', e?.message));
     })
     .catch((e) => {
+      if (smokeTest) {
+        console.error('Smoke launch failed:', e?.message || e);
+        app.exit(1);
+        return;
+      }
       dialog.showErrorBox('Aeka Scribe could not start', e.message || 'Startup failed.');
       quitting = true;
       app.quit();

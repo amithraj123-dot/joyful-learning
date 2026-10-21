@@ -1470,7 +1470,7 @@ function DesktopSettings({
   const bools = [
     ['launchAtLogin', 'Launch when I sign in to Windows'],
     ['autoPaste', 'Insert completed dictation into the original field'],
-    ['holdToTalk', 'Hold F8 to dictate; release F8 to finish'],
+    ['holdToTalk', 'Hold the hold-to-talk key to dictate; release it to finish'],
     ['captureSelection', 'Allow the command shortcut to read selected text'],
     ['reminders', 'Show calendar reminders'],
     ['callDetection', 'Suggest recording when a meeting window is detected'],
@@ -1684,6 +1684,19 @@ function DesktopSettings({
               />
             </label>
           ))}
+          <label className="field">
+            <span>Hold-to-talk key</span>
+            <select
+              value={settings.holdKey || 'F8'}
+              onChange={(e) => setSettings({ ...settings, holdKey: e.target.value })}
+            >
+              {Array.from({ length: 12 }, (_, i) => 'F' + (i + 1)).map((k) => (
+                <option value={k} key={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+          </label>
           {[
             ['shortcut', 'Start / finish dictation'],
             ['cancelShortcut', 'Cancel dictation'],

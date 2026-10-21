@@ -19,6 +19,7 @@ export const desktopDefaults = {
   launchAtLogin: false,
   autoPaste: true,
   holdToTalk: false,
+  holdKey: 'F8',
   shortcut: 'CommandOrControl+Shift+Space',
   // Ctrl+Shift+Esc is Task Manager and Ctrl+Shift+V is "paste as plain text" in most apps.
   cancelShortcut: 'CommandOrControl+Shift+Backspace',
@@ -61,6 +62,7 @@ export function validDesktopSettings(v) {
       /^(CommandOrControl|Control|Alt|Shift|Super|F[1-9])/.test(v[k])
     )
       s[k] = v[k];
+  if (typeof v.holdKey === 'string' && /^F([1-9]|1[0-2])$/.test(v.holdKey)) s.holdKey = v.holdKey;
   // Settings saved by 0.5 carry the old, conflicting defaults; move those (and only those) to the new ones.
   if (s.cancelShortcut === 'CommandOrControl+Shift+Escape')
     s.cancelShortcut = 'CommandOrControl+Shift+Backspace';
