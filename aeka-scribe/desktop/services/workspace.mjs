@@ -20,8 +20,9 @@ export const desktopDefaults = {
   autoPaste: true,
   holdToTalk: false,
   shortcut: 'CommandOrControl+Shift+Space',
-  cancelShortcut: 'CommandOrControl+Shift+Escape',
-  pasteShortcut: 'CommandOrControl+Shift+V',
+  // Ctrl+Shift+Esc is Task Manager and Ctrl+Shift+V is "paste as plain text" in most apps.
+  cancelShortcut: 'CommandOrControl+Shift+Backspace',
+  pasteShortcut: 'CommandOrControl+Alt+V',
   commandShortcut: 'CommandOrControl+Shift+E',
   reminders: true,
   reminderMinutes: 2,
@@ -60,6 +61,10 @@ export function validDesktopSettings(v) {
       /^(CommandOrControl|Control|Alt|Shift|Super|F[1-9])/.test(v[k])
     )
       s[k] = v[k];
+  // Settings saved by 0.5 carry the old, conflicting defaults; move those (and only those) to the new ones.
+  if (s.cancelShortcut === 'CommandOrControl+Shift+Escape')
+    s.cancelShortcut = 'CommandOrControl+Shift+Backspace';
+  if (s.pasteShortcut === 'CommandOrControl+Shift+V') s.pasteShortcut = 'CommandOrControl+Alt+V';
   s.asrEngine = v.asrEngine === 'local' ? 'local' : 'openai';
   s.retentionDays = [0, 7, 30, 90, 365].includes(v.retentionDays) ? v.retentionDays : 0;
   s.reminderMinutes = [0, 1, 2, 5, 10].includes(v.reminderMinutes) ? v.reminderMinutes : 2;

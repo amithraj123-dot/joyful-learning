@@ -12,6 +12,7 @@ const {
   shell,
   dialog,
   clipboard,
+  ClipboardItem,
   Notification,
   powerSaveBlocker,
   powerMonitor,
@@ -20,6 +21,9 @@ const {
 const path = require('node:path'),
   fs = require('node:fs/promises'),
   { pathToFileURL } = require('node:url');
+let pendingRestore = null,
+  automationError = '',
+  quitWatchdog = null;
 let window,
   overlay,
   tray,
@@ -149,28 +153,47 @@ async function pasteText(text) {
   const current = await windows.call('focus');
   if (current.handle !== target.handle || current.isPassword || !current.focusKnown)
     return { pasted: false, reason: 'The focused field changed. Use Copy to insert your reviewed text.' };
-  const saved = [];
-  let total = 0;
-  for (const format of clipboard.availableFormats()) {
-    const b = clipboard.readBuffer(format);
-    total += b.length;
-    if (total > 16 * 1024 * 1024)
-      return { pasted: false, reason: 'Your clipboard is too large to preserve safely. Use Copy.' };
-    saved.push([format, b]);
+  // Electron 44 exposes only the async ClipboardItem API (no availableFormats/readBuffer/writeBuffer).
+  // Snapshot every format as resolved Blobs before overwriting. When a second paste arrives while a
+  // restore is still pending, reuse the first snapshot so the dictated text is never saved as "the
+  // user's clipboard".
+  let snapshot = pendingRestore?.snapshot;
+  if (pendingRestore) clearTimeout(pendingRestore.timer);
+  pendingRestore = null;
+  if (!snapshot) {
+    let total = 0;
+    snapshot = [];
+    for (const item of await clipboard.read()) {
+      const entries = {};
+      for (const type of item.types) {
+        const value = await item.getType(type);
+        total += value?.size || 0;
+        if (total > 16 * 1024 * 1024)
+          return { pasted: false, reason: 'Your clipboard is too large to preserve safely. Use Copy.' };
+        entries[type] = value;
+      }
+      if (Object.keys(entries).length) snapshot.push(new ClipboardItem(entries));
+    }
   }
-  clipboard.writeText(text);
+  await clipboard.writeText(text);
   const sequence = await windows.call('clipboardSequence');
   let done;
   try {
     done = await windows.call('paste', { handle: target.handle });
   } finally {
-    setTimeout(async () => {
-      try {
-        if ((await windows.call('clipboardSequence')) !== sequence) return;
-        clipboard.clear();
-        for (const [format, data] of saved) clipboard.writeBuffer(format, data);
-      } catch {}
-    }, 1000);
+    const saved = snapshot;
+    pendingRestore = {
+      snapshot: saved,
+      timer: setTimeout(async () => {
+        pendingRestore = null;
+        try {
+          // Restore only if nothing else (the user or another app) has written to the clipboard since.
+          if ((await windows.call('clipboardSequence')) !== sequence) return;
+          if (saved.length) await clipboard.write(saved);
+          else clipboard.clear();
+        } catch {}
+      }, 1000),
+    };
   }
   return done;
 }
@@ -444,7 +467,7 @@ async function dispatch(action, p = {}) {
     case 'queue.list':
       return workspace.queueStatus();
     case 'queue.retry':
-      void workspace.processQueue();
+      void workspace.processQueue().catch((e) => console.error('Queue processing failed:', e?.message));
       return true;
     case 'audio.clear':
       return workspace.clearAudio();
@@ -454,7 +477,7 @@ async function dispatch(action, p = {}) {
       return calendars.saveConfig(p);
     case 'calendar.connect': {
       const result = await calendars.connect(p.provider);
-      void refreshCalendars();
+      void refreshCalendars().catch(() => {});
       return result;
     }
     case 'calendar.disconnect': {
@@ -517,10 +540,11 @@ async function dispatch(action, p = {}) {
       const config = await vault.read('sync');
       if (!config?.folder) throw Error('Choose a synced folder first.');
       const { portableUnseal } = await import('./services/vault.mjs');
-      let filename = path.join(config.folder, 'Aeka-Scribe-workspace.aekabackup');
-      const legacy = path.join(config.folder, 'Flow-workspace.flowbackup');
-      if (!(await fs.stat(filename).catch(() => null)) && (await fs.stat(legacy).catch(() => null)))
-        filename = legacy;
+      // Other devices may still be on a pre-rename release and write the legacy snapshot: use the newer one.
+      const current = path.join(config.folder, 'Aeka-Scribe-workspace.aekabackup'),
+        legacy = path.join(config.folder, 'Flow-workspace.flowbackup');
+      const [a, b] = await Promise.all([current, legacy].map((f) => fs.stat(f).catch(() => null)));
+      const filename = b && (!a || b.mtimeMs > a.mtimeMs) ? legacy : current;
       if ((await fs.stat(filename)).size > 100 * 1024 * 1024) throw Error('Snapshot is too large.');
       return workspace.restore(portableUnseal(await fs.readFile(filename), p.password));
     }
@@ -593,22 +617,16 @@ async function dispatch(action, p = {}) {
       throw Error('Unknown desktop action.');
   }
 }
-// Releases before the rename kept data in %APPDATA%\Flow Desktop. Copy it once (the original stays as a
-// fallback) so the vault, notes, settings and web sign-in carry over. Electron's safeStorage key lives in
-// the copied "Local State" file, so the vault still unlocks for the same Windows user.
-function migrateLegacyData() {
-  const fsSync = require('node:fs');
-  try {
-    const target = app.getPath('userData'),
-      legacy = path.join(app.getPath('appData'), 'Flow Desktop');
-    if (target === legacy || fsSync.existsSync(path.join(target, 'vault'))) return;
-    if (!fsSync.existsSync(path.join(legacy, 'vault'))) return;
-    fsSync.cpSync(legacy, target, { recursive: true, force: false, errorOnExist: false });
-  } catch (e) {
-    console.error('Could not copy data from the earlier Flow Desktop installation:', e?.message);
-  }
-}
-migrateLegacyData();
+// Releases before the rename kept data in %APPDATA%\Flow Desktop. Copy what the app needs once (the
+// original stays as a fallback): "Local State" holds the safeStorage key that unlocks the vault, "vault"
+// holds notes, settings and credentials, and the web-account partition keeps the hosted sign-in.
+// Files are staged first and the vault is moved into place last, so an interrupted copy (for example
+// while Flow Desktop is still running) is retried on the next launch instead of leaving an empty vault.
+const { migrateLegacyData } = require('./services/migrate-legacy.cjs');
+const migrationError = migrateLegacyData(
+  app.getPath('userData'),
+  path.join(app.getPath('appData'), 'Flow Desktop'),
+);
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => window && show());
@@ -624,6 +642,16 @@ else {
         return;
       }
       app.setAppUserModelId('com.aekaadvisors.scribe');
+      if (migrationError) {
+        dialog.showErrorBox(
+          'Earlier data could not be copied',
+          'Aeka Scribe could not copy your notes and settings from Flow Desktop (' +
+            (migrationError.code || migrationError.message) +
+            '). Quit Flow Desktop from its tray icon, then start Aeka Scribe again. Nothing has been deleted.',
+        );
+        app.quit();
+        return;
+      }
       const { openVault } = await import('./services/vault.mjs'),
         { createWorkspace } = await import('./services/workspace.mjs'),
         { createCalendars } = await import('./services/calendars.mjs'),
@@ -707,7 +735,8 @@ else {
         locked = true;
       });
       powerMonitor.on('resume', () => {
-        locked = true;
+        // Resume does not imply a locked screen (sign-in may not be required after sleep); ask Windows.
+        locked = powerMonitor.getSystemIdleState(1) === 'locked';
         calendarFreshAt = 0;
         void refreshCalendars().catch(() => {});
       });
@@ -736,6 +765,25 @@ else {
         }
       });
       window.once('ready-to-show', show);
+      window.webContents.on('render-process-gone', (_event, details) => {
+        // The renderer owned the recording; reset main-process state so quit and dictation work again.
+        recording = false;
+        meeting = false;
+        if (powerId !== null) {
+          powerSaveBlocker.stop(powerId);
+          powerId = null;
+        }
+        overlayState('idle');
+        if (quitPending) {
+          quitPending = false;
+          quitting = true;
+          app.quit();
+          return;
+        }
+        if (details.reason !== 'clean-exit') window.reload();
+      });
+      // Windows log-off or shutdown: ask the renderer to save what it can.
+      window.on('session-end', () => emit('app-finish'));
       window.webContents.setWindowOpenHandler(({ url }) => {
         try {
           const u = new URL(url);
@@ -841,9 +889,17 @@ else {
               events: calendarCache,
               busy: recording || meeting,
               fresh: Date.now() - calendarFreshAt < 360000,
-              locked: locked || !managedPolicy.values.allowRecording,
+              locked:
+                locked ||
+                powerMonitor.getSystemIdleState(1) === 'locked' ||
+                !managedPolicy.values.allowRecording,
             });
-          } catch {
+            automationError = '';
+          } catch (e) {
+            // Report a failing scheduler once instead of silently skipping every scheduled recording.
+            const message = e?.message || 'Scheduled recordings could not be checked.';
+            if (message !== automationError) emit('notice', { message: 'Scheduled recordings: ' + message });
+            automationError = message;
           } finally {
             automationChecking = false;
           }
@@ -872,7 +928,11 @@ else {
         ),
       );
       timers.push(
-        setInterval(() => void workspace.processQueue(), 60000),
+        setInterval(
+          () =>
+            void workspace.processQueue().catch((e) => console.error('Queue processing failed:', e?.message)),
+          60000,
+        ),
         setInterval(() => void refreshCalendars().catch(() => {}), 300000),
         setInterval(() => void remind().catch(() => {}), 15000),
       );
@@ -920,14 +980,35 @@ else {
           } catch {}
         }, 15000),
       );
-      void refreshCalendars();
-      void workspace.processQueue();
+      void refreshCalendars().catch(() => {});
+      void workspace.processQueue().catch((e) => console.error('Queue processing failed:', e?.message));
     })
     .catch((e) => {
       dialog.showErrorBox('Aeka Scribe could not start', e.message || 'Startup failed.');
       quitting = true;
       app.quit();
     });
+  // If the window never reports the recording as finished (it crashed or hung), do not block every
+  // later quit, including the installer's: offer to quit anyway after two minutes.
+  function armQuitWatchdog() {
+    clearTimeout(quitWatchdog);
+    quitWatchdog = setTimeout(async () => {
+      if (!quitPending) return;
+      const { response } = await dialog.showMessageBox({
+        type: 'warning',
+        buttons: ['Quit anyway', 'Keep waiting'],
+        defaultId: 1,
+        cancelId: 1,
+        message: 'The recording has not finished saving.',
+        detail: 'Saved audio chunks are recovered on the next start. The current unsaved chunk may be lost.',
+      });
+      if (response === 0 && quitPending) {
+        quitPending = false;
+        quitting = true;
+        app.quit();
+      } else if (quitPending) armQuitWatchdog();
+    }, 120000);
+  }
   app.on('before-quit', (event) => {
     if ((recording || meeting) && !quitPending) {
       event.preventDefault();
@@ -948,6 +1029,7 @@ else {
             if (response === 0) {
               quitPending = true;
               emit('app-finish');
+              armQuitWatchdog();
             }
           });
       }

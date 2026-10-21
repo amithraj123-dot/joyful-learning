@@ -25,7 +25,10 @@ export function validatePolicy(value) {
 }
 export async function loadPolicy(filename) {
   try {
-    return { managed: true, values: validatePolicy(JSON.parse(await fs.readFile(filename, 'utf8'))) };
+    return {
+      managed: true,
+      values: validatePolicy(JSON.parse((await fs.readFile(filename, 'utf8')).replace(/^\uFEFF/, ''))),
+    };
   } catch (e) {
     if (e.code === 'ENOENT') return { managed: false, values: { ...managedDefaults } };
     throw Error(

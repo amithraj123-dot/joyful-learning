@@ -375,11 +375,36 @@ export function parseActions(text) {
     return value.map((x) => ({ text: x.text, owner: x.owner, due: x.due }));
 }
 export function draftEmail(note) {
-    const title = note.title.replace(/[\r\n]/g, ' ');
-    return `Subject: Follow-up: ${title}\r\nX-Unsent: 1\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${noteDetails(note).followUp.replace(/\r?\n/g, '\r\n')}`;
+    const title = 'Follow-up: ' + note.title.replace(/[\r\n]/g, ' ');
+    // Non-ASCII subjects (names, ₹) need RFC 2047 encoding or many mail clients show garbled text.
+    const subject = /^[\x20-\x7e]*$/.test(title)
+        ? title
+        : '=?UTF-8?B?' + btoa(String.fromCharCode(...new TextEncoder().encode(title))) + '?=';
+    return `Subject: ${subject}\r\nX-Unsent: 1\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${noteDetails(note).followUp.replace(/\r?\n/g, '\r\n')}`;
 }
 export function actionsCalendar(note) {
-    const esc = (s) => s.replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/[,;]/g, '\\$&');
+    // A bare carriage return would end the content line and let action text inject iCalendar properties.
+    const esc = (s) => s
+        .replace(/\\/g, '\\\\')
+        .replace(/\r\n|\r|\n/g, '\\n')
+        .replace(/[,;]/g, '\\$&');
+    // RFC 5545 folds content lines longer than 75 octets.
+    const fold = (line) => {
+        const out = [];
+        let current = '', bytes = 0;
+        for (const ch of line) {
+            const size = new TextEncoder().encode(ch).length;
+            if (bytes + size > (out.length ? 74 : 75)) {
+                out.push(current);
+                current = '';
+                bytes = 0;
+            }
+            current += ch;
+            bytes += size;
+        }
+        out.push(current);
+        return out.join('\r\n ');
+    };
     return [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
@@ -401,6 +426,8 @@ export function actionsCalendar(note) {
             'END:VTODO',
         ]),
         'END:VCALENDAR',
-        '',
-    ].join('\r\n');
+    ]
+        .map(fold)
+        .concat('')
+        .join('\r\n');
 }
