@@ -475,35 +475,37 @@ export default function AekaScribe() {
         <div className="workspace-tag">
           <span className="avatar">A</span>
           <div>
-            <strong>Personal workspace</strong>
+            <strong>{native ? 'Personal workspace' : 'Firm workspace'}</strong>
             <small>Aeka Advisors</small>
           </div>
         </div>
-        {modulesFor(surface).map((mod) => (
-          <div className="nav-group" key={mod.id}>
-            <p className="nav-label">{mod.name.toUpperCase()}</p>
-            <nav aria-label={mod.name}>
-              {mod.pages
-                .filter((item) => !item.hidden)
-                .map((item) => (
-                  <button
-                    key={item.id}
-                    title={item.label}
-                    aria-label={item.label}
-                    aria-current={page === item.id ? 'page' : undefined}
-                    className={'nav-item ' + (page === item.id ? 'active' : '')}
-                    onClick={() => choosePage(item.id)}
-                  >
-                    <item.icon size={19} />
-                    {item.label}
-                    {item.id === 'history' && history.length > 0 && (
-                      <span className="nav-count">{history.length}</span>
-                    )}
-                  </button>
-                ))}
-            </nav>
-          </div>
-        ))}
+        <div className="nav-groups">
+          {modulesFor(surface).map((mod) => (
+            <div className="nav-group" key={mod.id}>
+              <p className="nav-label">{mod.name.toUpperCase()}</p>
+              <nav aria-label={mod.name}>
+                {mod.pages
+                  .filter((item) => !item.hidden)
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      title={item.label}
+                      aria-label={item.label}
+                      aria-current={page === item.id ? 'page' : undefined}
+                      className={'nav-item ' + (page === item.id ? 'active' : '')}
+                      onClick={() => choosePage(item.id)}
+                    >
+                      <item.icon size={19} />
+                      {item.label}
+                      {item.id === 'history' && history.length > 0 && (
+                        <span className="nav-count">{history.length}</span>
+                      )}
+                    </button>
+                  ))}
+              </nav>
+            </div>
+          ))}
+        </div>
         <div className="sidebar-bottom">
           <div className="private-note">
             <ShieldCheck size={19} />
@@ -536,11 +538,13 @@ export default function AekaScribe() {
           <div className="breadcrumb">
             Workspace <span>/</span> <strong>{title}</strong>
           </div>
-          <button className="connection-pill" onClick={() => choosePage(native ? 'desktop' : 'settings')}>
-            <span className={'status-dot ' + (configured ? 'green' : '')} />
-            {configured ? 'AI configured' : native ? 'AI setup needed' : 'Browser mode'}
-            <SlidersHorizontal size={14} />
-          </button>
+          {current.module.id === 'scribe' && (
+            <button className="connection-pill" onClick={() => choosePage(native ? 'desktop' : 'settings')}>
+              <span className={'status-dot ' + (configured ? 'green' : '')} />
+              {configured ? 'AI configured' : native ? 'AI setup needed' : 'Browser mode'}
+              <SlidersHorizontal size={14} />
+            </button>
+          )}
         </header>
         <div className="page-content">
           <div className="page-heading">

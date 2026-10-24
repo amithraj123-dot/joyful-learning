@@ -1478,10 +1478,24 @@ h1 {
   .version-line {
     display: none;
   }
-  .sidebar nav {
+  .nav-groups {
     display: flex;
     flex: 1;
-    overflow: auto;
+    min-width: 0;
+    overflow-x: auto;
+    gap: 5px;
+  }
+  .nav-group {
+    display: flex;
+    flex-shrink: 0;
+  }
+  .nav-group + .nav-group {
+    margin-top: 0;
+    padding-left: 6px;
+    border-left: 1px solid var(--line);
+  }
+  .sidebar nav {
+    display: flex;
     gap: 5px;
   }
   .nav-item {

@@ -988,6 +988,8 @@
 
 /* Tables */
 .wf-table-wrap {
+  /* positioned so visually hidden labels inside the table stay within the scroll area */
+  position: relative;
   overflow-x: auto;
   max-width: 100%;
   border-radius: var(--wf-radius);
