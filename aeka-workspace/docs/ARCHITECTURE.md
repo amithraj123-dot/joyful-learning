@@ -68,10 +68,10 @@ aeka-workspace/
 
 ## Current modules
 
-| Module | Surfaces | Purpose |
-| --- | --- | --- |
-| Workflow | Web | Clients, mandates, tasks with maker-checker sign-off, deadlines, deal tracker, engagements and billing, timesheets, team and import from the earlier Google Sheet app |
-| Scribe | Web, Windows | Dictation, meeting capture, personal notes, sharing, Ask your notes |
+| Module   | Surfaces     | Purpose                                                                                                                                                               |
+| -------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workflow | Web          | Clients, mandates, tasks with maker-checker sign-off, deadlines, deal tracker, engagements and billing, timesheets, team and import from the earlier Google Sheet app |
+| Scribe   | Web, Windows | Dictation, meeting capture, personal notes, sharing, Ask your notes                                                                                                   |
 
 Natural next layers: link Scribe meeting notes and action items to Workflow mandates and tasks; a
 recurring statutory compliance calendar with reminders; firm dashboards (pipeline, workload, realisation).
