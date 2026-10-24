@@ -16,7 +16,7 @@ export function signOffProblem(t: Pick<TaskInput, 'status' | 'preparedBy' | 'rev
 }
 
 export function useTaskActions() {
-  const { run, dispatch, caps, meEmail, matterById } = useWF();
+  const { run, dispatch, caps, meEmail, matterById, notify } = useWF();
 
   const canEdit = useCallback(
     (t: Task, matter?: Matter) => {
@@ -41,20 +41,15 @@ export function useTaskActions() {
       const problem = signOffProblem(next);
       if (problem) {
         if (opts?.onError) opts.onError(problem);
-        else dispatchProblem(problem);
+        else notify(problem);
         return undefined;
       }
       const saved = await run('task.update', { id: t.id, task: next, baseRevision: t.revision }, opts);
       if (saved) dispatch({ type: 'task', task: saved });
       return saved;
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [run, dispatch],
+    [run, dispatch, notify],
   );
-  const { notify } = useWF();
-  function dispatchProblem(message: string) {
-    notify(message);
-  }
 
   const create = useCallback(
     async (task: Partial<TaskInput> & Pick<TaskInput, 'matterId' | 'title'>, opts?: RunOptions) => {
