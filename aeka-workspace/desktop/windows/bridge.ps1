@@ -32,6 +32,7 @@ function Focus-Info {
  try{$el=[System.Windows.Automation.AutomationElement]::FocusedElement;if($null -ne $el){$isPassword=$el.Current.IsPassword;$focusKnown=$true}}catch{}
  return @{handle=$h.ToInt64().ToString();process=$processName;isPassword=$isPassword;focusKnown=$focusKnown;pid=$windowPid}
 }
+[Console]::WriteLine('{"ready":true}')
 while($null -ne ($line=[Console]::ReadLine())) {
  try {
   $r=$line|ConvertFrom-Json;$result=$null

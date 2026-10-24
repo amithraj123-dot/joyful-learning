@@ -4,6 +4,7 @@ import path from 'node:path';
 const ACTIONS = ['focus', 'paste', 'selection', 'clipboardSequence', 'call', 'holdKey', 'verifyInstaller'];
 // Authenticode checks on a large installer (with antivirus scanning) can take far longer than a paste.
 const TIMEOUTS = { verifyInstaller: 120000 };
+const STARTUP_GRACE = 60000;
 // Hold-to-talk may poll only F1 to F12 (virtual-key codes 112 to 123).
 export const holdKeyCode = (name) => {
   const m = /^F([1-9]|1[0-2])$/.exec(typeof name === 'string' ? name : '');
@@ -43,10 +44,18 @@ export function windowsBridge(script, { spawnProcess = spawn, platform = process
     }
     pending.clear();
   };
+  // The helper compiles its native code on start-up, which can take well over a normal call's timeout on a
+  // cold machine. Until it reports ready, calls get extra time instead of failing.
+  let ready = false;
   const onLine = (line) => {
     try {
-      const d = JSON.parse(line),
-        p = pending.get(d.id);
+      const d = JSON.parse(line);
+      if (d.ready === true) {
+        ready = true;
+        failures = 0;
+        return;
+      }
+      const p = pending.get(d.id);
       if (!p) return;
       failures = 0;
       pending.delete(d.id);
@@ -57,6 +66,7 @@ export function windowsBridge(script, { spawnProcess = spawn, platform = process
   const start = () => {
     if (closed || child) return;
     buffer = '';
+    ready = false;
     // "-ExecutionPolicy Bypass" applies to this process only. It lets the packaged helper run under
     // the default Restricted policy (and despite mark-of-the-web on an extracted ZIP), but it does not
     // override a policy set by Group Policy, so organisation controls still win.
@@ -114,10 +124,13 @@ export function windowsBridge(script, { spawnProcess = spawn, platform = process
           start();
         }
         const id = ++sequence,
-          timer = setTimeout(() => {
-            pending.delete(id);
-            reject(Error('Windows did not respond in time.'));
-          }, TIMEOUTS[action] || 8000);
+          timer = setTimeout(
+            () => {
+              pending.delete(id);
+              reject(Error('Windows did not respond in time.'));
+            },
+            (TIMEOUTS[action] || 8000) + (ready ? 0 : STARTUP_GRACE),
+          );
         pending.set(id, { resolve, reject, timer });
         child.stdin.write(JSON.stringify({ id, action, ...args }) + '\n', (e) => {
           if (e) {

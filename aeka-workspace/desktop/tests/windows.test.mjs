@@ -71,3 +71,14 @@ test('hold-to-talk accepts only F1 to F12', async () => {
   assert.equal(await call, true);
   bridge.close();
 });
+
+test('Windows helper ready line is not mistaken for a reply', async () => {
+  const { spawned, spawnProcess } = fakeSpawn();
+  const bridge = windowsBridge('bridge.ps1', { spawnProcess, platform: 'win32' });
+  const call = bridge.call('clipboardSequence');
+  await new Promise((r) => setImmediate(r));
+  spawned[0].reply('{"ready":true}\n');
+  spawned[0].reply(JSON.stringify({ id: spawned[0].last.id, result: 7 }) + '\n');
+  assert.equal(await call, 7);
+  bridge.close();
+});
