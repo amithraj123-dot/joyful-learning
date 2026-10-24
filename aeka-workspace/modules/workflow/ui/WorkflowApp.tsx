@@ -69,7 +69,7 @@ function Body({ store, page, navigate }: { store: WorkflowStore; page: string; n
 
 export default function WorkflowApp({ page, navigate, notify }: ModuleViewProps) {
   return (
-    <WorkflowProvider notify={notify}>
+    <WorkflowProvider notify={notify} page={page}>
       {(store) => (
         <div className="wf">
           <Body store={store} page={page} navigate={navigate} />

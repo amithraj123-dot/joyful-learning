@@ -17,7 +17,7 @@ import { useMatterLabel, useWF } from './store';
 const READ_ONLY_NOTE = 'Deadlines are added and changed by Assistant Managers and above.';
 
 export function DeadlinesPage({ navigate }: { navigate: Nav }) {
-  const { milestones, clients, matterById, caps, setFocusMatter } = useWF();
+  const { milestones, clients, matterById, caps, goToMatter } = useWF();
   const [client, setClient] = useState('all');
   const [kind, setKind] = useState('all');
   const [showDone, setShowDone] = useState(false);
@@ -76,7 +76,7 @@ export function DeadlinesPage({ navigate }: { navigate: Nav }) {
             list={list}
             showMatter
             onOpenMatter={(id) => {
-              setFocusMatter(id);
+              goToMatter(id);
               navigate('workflow/matters');
             }}
           />

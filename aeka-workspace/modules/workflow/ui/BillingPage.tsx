@@ -63,7 +63,7 @@ function useBillingDraft(b: MatterBilling) {
 }
 
 export function BillingPage({ navigate }: { navigate: Nav }) {
-  const { caps, matters, billingByMatter, clientById, setFocusMatter } = useWF();
+  const { caps, matters, billingByMatter, clientById, goToMatter } = useWF();
   const [search, setSearch] = useState('');
   const [el, setEl] = useState('all');
   const [inv, setInv] = useState('all');
@@ -174,7 +174,7 @@ export function BillingPage({ navigate }: { navigate: Nav }) {
                   billing={b}
                   onLog={() => setLog(m.id)}
                   onOpen={() => {
-                    setFocusMatter(m.id);
+                    goToMatter(m.id);
                     navigate('workflow/matters');
                   }}
                 />

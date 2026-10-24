@@ -16,12 +16,12 @@ type View = 'list' | 'client' | 'person';
 type Due = 'any' | 'overdue' | 'week' | 'none';
 
 export function useOpeners(navigate: Nav) {
-  const { setFocusMatter, setFocusTask } = useWF();
+  const { goToMatter, setFocusTask } = useWF();
   return {
     openTask: (id: string | null) => setFocusTask(id),
     openMatter: (id: string) => {
       setFocusTask(null);
-      setFocusMatter(id);
+      goToMatter(id);
       navigate('workflow/matters');
     },
   };

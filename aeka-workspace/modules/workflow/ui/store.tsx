@@ -136,7 +136,7 @@ const NO_CAPS: WorkflowCapabilities = {
   importData: false,
 };
 
-function useWorkflowValue(shellNotify: (message: string) => void) {
+function useWorkflowValue(shellNotify: (message: string) => void, page: string) {
   // The shell passes a new notify function on each render; keep a stable wrapper.
   const notifyRef = useRef(shellNotify);
   useEffect(() => {
@@ -155,6 +155,19 @@ function useWorkflowValue(shellNotify: (message: string) => void) {
   const [focusMatter, setFocusMatter] = useState<string | null>(null);
   const [focusDeal, setFocusDeal] = useState<string | null>(null);
   const [focusTask, setFocusTask] = useState<string | null>(null);
+  // A mandate opened from another page stays open after the page changes; arriving at Clients and
+  // Mandates any other way (for example from the navigation) shows the list.
+  const [seenPage, setSeenPage] = useState(page);
+  const [keepFocus, setKeepFocus] = useState(false);
+  if (page !== seenPage) {
+    setSeenPage(page);
+    if (!keepFocus) setFocusMatter(null);
+    setKeepFocus(false);
+  }
+  const goToMatter = useCallback((id: string) => {
+    setFocusMatter(id);
+    setKeepFocus(true);
+  }, []);
   // Unsaved deal tracker edits survive switching pages until saved or discarded.
   const [dealDrafts, setDealDrafts] = useState<Record<string, DealDraft>>({});
 
@@ -312,6 +325,7 @@ function useWorkflowValue(shellNotify: (message: string) => void) {
     notify,
     focusMatter,
     setFocusMatter,
+    goToMatter,
     focusDeal,
     setFocusDeal,
     focusTask,
@@ -326,12 +340,14 @@ const Ctx = createContext<WorkflowStore | null>(null);
 
 export function WorkflowProvider({
   notify,
+  page,
   children,
 }: {
   notify: (message: string) => void;
+  page: string;
   children: (store: WorkflowStore) => ReactNode;
 }) {
-  const value = useWorkflowValue(notify);
+  const value = useWorkflowValue(notify, page);
   return <Ctx.Provider value={value}>{children(value)}</Ctx.Provider>;
 }
 

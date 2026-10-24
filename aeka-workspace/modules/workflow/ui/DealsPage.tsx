@@ -79,7 +79,7 @@ function Kpi({ label, value, children }: { label: string; value?: string; childr
 }
 
 export function DealsPage({ navigate }: { navigate: Nav }) {
-  const { matters, clientById, focusDeal, setFocusDeal, setFocusMatter, dealDrafts } = useWF();
+  const { matters, clientById, focusDeal, setFocusDeal, goToMatter, dealDrafts } = useWF();
   const deals = matters
     .filter((m) => m.isDeal)
     .sort(
@@ -111,7 +111,7 @@ export function DealsPage({ navigate }: { navigate: Nav }) {
           type="button"
           className="text-link"
           onClick={() => {
-            setFocusMatter(selected.id);
+            goToMatter(selected.id);
             navigate('workflow/matters');
           }}
         >
