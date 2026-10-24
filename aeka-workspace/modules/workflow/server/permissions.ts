@@ -3,7 +3,8 @@ import { CloudError } from '../../../lib/cloud-store.ts';
 import { atLeast, type Member } from '../../../core/server/members.ts';
 import type { ModuleContext, Permission } from '../../../core/server/module.ts';
 import type { Matter, PersonKey, WorkflowCapabilities } from '../shared/types.ts';
-import { all, matters, notFound, one } from './db.ts';
+import { all, matters, notFound, one, type Table } from './db.ts';
+import { id } from './validate.ts';
 import type { People } from './people.ts';
 
 // "Manager+": Assistant Manager and above.
@@ -55,12 +56,26 @@ export function assertInsideWall(people: People, matter: Matter, keys: (PersonKe
 const LIVE = 'deleted_at IS NULL AND client_id IN (SELECT id FROM wf_clients WHERE deleted_at IS NULL)';
 
 // A live matter the caller may see. Restricted matters outside the caller's wall are reported as not
-// found, never as forbidden, so their existence is not disclosed.
-export async function visibleMatter(ctx: ModuleContext, matterId: unknown) {
-  const matter =
-    typeof matterId === 'string' ? await one(ctx.db, matters, `id = ? AND ${LIVE}`, matterId) : null;
-  if (!matter || !canSee(me(ctx), matter)) throw notFound('matter');
+// found, never as forbidden, so their existence is not disclosed. `label` names the record reached
+// through the matter, for the not-found message.
+export async function visibleMatter(ctx: ModuleContext, matterId: unknown, label = 'matter') {
+  const matter = await one(ctx.db, matters, `id = ? AND ${LIVE}`, id(matterId));
+  if (!matter || !canSee(me(ctx), matter)) throw notFound(label);
   return matter;
+}
+
+// A record that belongs to a matter (task, time entry, milestone, invoice), found only through a
+// matter the caller may see.
+export async function visibleChild<T extends { matterId: string }>(
+  ctx: ModuleContext,
+  t: Table<T>,
+  key: unknown,
+  label: string,
+  where = '1',
+) {
+  const record = await one(ctx.db, t, `id = ? AND ${where}`, id(key));
+  if (!record) throw notFound(label);
+  return { record, matter: await visibleMatter(ctx, record.matterId, label) };
 }
 
 export async function visibleMatters(ctx: ModuleContext) {

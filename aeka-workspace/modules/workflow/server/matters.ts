@@ -50,8 +50,8 @@ const checkRevision = (record: { revision: number }, base: number, label: string
 export const matterActions: Record<string, ModuleAction> = {
   'client.create': {
     permission: managerOnly,
-    handler: async (ctx) => {
-      const input = validClient(ctxPayload(ctx).client);
+    handler: async (ctx, p) => {
+      const input = validClient(p.client);
       await assertClientNameFree(ctx.db, input.name);
       const client: Client = {
         id: crypto.randomUUID(),
