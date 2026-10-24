@@ -1,6 +1,6 @@
 {
-  "name": "aeka-scribe",
-  "version": "0.6.0",
+  "name": "aeka-workspace",
+  "version": "0.7.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -74,5 +74,5 @@
     }
   },
   "packageManager": "pnpm@11.25.0",
-  "description": "Aeka Scribe: dictation and meeting notes workspace for Aeka Advisors"
+  "description": "Aeka Workspace: dictation, meeting notes and team workflow for Aeka Advisors"
 }

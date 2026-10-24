@@ -203,6 +203,9 @@ kbd {
   letter-spacing: 1.6px;
   margin: 0 13px 10px;
 }
+.nav-group + .nav-group {
+  margin-top: 22px;
+}
 .nav-item {
   width: 100%;
   display: flex;

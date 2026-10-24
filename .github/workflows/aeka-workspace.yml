@@ -1,10 +1,10 @@
-name: Aeka Scribe
+name: Aeka Workspace
 
 on:
   push:
-    paths: ['aeka-scribe/**', '.github/workflows/aeka-scribe.yml']
+    paths: ["aeka-workspace/**", ".github/workflows/aeka-workspace.yml"]
   pull_request:
-    paths: ['aeka-scribe/**', '.github/workflows/aeka-scribe.yml']
+    paths: ["aeka-workspace/**", ".github/workflows/aeka-workspace.yml"]
   workflow_dispatch:
 
 permissions:
@@ -12,7 +12,7 @@ permissions:
 
 defaults:
   run:
-    working-directory: aeka-scribe
+    working-directory: aeka-workspace
 
 jobs:
   checks:
@@ -30,7 +30,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: npm --prefix desktop ci
         env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
       - run: pnpm format:check
       - run: pnpm lint
       - run: node node_modules/typescript/bin/tsc --noEmit
@@ -77,7 +77,7 @@ jobs:
         with:
           name: aeka-scribe-windows-unsigned
           path: |
-            aeka-scribe/desktop/release/*.zip
-            aeka-scribe/desktop/release/*.exe
+            aeka-workspace/desktop/release/*.zip
+            aeka-workspace/desktop/release/*.exe
           if-no-files-found: error
           retention-days: 14

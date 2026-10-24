@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Aeka Scribe',
-  description: 'Aeka Scribe: dictation and meeting notes workspace for Aeka Advisors.',
-  applicationName: 'Aeka Scribe',
+  title: 'Aeka Workspace',
+  description: 'Aeka Workspace: dictation, meeting notes and team workflow for Aeka Advisors.',
+  applicationName: 'Aeka Workspace',
   authors: [{ name: 'Aeka Advisors India LLP' }],
   icons: {
     icon: '/favicon.png',

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import {
   AudioLines,
   Mic,
@@ -48,8 +48,10 @@ import {
 } from '../lib/scribe-core';
 import { useRecorder } from '../hooks/use-recorder';
 import { isDesktop, runtime } from '../lib/desktop-runtime';
-import { WorkspacePanel, type WorkspacePage } from '../components/workspace-panel';
-type Page = 'studio' | 'history' | 'vocabulary' | 'snippets' | 'models' | 'settings' | WorkspacePage;
+import { WorkspacePanel } from '../components/workspace-panel';
+import { findPage, modulesFor } from '../core/client/registry';
+// Page ids come from module manifests (core/client/registry.ts); Scribe ids are unprefixed.
+type Page = string;
 const STORAGE = 'aeka-scribe-workspace-v2',
   LEGACY_STORAGE = 'flow-workspace-v2'; // read once from releases before the rename
 const languages = [
@@ -68,22 +70,6 @@ const styleLabels: Record<Style, string> = {
   sentences: 'Sentences',
   notes: 'Notes',
 };
-const nav = [
-  { id: 'studio', label: 'Dictation', icon: AudioLines },
-  { id: 'meetings', label: 'Meetings', icon: CalendarDays },
-  { id: 'notes', label: 'All notes', icon: StickyNote },
-  { id: 'ask', label: 'Ask your notes', icon: MessageCircle },
-  { id: 'people', label: 'People and companies', icon: BookOpen },
-  { id: 'recipes', label: 'Templates and recipes', icon: WandSparkles },
-  { id: 'trash', label: 'Trash', icon: History },
-  { id: 'transforms', label: 'Transforms', icon: WandSparkles },
-  { id: 'team', label: 'Sharing and controls', icon: ShieldCheck },
-  { id: 'history', label: 'History', icon: History },
-  { id: 'vocabulary', label: 'Vocabulary', icon: BookOpen },
-  { id: 'snippets', label: 'Snippets', icon: FileText },
-  { id: 'models', label: 'Speech models', icon: Sparkles },
-  { id: 'desktop', label: 'Desktop setup', icon: Monitor },
-] as const;
 function download(name: string, text: string, type = 'text/plain') {
   const save = () => {
     const url = URL.createObjectURL(new Blob([text], { type }));
@@ -257,7 +243,19 @@ export default function AekaScribe() {
   const choosePage = (next: Page) => {
     setPage(next);
     setSearch('');
+    try {
+      localStorage.setItem('aeka-workspace-page', next);
+    } catch {}
   };
+  // Reopen the last page (web only: the desktop always opens on dictation).
+  useEffect(() => {
+    if (isDesktop()) return;
+    try {
+      const last = localStorage.getItem('aeka-workspace-page');
+      const found = last && findPage(last);
+      if (found && found.module.surfaces.includes('web')) setPage(last);
+    } catch {}
+  }, []);
   const start = (style?: Style) => {
     if (meetingBusy) {
       notify('Finish the meeting before starting dictation.');
@@ -452,24 +450,10 @@ export default function AekaScribe() {
     saved =
       !!draft.current &&
       history.some((e) => e.id === draft.current?.id && e.text === result && e.raw === raw);
-  const heading: Record<Page, [string, string]> = {
-    studio: ['Dictation', 'Speak naturally, review the transcript and refine the text before use'],
-    history: ['History', 'Search, restore and export earlier dictations'],
-    vocabulary: ['Vocabulary', 'Names, acronyms and terminology used in your matters'],
-    snippets: ['Snippets', 'Short spoken triggers that expand into standard text'],
-    models: ['Speech Models', 'Transcription options by accuracy, speed and vocabulary support'],
-    settings: ['Settings', 'Transcription, microphone access and local history'],
-    meetings: ['Meetings', 'Recordings, decisions and agreed next steps'],
-    notes: ['All Notes', 'Search, organise and revisit your notes'],
-    ask: ['Ask Your Notes', 'Answers drawn only from the meetings and notes you select, with sources'],
-    transforms: ['Transforms', 'Edit, translate or restructure text with the original alongside'],
-    desktop: ['Desktop and Calendars', 'Windows controls, calendar connections and encrypted local storage'],
-    team: ['Sharing and Controls', 'Shared notes, access grants and retention'],
-    people: ['People and Companies', 'Meeting history by person or organisation'],
-    recipes: ['Templates and Recipes', 'Reusable structures, prompts and preferences for meeting notes'],
-    trash: ['Trash', 'Restore a note or delete it permanently'],
-  };
-  const [title, subtitle] = heading[page];
+  const surface = native ? 'desktop' : 'web';
+  const current = findPage(page) ?? findPage('studio')!;
+  const { title, subtitle } = current.page;
+  const ModuleView = current.module.View;
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -480,12 +464,12 @@ export default function AekaScribe() {
             e.preventDefault();
             choosePage('studio');
           }}
-          aria-label="Aeka Scribe home"
+          aria-label={native ? 'Aeka Scribe home' : 'Aeka Workspace home'}
         >
           <span className="brand-mark" aria-hidden="true" />
           <span className="brand-word">
             <b>aeka</b>
-            <span>scribe</span>
+            <span>{native ? 'scribe' : 'workspace'}</span>
           </span>
         </a>
         <div className="workspace-tag">
@@ -495,24 +479,31 @@ export default function AekaScribe() {
             <small>Aeka Advisors</small>
           </div>
         </div>
-        <p className="nav-label">WORKSPACE</p>
-        <nav aria-label="Workspace">
-          {nav.map((item) => (
-            <button
-              key={item.id}
-              title={item.label}
-              aria-label={item.label}
-              className={'nav-item ' + (page === item.id ? 'active' : '')}
-              onClick={() => choosePage(item.id)}
-            >
-              <item.icon size={19} />
-              {item.label}
-              {item.id === 'history' && history.length > 0 && (
-                <span className="nav-count">{history.length}</span>
-              )}
-            </button>
-          ))}
-        </nav>
+        {modulesFor(surface).map((module) => (
+          <div className="nav-group" key={module.id}>
+            <p className="nav-label">{module.name.toUpperCase()}</p>
+            <nav aria-label={module.name}>
+              {module.pages
+                .filter((item) => !item.hidden)
+                .map((item) => (
+                  <button
+                    key={item.id}
+                    title={item.label}
+                    aria-label={item.label}
+                    aria-current={page === item.id ? 'page' : undefined}
+                    className={'nav-item ' + (page === item.id ? 'active' : '')}
+                    onClick={() => choosePage(item.id)}
+                  >
+                    <item.icon size={19} />
+                    {item.label}
+                    {item.id === 'history' && history.length > 0 && (
+                      <span className="nav-count">{history.length}</span>
+                    )}
+                  </button>
+                ))}
+            </nav>
+          </div>
+        ))}
         <div className="sidebar-bottom">
           <div className="private-note">
             <ShieldCheck size={19} />
@@ -535,8 +526,8 @@ export default function AekaScribe() {
             Settings
           </button>
           <div className="version-line">
-            <span>AEKA SCRIBE</span>
-            <span>0.6</span>
+            <span>{native ? 'AEKA SCRIBE' : 'AEKA WORKSPACE'}</span>
+            <span>0.7</span>
           </div>
         </div>
       </aside>
@@ -554,7 +545,7 @@ export default function AekaScribe() {
         <div className="page-content">
           <div className="page-heading">
             <div>
-              <p className="eyebrow">AEKA SCRIBE</p>
+              <p className="eyebrow">AEKA {current.module.name.toUpperCase()}</p>
               <h1>{title}</h1>
               <p className="subtitle">{subtitle}</p>
             </div>
@@ -1623,6 +1614,11 @@ export default function AekaScribe() {
               </section>
             </div>
           )}
+          {ModuleView && (
+            <Suspense fallback={<p className="muted">Loading…</p>}>
+              <ModuleView page={current.page.id} navigate={choosePage} notify={notify} />
+            </Suspense>
+          )}
           <WorkspacePanel
             page={page}
             deviceId={settings.deviceId}
@@ -1655,7 +1651,7 @@ export default function AekaScribe() {
           />
           <footer className="page-footer">
             <span>Aeka Advisors India LLP</span>
-            <span>Aeka Scribe</span>
+            <span>{native ? 'Aeka Scribe' : 'Aeka Workspace'}</span>
           </footer>
         </div>
       </main>

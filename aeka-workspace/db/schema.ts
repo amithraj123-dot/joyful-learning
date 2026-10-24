@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
 export const workspaceNotes = sqliteTable(
   'workspace_notes',
   {
@@ -69,3 +69,30 @@ export const workspaceMaintenance = sqliteTable('workspace_maintenance', {
   owner: text('owner').primaryKey(),
   retentionAt: integer('retention_at').notNull(),
 });
+
+// Core: firm members of the shared workspace (see core/server/members.ts).
+export const orgMembers = sqliteTable('org_members', {
+  email: text('email').primaryKey(),
+  name: text('name').notNull(),
+  initials: text('initials').notNull(),
+  designation: text('designation').notNull(),
+  isAdmin: integer('is_admin').notNull(),
+  active: integer('active').notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+// Core: activity trail written by every team module (see core/server/activity.ts).
+export const orgActivity = sqliteTable(
+  'org_activity',
+  {
+    id: text('id').primaryKey(),
+    at: integer('at').notNull(),
+    actor: text('actor').notNull(),
+    actorName: text('actor_name').notNull(),
+    module: text('module').notNull(),
+    action: text('action').notNull(),
+    target: text('target').notNull(),
+    summary: text('summary').notNull(),
+  },
+  (t) => [index('org_activity_at').on(t.at), index('org_activity_target').on(t.target)],
+);
