@@ -148,7 +148,7 @@ export function Chips<T extends string>({
 export function Dirty({ dirty }: { dirty: boolean }) {
   return (
     <span className={'wf-dirty' + (dirty ? ' on' : '')} aria-live="polite">
-      {dirty ? 'Unsaved changes' : 'All changes saved'}
+      {dirty ? 'Unsaved changes' : 'No unsaved changes'}
     </span>
   );
 }

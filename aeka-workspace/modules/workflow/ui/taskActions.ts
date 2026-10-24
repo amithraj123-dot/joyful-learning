@@ -8,8 +8,17 @@ import { taskInput, useWF, type RunOptions } from './store';
 export const MAKER_CHECKER_RULE =
   'When a preparer is recorded, a task can be sent to the client or completed only after a different person is recorded as reviewer.';
 
-export function signOffProblem(t: Pick<TaskInput, 'status' | 'preparedBy' | 'reviewedBy'>) {
+type SignOff = Pick<TaskInput, 'status' | 'preparedBy' | 'reviewedBy'>;
+// The maker-checker rule, checked (as on the server) only when the status, preparer or reviewer changes.
+export function signOffProblem(t: SignOff, current?: SignOff) {
   if (!SIGN_OFF_STATUSES.includes(t.status) || !t.preparedBy) return '';
+  if (
+    current &&
+    current.status === t.status &&
+    current.preparedBy === t.preparedBy &&
+    current.reviewedBy === t.reviewedBy
+  )
+    return '';
   if (!t.reviewedBy) return 'Record a reviewer before moving this task to ' + t.status + '.';
   if (t.reviewedBy === t.preparedBy) return 'The reviewer must be a different person from the preparer.';
   return '';
@@ -22,10 +31,7 @@ export function useTaskActions() {
     (t: Task, matter?: Matter) => {
       const m = matter ?? matterById.get(t.matterId);
       return (
-        caps.manageMatters ||
-        t.assignee === meEmail ||
-        t.createdBy === meEmail ||
-        !!m?.team.includes(meEmail)
+        caps.manageMatters || t.assignee === meEmail || t.createdBy === meEmail || !!m?.team.includes(meEmail)
       );
     },
     [caps.manageMatters, meEmail, matterById],
@@ -38,7 +44,7 @@ export function useTaskActions() {
   const update = useCallback(
     async (t: Task, patch: Partial<TaskInput>, opts?: RunOptions) => {
       const next = { ...taskInput(t), ...patch };
-      const problem = signOffProblem(next);
+      const problem = signOffProblem(next, t);
       if (problem) {
         if (opts?.onError) opts.onError(problem);
         else notify(problem);

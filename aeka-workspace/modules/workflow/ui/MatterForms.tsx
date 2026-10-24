@@ -30,7 +30,11 @@ export function ClientForm({ client, onClose }: { client?: Client; onClose: (sav
     setBusy(true);
     const input = { name: name.trim(), notes };
     const saved = client
-      ? await run('client.update', { id: client.id, client: input, baseRevision: client.revision }, { onError: setError })
+      ? await run(
+          'client.update',
+          { id: client.id, client: input, baseRevision: client.revision },
+          { onError: setError },
+        )
       : await run('client.create', { client: input }, { onError: setError });
     setBusy(false);
     if (saved) {
@@ -43,7 +47,13 @@ export function ClientForm({ client, onClose }: { client?: Client; onClose: (sav
     <Modal title={client ? 'Edit client' : 'New client'} onClose={() => onClose()}>
       <form onSubmit={submit}>
         <Field label="Client or group name">
-          <input value={name} onChange={(e) => setName(e.target.value)} data-autofocus required maxLength={200} />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            data-autofocus
+            required
+            maxLength={200}
+          />
         </Field>
         <Field label="Notes">
           <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -108,7 +118,11 @@ export function MatterForm({
     const input = { ...m, title: m.title.trim(), type: m.type.trim() || 'Other' };
     setBusy(true);
     const saved = matter
-      ? await run('matter.update', { id: matter.id, matter: input, baseRevision: matter.revision }, { onError: setError })
+      ? await run(
+          'matter.update',
+          { id: matter.id, matter: input, baseRevision: matter.revision },
+          { onError: setError },
+        )
       : await run('matter.create', { matter: input }, { onError: setError });
     setBusy(false);
     if (saved) {
@@ -123,7 +137,12 @@ export function MatterForm({
       <form onSubmit={submit}>
         <div className="wf-grid two">
           <Field label="Mandate title">
-            <input value={m.title} onChange={(e) => set('title', e.target.value)} data-autofocus maxLength={200} />
+            <input
+              value={m.title}
+              onChange={(e) => set('title', e.target.value)}
+              data-autofocus
+              maxLength={200}
+            />
           </Field>
           <Field label="Client">
             <select value={m.clientId} onChange={(e) => set('clientId', e.target.value)}>

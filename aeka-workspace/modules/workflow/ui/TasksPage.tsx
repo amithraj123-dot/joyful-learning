@@ -70,9 +70,7 @@ export function TasksPage({ navigate }: { navigate: Nav }) {
     });
   }, [tasks, search, person, status, client, due, view, today, matterById, clientById, members]);
 
-  const review = tasks
-    .filter((t) => t.status === 'In Review' && t.reviewedBy === meEmail)
-    .sort(byTaskOrder);
+  const review = tasks.filter((t) => t.status === 'In Review' && t.reviewedBy === meEmail).sort(byTaskOrder);
   const open = filtered.filter((t) => !isDone(t)).sort(byTaskOrder);
   const done = filtered.filter(isDone).sort((a, b) => b.updatedAt - a.updatedAt);
   const rowProps = { onOpen: openTask, onOpenMatter: openMatter };
@@ -157,7 +155,9 @@ export function TasksPage({ navigate }: { navigate: Nav }) {
 
         {!filtered.length ? (
           <Empty icon={ListChecks} title="No tasks match">
-            {tasks.length ? 'Change the filters or the search to see more tasks.' : 'Add the first task above.'}
+            {tasks.length
+              ? 'Change the filters or the search to see more tasks.'
+              : 'Add the first task above.'}
           </Empty>
         ) : view === 'list' ? (
           <>
@@ -214,9 +214,11 @@ function ByClient({ tasks, rowProps }: { tasks: Task[]; rowProps: RowProps }) {
             </span>
           </h3>
           <ul className="wf-task-list">
-            {[...g.list].sort((a, b) => Number(isDone(a)) - Number(isDone(b)) || byTaskOrder(a, b)).map((t) => (
-              <TaskRow key={t.id} task={t} {...rowProps} />
-            ))}
+            {[...g.list]
+              .sort((a, b) => Number(isDone(a)) - Number(isDone(b)) || byTaskOrder(a, b))
+              .map((t) => (
+                <TaskRow key={t.id} task={t} {...rowProps} />
+              ))}
           </ul>
         </section>
       ))}
@@ -253,9 +255,11 @@ function ByPerson({ tasks, rowProps }: { tasks: Task[]; rowProps: RowProps }) {
               </span>
             </h3>
             <ul className="wf-task-list">
-              {[...list].sort((a, b) => Number(isDone(a)) - Number(isDone(b)) || byTaskOrder(a, b)).map((t) => (
-                <TaskRow key={t.id} task={t} {...rowProps} />
-              ))}
+              {[...list]
+                .sort((a, b) => Number(isDone(a)) - Number(isDone(b)) || byTaskOrder(a, b))
+                .map((t) => (
+                  <TaskRow key={t.id} task={t} {...rowProps} />
+                ))}
             </ul>
           </section>
         );
@@ -277,9 +281,11 @@ function QuickAdd() {
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const cid = clientId || clients[0]?.id || '';
+  const firstOpen = clients.find((c) => matters.some((m) => m.clientId === c.id && m.status !== 'closed'));
+  const cid = clientId || (firstOpen ?? clients[0])?.id || '';
   const options = matters.filter((m) => m.clientId === cid && m.status !== 'closed');
-  const mid = matterId === NEW ? NEW : options.some((m) => m.id === matterId) ? matterId : (options[0]?.id ?? '');
+  const mid =
+    matterId === NEW ? NEW : options.some((m) => m.id === matterId) ? matterId : (options[0]?.id ?? '');
 
   if (!clients.length)
     return (
@@ -322,7 +328,10 @@ function QuickAdd() {
       setMatterId(created.id);
       setNewMatter('');
     }
-    const saved = await actions.create({ matterId: target, title: title.trim(), assignee, dueDate }, { onError: setError });
+    const saved = await actions.create(
+      { matterId: target, title: title.trim(), assignee, dueDate },
+      { onError: setError },
+    );
     setBusy(false);
     if (saved) {
       setTitle('');
@@ -336,7 +345,11 @@ function QuickAdd() {
       <h2 id="wf-quick-h">Add a task</h2>
       <div className="wf-quick-grid">
         <Field label="Task">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="For example, draft the s.56 note" />
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="For example, draft the s.56 note"
+          />
         </Field>
         <Field label="Client">
           <select

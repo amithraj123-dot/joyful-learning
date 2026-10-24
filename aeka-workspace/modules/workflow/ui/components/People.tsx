@@ -1,6 +1,7 @@
 'use client';
 // People: initials badge, single-person select and a team multi-select. Person keys are member emails or
 // "legacy:XX" for initials imported from the earlier sheet; legacy initials are shown in grey.
+import { useId } from 'react';
 import type { PersonKey } from '../../shared/types';
 import { isLegacy, personLabel, rank, type Member } from '../lib';
 import { useWF } from '../store';
@@ -9,7 +10,11 @@ export function PersonBadge({ person, showName }: { person: PersonKey | null; sh
   const { members } = useWF();
   const p = personLabel(person, members);
   if (!person)
-    return showName ? <span className="wf-caption">Unassigned</span> : <span className="wf-badge empty">-</span>;
+    return showName ? (
+      <span className="wf-caption">Unassigned</span>
+    ) : (
+      <span className="wf-badge empty">-</span>
+    );
   return (
     <span className="wf-person" title={p.name}>
       <span className={'wf-badge' + (p.legacy ? ' legacy' : '')} aria-hidden={showName ? true : undefined}>
@@ -67,11 +72,13 @@ export function PersonPicker({
   disabled?: boolean;
   id?: string;
 }) {
+  const generated = useId();
+  const selectId = id ?? generated;
   const all = usePeopleOptions([value, ...(only ?? [])]);
   const options = only ? all.filter((o) => only.includes(o.key) || o.key === value) : all;
   const select = (
     <select
-      id={id}
+      id={selectId}
       value={value ?? ''}
       disabled={disabled}
       aria-label={hideLabel ? label : undefined}
@@ -87,10 +94,10 @@ export function PersonPicker({
   );
   if (hideLabel) return select;
   return (
-    <label className="wf-field">
-      <span>{label}</span>
+    <div className="wf-field">
+      <label htmlFor={selectId}>{label}</label>
       {select}
-    </label>
+    </div>
   );
 }
 

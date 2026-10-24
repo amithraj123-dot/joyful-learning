@@ -158,30 +158,45 @@ function useWorkflowValue(shellNotify: (message: string) => void) {
   // Unsaved deal tracker edits survive switching pages until saved or discarded.
   const [dealDrafts, setDealDrafts] = useState<Record<string, DealDraft>>({});
 
-  const load = useCallback(async (initial: boolean) => {
-    const [me, snap, members] = await Promise.allSettled([
-      initial ? callModule<MeInfo>('core', 'me') : Promise.resolve(null),
-      wf('snapshot', {}),
-      callModule<Member[]>('core', 'members.list'),
-    ]);
-    const meValue = me.status === 'fulfilled' ? me.value : null;
-    if (snap.status === 'rejected') {
-      const status = errorStatus(snap.reason);
-      const message = errorMessage(snap.reason);
-      if (status === 403 && /not a member/i.test(message))
-        dispatch({ type: 'phase', phase: 'not-member', error: message, me: meValue });
-      else if (initial) dispatch({ type: 'phase', phase: 'error', error: message, me: meValue });
-      else notify(message);
-      return;
-    }
-    dispatch({
-      type: 'loaded',
-      snap: snap.value,
-      members: members.status === 'fulfilled' ? members.value : null,
-      me: meValue,
-      today: todayIST(),
-    });
-  }, [notify]);
+  // Warn before the tab is closed while a deal tracker has unsaved edits.
+  const unsavedDeal = Object.values(dealDrafts).some(dealDirty);
+  useEffect(() => {
+    if (!unsavedDeal) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [unsavedDeal]);
+
+  const load = useCallback(
+    async (initial: boolean) => {
+      const [me, snap, members] = await Promise.allSettled([
+        initial ? callModule<MeInfo>('core', 'me') : Promise.resolve(null),
+        wf('snapshot', {}),
+        callModule<Member[]>('core', 'members.list'),
+      ]);
+      const meValue = me.status === 'fulfilled' ? me.value : null;
+      if (snap.status === 'rejected') {
+        const status = errorStatus(snap.reason);
+        const message = errorMessage(snap.reason);
+        if (status === 403 && /not a member/i.test(message))
+          dispatch({ type: 'phase', phase: 'not-member', error: message, me: meValue });
+        else if (initial) dispatch({ type: 'phase', phase: 'error', error: message, me: meValue });
+        else notify(message);
+        return;
+      }
+      dispatch({
+        type: 'loaded',
+        snap: snap.value,
+        members: members.status === 'fulfilled' ? members.value : null,
+        me: meValue,
+        today: todayIST(),
+      });
+    },
+    [notify],
+  );
 
   const reload = useCallback(() => load(false), [load]);
   const retry = useCallback(() => {
@@ -224,7 +239,9 @@ function useWorkflowValue(shellNotify: (message: string) => void) {
         const status = errorStatus(e);
         let message = errorMessage(e);
         if (status === 409 && 'baseRevision' in (payload as object)) {
-          message = CONFLICT_MESSAGE;
+          // A revision conflict: load the latest data. Other 409s (for example a duplicate name) keep
+          // the server's own message.
+          if (/changed since/i.test(message)) message = CONFLICT_MESSAGE;
           await load(false);
         } else if (status === 403 && /not a member/i.test(message)) {
           dispatch({ type: 'phase', phase: 'not-member', error: message });
@@ -376,6 +393,16 @@ export function matterInput(m: Matter) {
     isDeal: m.isDeal,
   };
 }
+
+export const dealInput = (d: DealTracker): DealInput => ({
+  dealValue: d.dealValue,
+  representing: d.representing,
+  targetCompany: d.targetCompany,
+  targetDocs: d.targetDocs,
+  counterparties: d.counterparties,
+});
+export const dealDirty = (x: DealDraft | undefined) =>
+  !!x && JSON.stringify(x.draft) !== JSON.stringify(dealInput(x.base));
 
 export function taskInput(t: Task) {
   return {

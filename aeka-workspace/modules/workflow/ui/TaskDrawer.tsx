@@ -62,7 +62,7 @@ function DrawerBody({
     setDraft((d) => ({ ...d, [k]: v }));
     setError('');
   };
-  const problem = signOffProblem(draft);
+  const problem = signOffProblem(draft, base);
 
   const save = async () => {
     if (!dirty || saving) return;
@@ -149,7 +149,8 @@ function DrawerBody({
       )}
       {!editable && (
         <p className="wf-note">
-          Only the mandate team, the assignee, the creator and Assistant Managers and above can edit this task.
+          Only the mandate team, the assignee, the creator and Assistant Managers and above can edit this
+          task.
         </p>
       )}
       <fieldset className="wf-plain" disabled={!editable}>
@@ -170,11 +171,7 @@ function DrawerBody({
             </select>
           </Field>
           <DateInput label="Due date" value={draft.dueDate} onChange={(v) => set('dueDate', v)} />
-          <PersonPicker
-            label="Currently with"
-            value={draft.assignee}
-            onChange={(v) => set('assignee', v)}
-          />
+          <PersonPicker label="Currently with" value={draft.assignee} onChange={(v) => set('assignee', v)} />
           <div className="wf-field">
             <span>Priority</span>
             <Toggle pressed={draft.priority} onChange={(v) => set('priority', v)}>
@@ -202,7 +199,8 @@ function DrawerBody({
           </div>
           {base.reviewedAt && (
             <p className="wf-caption">
-              Signed off by <PersonBadge person={base.reviewedBy} showName /> on {formatStamp(base.reviewedAt)}
+              Signed off by <PersonBadge person={base.reviewedBy} showName /> on{' '}
+              {formatStamp(base.reviewedAt)}
             </p>
           )}
           {problem && <p className="wf-error">{problem}</p>}

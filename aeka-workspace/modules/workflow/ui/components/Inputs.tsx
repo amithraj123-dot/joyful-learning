@@ -1,6 +1,6 @@
 'use client';
 // Form inputs: money (rupees in, paise out), dates (YYYY-MM-DD), hours (0.25 steps, minutes out).
-import { useState, type ReactNode } from 'react';
+import { cloneElement, isValidElement, useId, useState, type ReactElement, type ReactNode } from 'react';
 
 const toText = (paise: number | null) => (paise == null ? '' : String(paise / 100));
 // null for empty, NaN for text that is not an amount.
@@ -26,6 +26,7 @@ export function MoneyInput({
   disabled?: boolean;
   required?: boolean;
 }) {
+  const id = useId();
   const [text, setText] = useState(() => toText(value));
   const parsed = parseRupees(text);
   // Follow the value when it changes from outside (for example after a save or a reload).
@@ -34,6 +35,7 @@ export function MoneyInput({
     <span className="wf-money">
       <span aria-hidden="true">₹</span>
       <input
+        id={id}
         inputMode="decimal"
         value={shown}
         disabled={disabled}
@@ -51,11 +53,11 @@ export function MoneyInput({
   );
   if (hideLabel) return input;
   return (
-    <label className="wf-field">
-      <span>{label} (₹)</span>
+    <div className="wf-field">
+      <label htmlFor={id}>{label} (₹)</label>
       {input}
       {Number.isNaN(parseRupees(shown)) && <small className="wf-error">Enter an amount in rupees.</small>}
-    </label>
+    </div>
   );
 }
 
@@ -67,6 +69,7 @@ export function DateInput({
   required,
   disabled,
   min,
+  max,
 }: {
   value: string | null;
   onChange: (v: string | null) => void;
@@ -75,12 +78,16 @@ export function DateInput({
   required?: boolean;
   disabled?: boolean;
   min?: string;
+  max?: string;
 }) {
+  const id = useId();
   const input = (
     <input
+      id={id}
       type="date"
       value={value ?? ''}
       min={min}
+      max={max}
       required={required}
       disabled={disabled}
       aria-label={hideLabel ? label : undefined}
@@ -89,19 +96,33 @@ export function DateInput({
   );
   if (hideLabel) return input;
   return (
-    <label className="wf-field">
-      <span>{label}</span>
+    <div className="wf-field">
+      <label htmlFor={id}>{label}</label>
       {input}
-    </label>
+    </div>
   );
 }
 
+// A labelled control: the label is tied to the single child control by id, so the control's name is the
+// label alone (a wrapping label would also read out a select's options).
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: ReactNode }) {
+  const generated = useId();
+  const hintId = generated + '-hint';
+  if (!isValidElement(children))
+    return (
+      <div className="wf-field">
+        <span>{label}</span>
+        {children}
+        {hint && <small>{hint}</small>}
+      </div>
+    );
+  const child = children as ReactElement<{ id?: string; 'aria-describedby'?: string }>;
+  const id = child.props.id ?? generated;
   return (
-    <label className="wf-field">
-      <span>{label}</span>
-      {children}
-      {hint && <small>{hint}</small>}
-    </label>
+    <div className="wf-field">
+      <label htmlFor={id}>{label}</label>
+      {cloneElement(child, { id, ...(hint ? { 'aria-describedby': hintId } : {}) })}
+      {hint && <small id={hintId}>{hint}</small>}
+    </div>
   );
 }

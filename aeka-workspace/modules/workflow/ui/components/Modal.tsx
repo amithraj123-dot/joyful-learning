@@ -1,7 +1,7 @@
 'use client';
 // Dialog with focus on open, a focus trap, Esc to close and focus returned to the opener on close.
 // variant "drawer" slides in from the right and becomes full width on phones.
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useEffectEvent, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -25,7 +25,7 @@ export function Modal({
   footer?: ReactNode;
   variant?: 'dialog' | 'drawer';
   wide?: boolean;
-  onKeyDown?: (e: React.KeyboardEvent) => void;
+  onKeyDown?: (e: KeyboardEvent) => void;
 }) {
   const id = useId();
   const ref = useRef<HTMLDivElement>(null);
@@ -38,20 +38,28 @@ export function Modal({
     (first ?? node)?.focus();
     return () => opener?.focus?.();
   }, []);
-  const keydown = (e: React.KeyboardEvent) => {
+  // Keys are handled on the document so they still work when focus has fallen back to the page body
+  // (for example after the focused Save button becomes disabled).
+  const onDocKey = useEffectEvent((e: KeyboardEvent) => {
+    const node = ref.current;
+    const target = e.target as Node | null;
+    if (!node || (target && target !== document.body && !node.contains(target))) return;
     if (e.key === 'Escape') {
       e.stopPropagation();
       onClose();
       return;
     }
-    if (e.key === 'Tab' && ref.current) {
-      const items = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    if (e.key === 'Tab') {
+      const items = [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
         (el) => el.offsetParent !== null,
       );
       if (!items.length) return;
       const first = items[0],
         last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
+      if (!node.contains(document.activeElement)) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
         last.focus();
       } else if (!e.shiftKey && document.activeElement === last) {
@@ -60,7 +68,12 @@ export function Modal({
       }
     }
     onKeyDown?.(e);
-  };
+  });
+  useEffect(() => {
+    const listener = (e: KeyboardEvent) => onDocKey(e);
+    document.addEventListener('keydown', listener);
+    return () => document.removeEventListener('keydown', listener);
+  }, []);
   if (typeof document === 'undefined') return null;
   return createPortal(
     <div className={'wf-overlay ' + variant} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -71,7 +84,6 @@ export function Modal({
         aria-labelledby={id}
         tabIndex={-1}
         className={'wf-modal ' + variant + (wide ? ' wide' : '')}
-        onKeyDown={keydown}
       >
         <div className="wf-modal-head">
           <div>
