@@ -1,0 +1,14 @@
+node_modules
+dist
+.sites-runtime
+.wrangler
+pnpm-lock.yaml
+desktop/node_modules
+desktop/ui-dist
+desktop/release
+desktop/generated
+desktop/assets
+public/pdf.worker.min.mjs
+vendor
+drizzle
+components/ui

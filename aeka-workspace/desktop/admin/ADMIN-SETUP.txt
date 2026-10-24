@@ -1,0 +1,79 @@
+AEKA SCRIBE 0.6.0: ADMINISTRATOR AND PUBLISHER SETUP
+Aeka Advisors India LLP
+
+INSTALLATION
+The NSIS installer installs Aeka Scribe for all users of the computer (in
+Program Files) and asks for administrator approval. Use it for managed
+deployments: ordinary users cannot modify a per-machine installation. The
+portable ZIP remains a per-user copy that its user can modify, so device policy
+on a ZIP copy is a convenience rather than a control. The installer removes a
+per-user installation from an earlier release for the Windows account that runs
+it; per-user copies under other accounts remain until they are uninstalled from
+Settings > Apps. Notes, settings and credentials stay in each user's own
+encrypted vault under %APPDATA%\Aeka Scribe and are not removed.
+
+Packaged builds disable ELECTRON_RUN_AS_NODE, NODE_OPTIONS and the Node.js
+inspector switches, load the application only from its integrity-checked
+app.asar and encrypt the web sign-in cookie store.
+
+DEVICE POLICY
+Deploy policy.example.json as %ProgramData%\Aeka Scribe\policy.json, with ACLs
+that permit ordinary users to read it and only administrators to modify it.
+A policy already deployed at %ProgramData%\Flow Desktop\policy.json (releases
+before the rename) is still honoured when the new file is absent; move it to the
+new location when convenient. Restart Aeka Scribe after policy changes. Invalid
+policy files prevent startup.
+
+Aeka Scribe locates the ProgramData folder from the machine registry
+(HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList, value
+ProgramData), not from the %ProgramData% environment variable, which users can
+change. If the registry cannot be read, it uses ProgramData on the system drive.
+Policy delivered through HKLM\SOFTWARE\Policies registry values is not yet
+supported; deploy the JSON file (for example with Group Policy Preferences or
+Intune).
+
+All boolean fields default to true. retentionDays supports 0 (no maximum),
+7, 30, 90 or 365 days since the note's last update. The shorter managed/ user
+period applies.
+
+updateFeed, updatePublicKey and updateThumbprint pin the update publisher. Leave
+all three empty to let users configure a publisher themselves, or set all three
+together: the HTTPS manifest URL, the Ed25519 public key in PEM form (write line
+breaks as \n inside the JSON string) and the 40-character hexadecimal Windows
+code-signing certificate thumbprint. When pinned, Publisher setup shows "Managed
+by your administrator" and users cannot change these values; they may still
+choose automatic downloads. A partial or malformed set prevents startup. Active recordings and pending audio are protected. Retention runs
+while Aeka Scribe is open. Exports are application controls, not a DLP or
+anti-copy guarantee. This release does not provide SSO, SCIM, MDM enrolment or
+certification.
+
+SIGNED UPDATE FEED
+The automatic updater is implemented but no production publisher/ feed is
+provisioned. The delivered development packages are unsigned. Do not disable
+signature validation to distribute them through the updater.
+
+1. Build an NSIS installer from the source and sign the executable and
+   installer with the firm's trusted Windows code-signing certificate.
+2. Maintain an Ed25519 release-manifest signing key in a secret manager.
+   The application receives only the public PEM key and Windows publisher
+   thumbprint.
+3. Run desktop/scripts/sign-release.mjs from the source checkout with the
+   private-key file path in AEKA_SCRIBE_SIGNING_KEY_FILE (optional release
+   notes in AEKA_SCRIBE_RELEASE_NOTES). The helper writes a signed JSON
+   manifest for product com.aekaadvisors.scribe. It never embeds or prints the
+   private key.
+4. Publish the manifest and installer at HTTPS URLs on the same origin.
+   Keep the expiry within 31 days (the helper uses 14). No redirects are used.
+5. On managed devices, pin the feed URL, Ed25519 public key and Windows
+   certificate thumbprint in policy.json (see DEVICE POLICY). Otherwise each
+   user enters them in Desktop settings > Publisher setup and confirms the feed
+   host and thumbprint in a Windows dialog before they are saved. Automatic
+   checks/ downloads are optional and run every six hours while open; an
+   installer already verified for the same release is not downloaded again.
+6. The client checks product, platform, version, expiry, byte count, SHA-256,
+   Ed25519 signature and Windows Authenticode publisher. Installation requires
+   an explicit click and a Windows confirmation showing the version and
+   publisher, and is blocked during recording or pending transcription.
+
+No service credentials or signing material are included in the source or
+package.
