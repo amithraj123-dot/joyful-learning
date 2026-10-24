@@ -479,11 +479,11 @@ export default function AekaScribe() {
             <small>Aeka Advisors</small>
           </div>
         </div>
-        {modulesFor(surface).map((module) => (
-          <div className="nav-group" key={module.id}>
-            <p className="nav-label">{module.name.toUpperCase()}</p>
-            <nav aria-label={module.name}>
-              {module.pages
+        {modulesFor(surface).map((mod) => (
+          <div className="nav-group" key={mod.id}>
+            <p className="nav-label">{mod.name.toUpperCase()}</p>
+            <nav aria-label={mod.name}>
+              {mod.pages
                 .filter((item) => !item.hidden)
                 .map((item) => (
                   <button

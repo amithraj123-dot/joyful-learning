@@ -10,9 +10,9 @@ export function modulesFor(surface: Surface) {
 }
 
 export function findPage(pageId: string): { module: ClientModule; page: ModulePage } | null {
-  for (const module of clientModules) {
-    const page = module.pages.find((p) => p.id === pageId);
-    if (page) return { module, page };
+  for (const mod of clientModules) {
+    const page = mod.pages.find((p) => p.id === pageId);
+    if (page) return { module: mod, page };
   }
   return null;
 }
