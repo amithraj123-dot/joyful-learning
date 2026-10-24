@@ -29,7 +29,8 @@ async function timeInput(ctx: ModuleContext, value: unknown, current?: TimeEntry
   const person = await people.check(e.person, 'person', current ? [current.person] : []);
   if (person !== m.email && !isManager(m))
     throw forbidden('Only a Manager or above can record time for someone else.');
-  if (current?.person !== person || current.matterId !== matter.id) assertInsideWall(people, matter, [person]);
+  if (current?.person !== person || current.matterId !== matter.id)
+    assertInsideWall(people, matter, [person]);
   const fields = timeFields(e);
   if (fields.date > todayIST(ctx.now)) throw new CloudError('Time cannot be recorded for a future date.');
   const day = await ctx.db
@@ -37,7 +38,9 @@ async function timeInput(ctx: ModuleContext, value: unknown, current?: TimeEntry
     .bind(person, fields.date, current?.id ?? '')
     .first<{ n: number }>();
   if ((day?.n ?? 0) + fields.minutes > 1440)
-    throw new CloudError(`This would record more than 24 hours for ${people.name(person)} on ${fields.date}.`);
+    throw new CloudError(
+      `This would record more than 24 hours for ${people.name(person)} on ${fields.date}.`,
+    );
   const entry = { ...fields, matterId: matter.id, person };
   return { matter, entry, who: people.name(person) };
 }
@@ -69,9 +72,20 @@ export async function timeIn(
   const ids = new Set(visible.map((x) => x.id));
   const where = ['date >= ?', 'date <= ?'];
   const params: unknown[] = [range.from, range.to];
-  if (only.matterId) (where.push('matter_id = ?'), params.push(only.matterId));
-  if (only.person) (where.push('person = ?'), params.push(only.person));
-  const rows = await all(ctx.db, time, where.join(' AND ') + ' ORDER BY date DESC, created_at DESC', ...params);
+  if (only.matterId) {
+    where.push('matter_id = ?');
+    params.push(only.matterId);
+  }
+  if (only.person) {
+    where.push('person = ?');
+    params.push(only.person);
+  }
+  const rows = await all(
+    ctx.db,
+    time,
+    where.join(' AND ') + ' ORDER BY date DESC, created_at DESC',
+    ...params,
+  );
   return { entries: rows.filter((e) => ids.has(e.matterId)), matters: visible };
 }
 

@@ -13,10 +13,11 @@
 //                 reviewedBy who is a different person; reviewedAt is stamped by the server
 //   milestones    Manager+
 //   time          own entries: any member; others' entries: Manager+; edit/delete own entries within 30
-//                 days, others' with Manager+
+//                 days of recording them, others' with Manager+
 //   billing       view and edit: Manager+
 //   feedback      self: the member writes their own; review: Manager+ writes, the member reads their own;
 //                 others' self-reflections: Manager+, or team members when peerFeedbackVisible
+//   deal tracker  read: anyone who can see the matter; save: the matter team or Manager+
 //   import        admins only
 import type {
   Client,

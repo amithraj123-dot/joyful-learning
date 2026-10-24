@@ -26,9 +26,9 @@ type Obj = Record<string, unknown>;
 const bad = (message: string) => new CloudError(message);
 
 export const MAX_PAISE = 1e12; // ₹1,000 crore
-export const ID = /^[A-Za-z0-9_-]{1,80}$/;
+const ID = /^[A-Za-z0-9_-]{1,80}$/;
 export const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
-export const LEGACY_KEY = /^legacy:[A-Z0-9]{1,8}$/;
+const LEGACY_KEY = /^legacy:[A-Z0-9]{1,8}$/;
 
 export function obj(value: unknown, label: string): Obj {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw bad(`Send the ${label} details.`);
@@ -73,10 +73,8 @@ export function date(value: unknown, label: string) {
 export const optionalDate = (value: unknown, label: string) =>
   value == null || value === '' ? null : date(value, label);
 
-// Days between two YYYY-MM-DD dates (b minus a).
+// Days from date a to date b (YYYY-MM-DD).
 export const daysBetween = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 86400000;
-export const addDays = (d: string, days: number) =>
-  new Date(Date.parse(d) + days * 86400000).toISOString().slice(0, 10);
 
 export const id = (value: unknown) => (typeof value === 'string' && ID.test(value) ? value : '');
 

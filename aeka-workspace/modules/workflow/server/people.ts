@@ -24,7 +24,13 @@ export async function loadPeople(db: D1Database) {
     if (current.includes(key)) return key;
     if (key.startsWith('legacy:')) {
       if (!legacyKnown.has(key))
-        legacyKnown.set(key, !!(await db.prepare(LEGACY_IN_DATA).bind(...Array(7).fill(key)).first()));
+        legacyKnown.set(
+          key,
+          !!(await db
+            .prepare(LEGACY_IN_DATA)
+            .bind(...Array(7).fill(key))
+            .first()),
+        );
       if (legacyKnown.get(key)) return key;
     } else if (members.get(key)?.active) return key;
     throw new CloudError(`Choose an active firm member as the ${label}.`);

@@ -216,7 +216,9 @@ export function update<T>(db: D1Database, t: Table<T>, record: T, baseRevision?:
   const cols = fields(t).filter((f) => f !== t.key);
   const check = baseRevision === undefined ? '' : ' AND revision = ?';
   return db
-    .prepare(`UPDATE ${t.name} SET ${cols.map((f) => column(f) + ' = ?').join(', ')} WHERE ${column(t.key)} = ?${check}`)
+    .prepare(
+      `UPDATE ${t.name} SET ${cols.map((f) => column(f) + ' = ?').join(', ')} WHERE ${column(t.key)} = ?${check}`,
+    )
     .bind(...toValues(t, record, cols), record[t.key], ...(baseRevision === undefined ? [] : [baseRevision]));
 }
 
@@ -233,7 +235,10 @@ const bump = (db: D1Database, now: number) =>
     .bind(now);
 
 export async function readVersion(db: D1Database) {
-  const r = await db.prepare("SELECT value FROM wf_meta WHERE key = 'version'").bind().first<{ value: number }>();
+  const r = await db
+    .prepare("SELECT value FROM wf_meta WHERE key = 'version'")
+    .bind()
+    .first<{ value: number }>();
   return r?.value ?? 0;
 }
 

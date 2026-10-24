@@ -49,11 +49,7 @@ async function taskInput(ctx: ModuleContext, people: People, value: unknown, cur
     throw new CloudError(
       `Before this task is marked "${fields.status}", it must be reviewed by someone other than its preparer.`,
     );
-  const reviewedAt = !reviewedBy
-    ? null
-    : reviewedBy === current?.reviewedBy
-      ? current.reviewedAt
-      : ctx.now;
+  const reviewedAt = !reviewedBy ? null : reviewedBy === current?.reviewedBy ? current.reviewedAt : ctx.now;
   return { matter, input: { ...fields, matterId: matter.id, assignee, preparedBy, reviewedBy, reviewedAt } };
 }
 
@@ -67,7 +63,8 @@ async function milestoneInput(ctx: ModuleContext, value: unknown, current?: Mile
   const matter = await visibleMatter(ctx, m.matterId);
   const people = await loadPeople(ctx.db);
   const owner = await people.optional(m.owner, 'owner', current ? [current.owner] : []);
-  assertInsideWall(people, matter, [owner]);
+  const unchanged = owner === current?.owner && matter.id === current.matterId;
+  assertInsideWall(people, matter, unchanged ? [] : [owner]);
   return { matter, input: { ...milestoneFields(m), matterId: matter.id, owner } };
 }
 
@@ -162,7 +159,11 @@ export const taskActions: Record<string, ModuleAction> = {
       const { matter, input } = await milestoneInput(ctx, p.milestone, current);
       const milestone = { ...current, ...input, revision: base + 1, updatedAt: ctx.now };
       await saveRevision(ctx.db, ctx.now, milestones, milestone, base, 'milestone');
-      await ctx.log('milestone.updated', milestone.id, `Updated milestone "${milestone.title}" on ${matter.title}`);
+      await ctx.log(
+        'milestone.updated',
+        milestone.id,
+        `Updated milestone "${milestone.title}" on ${matter.title}`,
+      );
       return milestone;
     },
   },

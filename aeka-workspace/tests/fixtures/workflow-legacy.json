@@ -1,0 +1,202 @@
+{
+  "clients": [
+    {
+      "id": "c_mf3k2",
+      "name": "Vista Earth Group",
+      "createdAt": 1750000000000,
+      "projects": [
+        {
+          "id": "p_falcon",
+          "title": "Project Falcon",
+          "type": "Deal (Buy Side)",
+          "status": "onhold",
+          "stage": "Definitive Docs",
+          "team": ["DS", "RD", "ZZ"],
+          "note": "SPA under negotiation; long stop date 30 November.",
+          "isPriority": true,
+          "allowTeamFeedbackVisibility": true,
+          "createdAt": 1751000000000,
+          "updatedAt": 1760000000000,
+          "todos": [
+            {
+              "id": "t1",
+              "text": "Draft SPA comments",
+              "done": false,
+              "assignee": "RD",
+              "workflowStatus": "In Review",
+              "preparedBy": "RD",
+              "reviewedBy": "DS",
+              "dueDate": "2026-11-10",
+              "createdAt": 1752000000000,
+              "isPriority": true,
+              "notes": "Focus on tax indemnity",
+              "steps": [
+                { "id": "s1", "text": "Review indemnities", "done": true },
+                { "id": "s2", "text": "Tax warranties", "done": false }
+              ]
+            },
+            {
+              "id": "t2",
+              "text": "Collect capitalisation table",
+              "done": true,
+              "assignee": "ZZ",
+              "createdAt": 1752000000001
+            },
+            { "id": "t3", "text": "", "done": false, "createdAt": 1752000000002 }
+          ],
+          "hoursLog": [
+            {
+              "id": "h1",
+              "who": "RD",
+              "date": "2026-09-01",
+              "hours": 2.5,
+              "description": "=HYPERLINK(\"http://evil.example\")"
+            },
+            { "id": "h2", "who": "ZZ", "date": "2026-09-02", "hours": 1.26 },
+            { "id": "h3", "who": "DS", "date": "not a date", "hours": 1 }
+          ],
+          "feedbacks": [
+            {
+              "member": "RD",
+              "feedbackText": "Handled the SPA mark-up well.",
+              "rating": 4,
+              "updatedAt": 1759000000000,
+              "updatedBy": "DS"
+            }
+          ],
+          "admin": {
+            "elStatus": "Fully Executed",
+            "invoiceStatus": "Partially Invoiced",
+            "budgetAmount": 500000,
+            "billedAmount": 200000,
+            "timeCostStatus": "Within Budget",
+            "invoiceLogs": [
+              {
+                "id": "i1",
+                "invoiceNo": "AEKA/25-26/014",
+                "date": "2026-08-15",
+                "amount": 150000,
+                "entityRaisedOn": "Vista Earth Private Limited",
+                "createdAt": 1755000000000
+              },
+              { "id": "i2", "invoiceNo": "", "date": "", "amount": 0 }
+            ]
+          },
+          "milestones": [
+            { "id": "m1", "title": "Long stop date", "dueDate": "2026-11-30", "done": false },
+            { "id": "m2", "title": "Undated filing", "dueDate": "", "done": false }
+          ],
+          "sellers": ["Seller One", "Mauritius Holdco"],
+          "dealDocuments": [
+            {
+              "id": "dd1",
+              "name": "SPA",
+              "sellerName": "Seller One",
+              "status": "Negotiating",
+              "updatedAt": 1
+            },
+            {
+              "id": "dd2",
+              "name": "Captable",
+              "sellerName": "Seller One",
+              "status": "Closed",
+              "updatedAt": 1
+            },
+            {
+              "id": "dd3",
+              "name": "Tax CPs - 499",
+              "sellerName": "Mauritius Holdco",
+              "status": "N/A",
+              "updatedAt": 1
+            },
+            {
+              "id": "dd4",
+              "name": "Board resolution",
+              "sellerName": "Seller One",
+              "status": "Draft Shared",
+              "notes": "Awaiting signatures",
+              "updatedAt": 1
+            }
+          ],
+          "liveDealTracker": {
+            "dealValue": "INR 45 crore",
+            "representing": "Buy Side",
+            "noSellersBuyers": 2,
+            "companyName": "Falcon Tech Private Limited",
+            "counterpartiesNames": "mauritius holdco",
+            "ssaStatus": "Draft Closed/ Finalised",
+            "captableStatus": "Executed",
+            "valuationStatus": "Draft pending",
+            "valuationNotes": "Rule 11UA report awaited",
+            "customDocs": [{ "id": "x1", "name": "Disclosure Letter", "status": "In Review" }],
+            "counterparties": [
+              {
+                "name": "mauritius holdco",
+                "spaStatus": "Comments Shared",
+                "taxCpStatus": "In Review",
+                "computationStatus": "Not Applicable",
+                "incomeTax": "Non-Resident",
+                "fema": "Non-Resident",
+                "customDocs": [{ "id": "cd1", "name": "Form 10F / TRC", "status": "Draft pending" }]
+              }
+            ]
+          }
+        },
+        {
+          "id": "p_msop",
+          "title": "MSOP Advisory",
+          "type": "Ideal Structuring",
+          "status": "active",
+          "stage": "Term Sheet & Structuring",
+          "team": ["GM"],
+          "teamMembers": [
+            { "id": "tm_GM", "name": "Gauri Menon", "designation": "Associate", "initials": "GM" }
+          ],
+          "todos": [],
+          "hoursLog": [],
+          "admin": {
+            "elStatus": "Drafting",
+            "invoiceStatus": "Invoiced",
+            "budgetAmount": 100000,
+            "billedAmount": 75000.5,
+            "invoiceLogs": []
+          },
+          "createdAt": 1753000000000,
+          "updatedAt": 1753000000000
+        }
+      ]
+    },
+    {
+      "id": "c_nw88",
+      "name": "Northwind Capital",
+      "createdAt": 1754000000000,
+      "projects": [
+        {
+          "id": "p_lp",
+          "title": "LP Working",
+          "type": "LP Working",
+          "status": "closed",
+          "stage": "Post-Transaction Integration",
+          "team": ["GM"],
+          "todos": [{ "id": "t1", "text": "File Form FC-GPR", "done": true, "createdAt": 1754000000000 }],
+          "hoursLog": [{ "id": "h1", "who": "GM", "date": "2026-07-01", "hours": 0.5 }],
+          "admin": { "elStatus": "Fully Executed", "invoiceStatus": "Paid" },
+          "createdAt": 1754000000000,
+          "updatedAt": 1754000000000
+        }
+      ]
+    },
+    { "id": "c_dup", "name": "vista earth group", "projects": [] }
+  ],
+  "teamMembers": [
+    {
+      "id": "1",
+      "name": "Dev Sharma",
+      "designation": "Assistant Manager",
+      "initials": "DS",
+      "isAdmin": true
+    },
+    { "id": "2", "name": "Riya Desai", "designation": "Manager", "initials": "RD" },
+    { "id": "3", "name": "Gauri Menon", "designation": "Associate", "initials": "GM" }
+  ]
+}
