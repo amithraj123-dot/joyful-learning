@@ -57,7 +57,7 @@ async function taskInput(ctx: ModuleContext, people: People, value: unknown, cur
   return { matter, input: { ...fields, matterId: matter.id, assignee, preparedBy, reviewedBy, reviewedAt } };
 }
 
-async function editableTask(ctx: ModuleContext, key: unknown, where = 'deleted_at IS NULL') {
+async function findTask(ctx: ModuleContext, key: unknown, where = 'deleted_at IS NULL') {
   const { record, matter } = await visibleChild(ctx, tasks, key, 'task', where);
   return { task: record, matter };
 }
@@ -91,7 +91,7 @@ export const taskActions: Record<string, ModuleAction> = {
   },
   'task.update': {
     handler: async (ctx, p) => {
-      const { task: current, matter: from } = await editableTask(ctx, p.id);
+      const { task: current, matter: from } = await findTask(ctx, p.id);
       if (!mayEdit(me(ctx), current, from))
         throw forbidden('You may edit tasks on your matters, tasks assigned to you and tasks you created.');
       const base = baseRevision(p);
@@ -111,7 +111,7 @@ export const taskActions: Record<string, ModuleAction> = {
   },
   'task.delete': {
     handler: async (ctx, p) => {
-      const { task: current, matter } = await editableTask(ctx, p.id);
+      const { task: current, matter } = await findTask(ctx, p.id);
       if (!mayDelete(me(ctx), current))
         throw forbidden('Only the creator of a task or a Manager and above can delete it.');
       const base = baseRevision(p);
@@ -124,7 +124,7 @@ export const taskActions: Record<string, ModuleAction> = {
   },
   'task.restore': {
     handler: async (ctx, p) => {
-      const { task: current, matter } = await editableTask(ctx, p.id, 'deleted_at IS NOT NULL');
+      const { task: current, matter } = await findTask(ctx, p.id, 'deleted_at IS NOT NULL');
       if (!mayDelete(me(ctx), current))
         throw forbidden('Only the creator of a task or a Manager and above can restore it.');
       const task = { ...current, deletedAt: null, revision: current.revision + 1, updatedAt: ctx.now };
