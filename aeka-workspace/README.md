@@ -1,20 +1,26 @@
-# Aeka Scribe
+# Aeka Workspace
 
-Dictation and meeting notes workspace of Aeka Advisors India LLP. Version 0.6.0.
+The workspace of Aeka Advisors India LLP. Version 0.7.0.
 
-Aeka Scribe has two parts that share one codebase:
+Aeka Workspace is a modular application: a core (sign-in, firm members and roles, permissions, one
+API entry point and a firm activity trail) with independent modules on top. The architecture and the
+steps for adding a module are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-- **Windows desktop application** (`desktop/`, Electron): global dictation shortcuts with guarded
-  insertion into the focused field, meeting capture (microphone and system audio), an encrypted
-  local vault, calendar sign-in, reviewed actions to email and collaboration tools, signed updates
-  and administrator policy.
-- **Web workspace** (`app/`, `components/`, `lib/`; Vinext on Cloudflare Workers with D1): notes,
-  transcripts, summaries, sharing grants, comments, retention and read-only MCP note tools.
+| Module | Where | What it does |
+| --- | --- | --- |
+| **Workflow** | Web | Clients and mandates, tasks with maker-checker sign-off, deadlines, the deal tracker, engagements and billing, timesheets with export, team access, and import from the earlier Google Sheet workflow app |
+| **Scribe** | Web and Windows | Dictation, meeting capture, notes, summaries, sharing and Ask your notes |
+
+The Windows companion app (`desktop/`, Electron) is named **Aeka Scribe**: global dictation shortcuts
+with guarded insertion into the focused field, meeting capture (microphone and system audio), an
+encrypted local vault, calendar sign-in, reviewed actions to email and collaboration tools, signed
+updates and administrator policy. The web workspace (`app/`, `core/`, `modules/`, `lib/`) runs on
+Vinext on Cloudflare Workers with a D1 database.
 
 The setup guide and feature status are in [`public/desktop-guide.html`](public/desktop-guide.html)
 (packaged with the Windows build as `START-HERE.html`). Administrator and publisher setup is in
-[`desktop/admin/ADMIN-SETUP.txt`](desktop/admin/ADMIN-SETUP.txt). The review that produced this
-release is in [`docs/REVIEW-0.6.md`](docs/REVIEW-0.6.md).
+[`desktop/admin/ADMIN-SETUP.txt`](desktop/admin/ADMIN-SETUP.txt). Reviews: [`docs/REVIEW-0.6.md`](docs/REVIEW-0.6.md)
+(Scribe) and [`docs/REVIEW-0.7.md`](docs/REVIEW-0.7.md) (Workflow).
 
 ## Development
 
