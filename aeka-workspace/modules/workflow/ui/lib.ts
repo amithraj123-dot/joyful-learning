@@ -40,6 +40,8 @@ export interface ActivityEntry {
   summary: string;
 }
 
+export type Nav = (page: string) => void;
+
 export const errorMessage = (e: unknown) =>
   e instanceof Error ? e.message : 'The workspace request failed.';
 export const errorStatus = (e: unknown) => (e instanceof ModuleError ? e.status : 0);
