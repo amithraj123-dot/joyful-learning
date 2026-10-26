@@ -238,6 +238,37 @@ export const wfFeedback = sqliteTable(
   },
   (t) => [uniqueIndex('wf_feedback_member').on(t.matterId, t.member, t.kind)],
 );
+// Scribe meeting notes linked to mandates: a copy shared by the note's owner (see MeetingLink).
+// owner_user is the owner's sign-in id, which keys their notes; it is never sent to browsers.
+export const wfMeetingLinks = sqliteTable(
+  'wf_meeting_links',
+  {
+    id: text('id').primaryKey(),
+    matterId: text('matter_id').notNull(),
+    ownerUser: text('owner_user').notNull(),
+    noteId: text('note_id').notNull(),
+    title: text('title').notNull(),
+    meetingAt: integer('meeting_at').notNull(),
+    attendees: text('attendees').notNull(),
+    summary: text('summary').notNull(),
+    actions: text('actions').notNull(),
+    includeTranscript: integer('include_transcript').notNull(),
+    transcriptChars: integer('transcript_chars').notNull(),
+    linkedBy: text('linked_by').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    revision: integer('revision').notNull(),
+  },
+  (t) => [
+    uniqueIndex('wf_meeting_links_note').on(t.matterId, t.ownerUser, t.noteId),
+    index('wf_meeting_links_owner').on(t.ownerUser, t.noteId),
+  ],
+);
+// The shared transcript of a meeting link, kept apart so listing links does not read it.
+export const wfMeetingTranscripts = sqliteTable('wf_meeting_transcripts', {
+  linkId: text('link_id').primaryKey(),
+  transcript: text('transcript').notNull(),
+});
 // One row, key "version": bumped on every workflow write (including deletes) so clients can poll cheaply.
 export const wfMeta = sqliteTable('wf_meta', {
   key: text('key').primaryKey(),

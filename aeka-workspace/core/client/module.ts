@@ -21,6 +21,21 @@ export interface ModuleViewProps {
   notify: (message: string) => void;
 }
 
+// Slots: places on one module's screens where other modules may add a panel. The module that owns the
+// screen renders every contribution for the current surface (see slotsFor in registry.ts) and passes the
+// props below; contributions are lazily loaded and must render nothing when they do not apply.
+export interface SlotProps {
+  // Under the title of an open Scribe note.
+  'scribe.note': {
+    note: { id: string; title: string; kind: 'meeting' | 'scratchpad'; actions: number; segments: number };
+    unsaved: boolean; // the note has edits not yet saved
+    save: () => Promise<unknown>; // saves those edits
+    navigate: (page: string) => void;
+    notify: (message: string) => void;
+  };
+}
+export type SlotName = keyof SlotProps;
+
 export interface ClientModule {
   id: string;
   name: string; // navigation group label and page eyebrow
@@ -28,4 +43,6 @@ export interface ClientModule {
   pages: ModulePage[];
   // Renders this module's pages. Omitted only by Scribe, whose pages the shell renders itself.
   View?: ComponentType<ModuleViewProps>;
+  // Panels this module adds to other modules' screens.
+  slots?: { [K in SlotName]?: ComponentType<SlotProps[K]> };
 }

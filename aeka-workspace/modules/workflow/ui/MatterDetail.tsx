@@ -1,7 +1,7 @@
 'use client';
 // Mandate detail: header with status and team, and tabs for tasks, time, deal, team and reviews,
-// billing, deadlines and activity.
-import { useState } from 'react';
+// meetings, billing, deadlines and activity.
+import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowUpRight, Flame, Lock, Pencil, Trash2 } from 'lucide-react';
 import { MATTER_STATUSES, MATTER_STATUS_LABELS, type Matter, type MatterStatus } from '../shared/types';
 import { StatusPill, TabPanel, Tabs } from './components/Bits';
@@ -13,12 +13,13 @@ import { MilestoneList } from './DeadlinesPage';
 import { DealSummary } from './DealsPage';
 import type { Nav } from './lib';
 import { MatterForm } from './MatterForms';
+import { MatterMeetingsTab } from './MatterMeetingsTab';
 import { MatterTasksTab } from './MatterTasksTab';
 import { MatterTeamTab } from './MatterTeamTab';
 import { matterInput, useWF } from './store';
 import { MatterTimeTab } from './TimePage';
 
-type Tab = 'tasks' | 'time' | 'deal' | 'team' | 'billing' | 'deadlines' | 'activity';
+type Tab = 'tasks' | 'time' | 'deal' | 'team' | 'meetings' | 'billing' | 'deadlines' | 'activity';
 
 export function MatterDetail({
   matter,
@@ -29,8 +30,21 @@ export function MatterDetail({
   navigate: Nav;
   onBack: () => void;
 }) {
-  const { clientById, caps, run, dispatch, notify, tasks, milestones, setFocusDeal } = useWF();
-  const [tab, setTab] = useState<Tab>('tasks');
+  const {
+    clientById,
+    caps,
+    run,
+    dispatch,
+    notify,
+    tasks,
+    milestones,
+    setFocusDeal,
+    matterTab,
+    setMatterTab,
+  } = useWF();
+  // A tab asked for by another module (for example Meetings, from a Scribe note) is shown once.
+  const [tab, setTab] = useState<Tab>(() => (matterTab as Tab | null) ?? 'tasks');
+  useEffect(() => setMatterTab(null), [setMatterTab]);
   const [editing, setEditing] = useState(false);
   const client = clientById.get(matter.clientId);
   const openTasks = tasks.filter((t) => t.matterId === matter.id && t.status !== 'Completed').length;
@@ -40,6 +54,7 @@ export function MatterDetail({
     { id: 'time', label: 'Timesheet' },
     ...(matter.isDeal ? [{ id: 'deal' as const, label: 'Deal tracker' }] : []),
     { id: 'team', label: 'Team and reviews' },
+    { id: 'meetings', label: 'Meetings' },
     ...(caps.viewBilling ? [{ id: 'billing' as const, label: 'Billing' }] : []),
     { id: 'deadlines', label: 'Deadlines', count: openDeadlines },
     { id: 'activity', label: 'Activity' },
@@ -152,6 +167,7 @@ export function MatterDetail({
           </div>
         )}
         {current === 'team' && <MatterTeamTab matter={matter} onUpdate={quickUpdate} />}
+        {current === 'meetings' && <MatterMeetingsTab matter={matter} navigate={navigate} />}
         {current === 'billing' && <BillingEditor matter={matter} />}
         {current === 'deadlines' && (
           <div className="card wf-section">

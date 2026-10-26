@@ -8,12 +8,15 @@ new modules (or new pages and actions within a module) without changing the othe
 ```
 aeka-workspace/
   core/
-    client/   module.ts (manifest contract), registry.ts (modules in the app), api.ts (callModule)
+    client/   module.ts (manifest and slot contracts), registry.ts (modules in the app, slotsFor),
+              Slot.tsx (renders slot contributions), handover.ts (open a record in another module),
+              api.ts (callModule)
     server/   module.ts (server contract), router.ts (POST /api/modules), registry.ts,
               members.ts (firm members and designations), activity.ts (firm activity trail),
               core-module.ts (me, members, activity actions)
   modules/
-    scribe/   manifest.ts: dictation, meetings and personal notes (pages rendered by app/page.tsx)
+    scribe/   manifest.ts: dictation, meetings and personal notes (pages rendered by app/page.tsx);
+              server/notes.ts: the read service other modules use for a user's own note
     workflow/ manifest.ts, shared/ (types and action contract), server/ (actions), ui/ (pages)
   app/        the shell (app/page.tsx), API routes, styles
   lib/        Scribe libraries (notes, transcription, AI) shared by web and desktop
@@ -34,10 +37,29 @@ aeka-workspace/
    with `{ db, user, member, now, log }`. Errors written for users are returned; internal errors are
    logged and replaced with a generic message.
 4. **Modules.** Each module registers a browser manifest (pages, icons, headings, a lazily loaded
-   view) and a server definition (named actions with permissions). Modules call each other only through
-   their actions, never through each other's tables.
+   view) and a server definition (named actions with permissions). Modules never read each other's
+   tables: on the server, a module calls another module's service (for example
+   `modules/scribe/server/notes.ts`), which returns only what may be shared.
 5. **Activity trail (core).** Every module records who did what (`ctx.log`) in `org_activity`. Entries
    never contain confidential content such as fees or feedback text.
+
+## Extension points between modules
+
+- **Slots.** A module can add a panel to another module's screen. The screen's owner declares the slot
+  and its props in `SlotProps` (`core/client/module.ts`) and renders `<Slot name=… surface=… props=…/>`;
+  a contributing module lists a lazily loaded component under `slots` in its manifest. Contributions
+  load only on the surfaces the contributing module supports, and one that fails shows nothing rather
+  than breaking the page. Slots today: `scribe.note` (under the title of an open note).
+- **Hand-over.** To open a record in another module, call `handOver(key, value)` from
+  `core/client/handover.ts` and navigate; the receiving module reads it once. Keys today:
+  `workflow.matter` (a mandate and tab) and `scribe.note` (one of the user's notes).
+- **Services.** Server code of one module may import another module's `server/` service, never its
+  tables or its action handlers.
+
+Example: Scribe meeting notes linked to Workflow mandates. Workflow fills the `scribe.note` slot with
+the mandate link panel; its `meetings.*` actions read the caller's own note through Scribe's service and
+keep a shared copy in `wf_meeting_links`; the mandate's Meetings tab hands over to `scribe.note` to
+reopen the note for its owner.
 
 ## Data rules
 
@@ -73,5 +95,5 @@ aeka-workspace/
 | Workflow | Web          | Clients, mandates, tasks with maker-checker sign-off, deadlines, deal tracker, engagements and billing, timesheets, team and import from the earlier Google Sheet app |
 | Scribe   | Web, Windows | Dictation, meeting capture, personal notes, sharing, Ask your notes                                                                                                   |
 
-Natural next layers: link Scribe meeting notes and action items to Workflow mandates and tasks; a
-recurring statutory compliance calendar with reminders; firm dashboards (pipeline, workload, realisation).
+Scribe meeting notes link to Workflow mandates (see Extension points). Natural next layers: a recurring
+statutory compliance calendar with reminders; firm dashboards (pipeline, workload, realisation).

@@ -275,3 +275,39 @@ export const formatINR = (paise: number | null | undefined) =>
   paise == null
     ? '-'
     : '₹' + (paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+// A Scribe meeting note linked to a mandate. Linking shares a copy, taken when the note's owner links or
+// updates it: title, date, attendees, summary and action items, and the transcript only if the owner
+// chose to share it. The note itself stays private to its owner; later edits are shared only when the
+// owner updates the copy. Each action item can become one Workflow task (`taskId`).
+export interface MeetingAction {
+  id: string; // the action item's id in the Scribe note
+  text: string;
+  owner: string; // as written in the note (a name or an email), a suggestion only
+  due: string; // YYYY-MM-DD or empty
+  taskId: string | null; // the task created from this item, if any
+}
+export interface MeetingLink {
+  id: string;
+  matterId: string;
+  noteId: string;
+  title: string;
+  meetingAt: number; // meeting start (or note creation), ms
+  attendees: string[];
+  summary: string;
+  actions: MeetingAction[];
+  includeTranscript: boolean;
+  transcriptChars: number; // 0 when the transcript is not shared
+  linkedBy: PersonKey; // the note's owner
+  createdAt: number;
+  updatedAt: number; // when the shared copy was last taken
+  revision: number;
+}
+// Mandates a member can link a note to, for the picker in Scribe.
+export interface MeetingTarget {
+  matterId: string;
+  title: string;
+  clientName: string;
+  status: MatterStatus;
+  restricted: boolean;
+}

@@ -68,20 +68,27 @@ async function milestoneInput(ctx: ModuleContext, value: unknown, current?: Mile
   return { matter, input: { ...milestoneFields(m), matterId: matter.id, owner } };
 }
 
+// A new task, validated with the task rules, and the statement that inserts it. Callers run the
+// statement with write() (alone or with others) and record the activity.
+export async function newTask(ctx: ModuleContext, people: People, value: unknown, id = crypto.randomUUID()) {
+  const { matter, input } = await taskInput(ctx, people, value);
+  const task: Task = {
+    id,
+    ...input,
+    createdBy: me(ctx).email,
+    createdAt: ctx.now,
+    updatedAt: ctx.now,
+    revision: 1,
+    deletedAt: null,
+  };
+  return { task, matter, statement: insert(ctx.db, tasks, task) };
+}
+
 export const taskActions: Record<string, ModuleAction> = {
   'task.create': {
     handler: async (ctx, p) => {
-      const { matter, input } = await taskInput(ctx, await loadPeople(ctx.db), p.task);
-      const task: Task = {
-        id: crypto.randomUUID(),
-        ...input,
-        createdBy: me(ctx).email,
-        createdAt: ctx.now,
-        updatedAt: ctx.now,
-        revision: 1,
-        deletedAt: null,
-      };
-      await write(ctx.db, ctx.now, [insert(ctx.db, tasks, task)]);
+      const { task, matter, statement } = await newTask(ctx, await loadPeople(ctx.db), p.task);
+      await write(ctx.db, ctx.now, [statement]);
       await ctx.log('task.created', task.id, `Created task "${task.title}" on ${matter.title}`);
       return task;
     },

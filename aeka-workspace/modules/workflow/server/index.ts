@@ -6,6 +6,7 @@ import { exportAction } from './export.ts';
 import { feedbackActions } from './feedback.ts';
 import { importActions } from './import.ts';
 import { matterActions } from './matters.ts';
+import { meetingActions } from './meetings.ts';
 import { snapshotActions } from './snapshot.ts';
 import { taskActions } from './tasks.ts';
 import { timeActions } from './time.ts';
@@ -21,6 +22,7 @@ export const workflowServer: ServerModule = {
     ...billingActions,
     ...dealActions,
     ...feedbackActions,
+    ...meetingActions,
     ...importActions,
   },
 };

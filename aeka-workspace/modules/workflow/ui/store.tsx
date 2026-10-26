@@ -13,6 +13,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { clear, peek } from '../../../core/client/handover';
 import { callModule } from '../../../core/client/api';
 import { wf } from '../shared/client';
 import type { DealInput, WorkflowAction, WorkflowActions } from '../shared/contract';
@@ -152,7 +153,12 @@ function useWorkflowValue(shellNotify: (message: string) => void, page: string) 
     today: '',
   });
   // Page-level selections shared across pages (for example "open this mandate").
-  const [focusMatter, setFocusMatter] = useState<string | null>(null);
+  // Another module (for example a Scribe note) may have asked for a mandate to be opened.
+  const [arrival] = useState(() => peek('workflow.matter'));
+  useEffect(() => clear('workflow.matter'), []);
+  const [focusMatter, setFocusMatter] = useState<string | null>(arrival?.matterId ?? null);
+  // The tab to show when that mandate opens; MatterDetail takes it once.
+  const [matterTab, setMatterTab] = useState<string | null>(arrival?.tab ?? null);
   const [focusDeal, setFocusDeal] = useState<string | null>(null);
   const [focusTask, setFocusTask] = useState<string | null>(null);
   // A mandate opened from another page stays open after the page changes; arriving at Clients and
@@ -325,6 +331,8 @@ function useWorkflowValue(shellNotify: (message: string) => void, page: string) 
     notify,
     focusMatter,
     setFocusMatter,
+    matterTab,
+    setMatterTab,
     goToMatter,
     focusDeal,
     setFocusDeal,

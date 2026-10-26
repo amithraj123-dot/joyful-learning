@@ -19,6 +19,9 @@
 //                 others' self-reflections: Manager+, or team members when peerFeedbackVisible
 //   deal tracker  read: anyone who can see the matter; save: the matter team or Manager+
 //   import        admins only
+//   meetings      read: anyone who can see the matter; link or update: only the note's owner, from their
+//                 own web notes, on a matter they can see; unlink: the owner or Manager+; tasks from
+//                 action items: anyone who can see the matter (the task rules apply), once per item
 import type {
   Client,
   Counterparty,
@@ -28,6 +31,8 @@ import type {
   Invoice,
   Matter,
   MatterBilling,
+  MeetingLink,
+  MeetingTarget,
   Milestone,
   PersonKey,
   Snapshot,
@@ -152,6 +157,29 @@ export interface WorkflowActions {
       rating: number | null;
     } & Rev;
     result: Feedback;
+  };
+
+  // Scribe meeting notes linked to mandates
+  'meetings.list': { payload: { matterId: string }; result: MeetingLink[] }; // newest meeting first
+  'meetings.transcript': { payload: { id: string }; result: { transcript: string } }; // '' when not shared
+  'meetings.forNote': {
+    payload: { noteId: string }; // the caller's own note
+    result: (MeetingLink & { matterTitle: string; clientName: string })[];
+  };
+  'meetings.targets': { payload: Record<string, never>; result: MeetingTarget[] };
+  // Links the caller's note, or updates the shared copy when it is already linked to that mandate.
+  'meetings.link': {
+    payload: { noteId: string; matterId: string; includeTranscript: boolean };
+    result: MeetingLink;
+  };
+  'meetings.unlink': { payload: { id: string }; result: true }; // tasks already created stay
+  // Creates one task per chosen action item; items that already have a task are refused.
+  'meetings.createTasks': {
+    payload: {
+      id: string;
+      items: { actionId: string; title: string; assignee: PersonKey | null; dueDate: string | null }[];
+    } & Rev;
+    result: { link: MeetingLink; tasks: Task[] };
   };
 
   // Import from the earlier Google Sheet app (admins). Source is either the Apps Script web-app URL

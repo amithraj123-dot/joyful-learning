@@ -6,10 +6,10 @@ Aeka Workspace is a modular application: a core (sign-in, firm members and roles
 API entry point and a firm activity trail) with independent modules on top. The architecture and the
 steps for adding a module are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-| Module       | Where           | What it does                                                                                                                                                                                              |
-| ------------ | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Workflow** | Web             | Clients and mandates, tasks with maker-checker sign-off, deadlines, the deal tracker, engagements and billing, timesheets with export, team access, and import from the earlier Google Sheet workflow app |
-| **Scribe**   | Web and Windows | Dictation, meeting capture, notes, summaries, sharing and Ask your notes                                                                                                                                  |
+| Module       | Where           | What it does                                                                                                                                                                                                                                |
+| ------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Workflow** | Web             | Clients and mandates, tasks with maker-checker sign-off, deadlines, the deal tracker, engagements and billing, timesheets with export, team access, meeting notes linked from Scribe, and import from the earlier Google Sheet workflow app |
+| **Scribe**   | Web and Windows | Dictation, meeting capture, notes, summaries, sharing and Ask your notes                                                                                                                                                                    |
 
 The Windows companion app (`desktop/`, Electron) is named **Aeka Scribe**: global dictation shortcuts
 with guarded insertion into the focused field, meeting capture (microphone and system audio), an

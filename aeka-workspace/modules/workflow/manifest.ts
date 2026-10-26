@@ -20,6 +20,8 @@ export const workflowModule: ClientModule = {
   name: 'Workflow',
   surfaces: ['web'],
   View: lazy(() => import('./ui/WorkflowApp')),
+  // On an open Scribe note: link it to mandates.
+  slots: { 'scribe.note': lazy(() => import('./ui/NoteMandateLink')) },
   pages: [
     {
       id: 'workflow/dashboard',

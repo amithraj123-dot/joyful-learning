@@ -39,6 +39,7 @@ features and no server code.
 | Timesheet tab and Export Hours  | **Timesheets**: own entries with description and billable flag, daily limit, 30-day edit window; firm export (Manager and above) grouped by entry, client, mandate or person                                                                                            |
 | Team Admin                      | **Team and Access**: members by email with designation and admin rights; import from the Google Sheet                                                                                                                                                                   |
 | Activity log (unused)           | **Activity**: firm-wide, paged, by module                                                                                                                                                                                                                               |
+| (new)                           | **Meetings on a mandate**: Scribe meeting notes linked by their owners, with summary, attendees and action items (the transcript only if the owner shares it); action items become tasks, once each                                                                     |
 
 ### Controls now enforced on the server
 
@@ -50,10 +51,14 @@ features and no server code.
 - Every record carries a revision; a stale edit is refused and the user reloads instead of overwriting.
 - Separate self-reflection and review records; members read their own reviews but cannot change them.
 - All changes are recorded in the firm activity trail without fees or feedback text.
+- A meeting note is shared only by its owner, only to a mandate they can see, and only as a copy of
+  the title, date, attendees, summary and action items; their own notes are never shared and the
+  transcript only when they tick the box. The copy changes only when the owner updates it. The owner or
+  Manager and above can remove it; tasks already created stay.
 
 ## Moving the team across
 
-1. Apply migrations `0004` and `0005` to the hosted database, then deploy.
+1. Apply migrations `0004`, `0005` and `0006` to the hosted database, then deploy.
 2. Expand the Site's audience to the firm, then open Aeka Workspace: the first person becomes the
    administrator partner.
 3. In **Team and Access**, add colleagues by email, then use **Import from Google Sheet** with the Apps
@@ -64,20 +69,27 @@ features and no server code.
 
 ## Verification
 
-- 90 web and shared tests (24 for Workflow: permissions, restricted mandates, conflicts, maker-checker,
-  time rules, export, feedback visibility, deal tracker and import) and 72 desktop tests pass; types,
-  formatting and lint (0 errors) pass; the web and desktop builds succeed.
+- 95 web and shared tests (29 for Workflow: permissions, restricted mandates, conflicts, maker-checker,
+  time rules, export, feedback visibility, deal tracker, import and meeting links) and 72 desktop tests
+  pass; types, formatting and lint (0 errors) pass; the web and desktop builds succeed.
 - The module was exercised end to end on the local runtime (Workers with D1): client, mandate, task,
-  sign-off, time, review, deadline, fee, invoice, deal tracker, export and import preview. Every page
-  was checked at desktop and phone widths.
+  sign-off, time, review, deadline, fee, invoice, deal tracker, export and import preview, and a
+  meeting note linked from Scribe with its transcript, two tasks created from its action items and the
+  note reopened from the mandate. Every page was checked at desktop and phone widths.
+
+## Scribe meeting notes on mandates
+
+From an open meeting note, its owner chooses **Link to a mandate**, picks the mandate and decides
+whether to share the transcript. The mandate gets a **Meetings** tab listing the linked notes; anyone
+on the mandate can turn an action item into a task (one task per item, even if two people try at
+once). The owner can update the shared copy after editing the note, stop sharing the transcript or
+remove the link. Notes kept only in the Windows app must be synced to the web workspace first.
 
 ## Recommended next layers
 
-1. **Scribe to Workflow link**: attach meeting notes and transcripts to a mandate and turn their action
-   items into tasks.
-2. **Statutory compliance calendar**: recurring due dates (advance tax, TDS returns, Form 3CEB, Form
+1. **Statutory compliance calendar**: recurring due dates (advance tax, TDS returns, Form 3CEB, Form
    15CA/CB, FC-GPR, FLA return, DPT-3) generated per client, with owners.
-3. **Reminders**: email digests for tasks due, items awaiting review, unsigned engagement letters and
+2. **Reminders**: email digests for tasks due, items awaiting review, unsigned engagement letters and
    overdue invoices.
-4. **Time cost and realisation**: rates by grade, time cost against fee, approvals.
-5. **Firm dashboards**: pipeline by stage, workload by person and receivables ageing.
+3. **Time cost and realisation**: rates by grade, time cost against fee, approvals.
+4. **Firm dashboards**: pipeline by stage, workload by person and receivables ageing.

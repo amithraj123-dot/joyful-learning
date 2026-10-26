@@ -1303,6 +1303,98 @@ textarea.wf-cell-input {
   flex-wrap: wrap;
 }
 
+/* Mandate Meetings tab */
+.wf-meeting-intro {
+  margin: 0 0 12px;
+}
+.wf-meetings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.wf-meeting {
+  border: 1px solid #e6e6e6;
+  border-left: 3px solid var(--aeka-red);
+  padding: 14px 16px;
+  min-width: 0;
+}
+.wf-meeting-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+}
+.wf-meeting-head .wf-h3 {
+  margin: 0 0 2px;
+}
+.wf-meeting-people {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+.wf-meeting-summary p {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 10px 0 4px;
+  overflow-wrap: anywhere;
+}
+.wf-meeting-actions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.wf-meeting-actions li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.wf-meeting-actions li > input,
+.wf-meeting-actions li > svg {
+  flex: none;
+  margin-top: 3px;
+}
+.wf-meeting-actions .grow {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wf-meeting-foot {
+  margin-top: 12px;
+}
+.wf-green {
+  color: #2e7d32;
+}
+.wf-transcript {
+  margin: 12px 0 0;
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.7;
+  background: #fafafa;
+  border: 1px solid #ececec;
+  padding: 10px 12px;
+}
+.wf-create-tasks {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 16px;
+}
+.wf-create-tasks li {
+  display: grid;
+  gap: 8px;
+}
+
 @media (max-width: 1000px) {
   .wf-split {
     grid-template-columns: minmax(0, 1fr);

@@ -8,6 +8,7 @@ import type {
   Invoice,
   Matter,
   MatterBilling,
+  MeetingLink,
   Milestone,
   Task,
   TimeEntry,
@@ -165,6 +166,35 @@ export const feedback: Table<Feedback> = {
   },
 };
 
+// ownerUser is server-only: the owner's sign-in id, which keys their Scribe notes.
+export type MeetingLinkRow = MeetingLink & { ownerUser: string };
+export const meetingLinks: Table<MeetingLinkRow> = {
+  name: 'wf_meeting_links',
+  key: 'id',
+  cols: {
+    id: v,
+    matterId: v,
+    ownerUser: v,
+    noteId: v,
+    title: v,
+    meetingAt: v,
+    attendees: 'json',
+    summary: v,
+    actions: 'json',
+    includeTranscript: 'bool',
+    transcriptChars: v,
+    linkedBy: v,
+    createdAt: v,
+    updatedAt: v,
+    revision: v,
+  },
+};
+export const meetingTranscripts: Table<{ linkId: string; transcript: string }> = {
+  name: 'wf_meeting_transcripts',
+  key: 'linkId',
+  cols: { linkId: v, transcript: v },
+};
+
 const fields = <T>(t: Table<T>) => Object.keys(t.cols) as (keyof T & string)[];
 
 function fromRow<T>(t: Table<T>, row: Row): T {
@@ -209,6 +239,22 @@ export function insert<T>(db: D1Database, t: Table<T>, record: T, skipExisting =
       }`,
     )
     .bind(...toValues(t, record));
+}
+
+// INSERT only when `condition` (SQL over other tables) holds at that point of the transaction.
+export function insertWhere<T>(
+  db: D1Database,
+  t: Table<T>,
+  record: T,
+  condition: string,
+  ...params: unknown[]
+) {
+  const cols = fields(t);
+  return db
+    .prepare(
+      `INSERT INTO ${t.name}(${cols.map(column).join(',')}) SELECT ${cols.map(() => '?').join(',')} WHERE ${condition}`,
+    )
+    .bind(...toValues(t, record), ...params);
 }
 
 // UPDATE every column of the record; with baseRevision only if the stored row still has that revision.

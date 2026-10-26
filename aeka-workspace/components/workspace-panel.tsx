@@ -41,6 +41,8 @@ import {
   type CalendarEvent,
 } from '../lib/workspace-core';
 import { TeamPanel } from './team-panel';
+import { Slot } from '../core/client/Slot';
+import { clear as clearHandover, peek as peekHandover } from '../core/client/handover';
 import { DesktopAdvanced, MeetingAutomation } from './desktop-advanced';
 import { noteDetails, isTrashed, inFolder, noteFolders } from '../lib/note-details';
 import { type ChatScope } from '../lib/meeting-studio';
@@ -65,7 +67,7 @@ type Props = {
   onImportResources: (r: { terms: Term[]; snippets: Snippet[] }) => void;
   dictationBusy: boolean;
   notify: (text: string) => void;
-  onNavigate: (page: WorkspacePage) => void;
+  onNavigate: (page: WorkspacePage | (string & {})) => void;
   onStatusChange: () => void;
   onMeetingBusy: (busy: boolean) => void;
 };
@@ -484,6 +486,17 @@ export function WorkspacePanel(props: Props) {
       onNavigate('notes');
     }
   };
+  // Another module (for example a mandate's Meetings tab) asked for one of this user's notes to be opened.
+  useEffect(() => {
+    const wanted = peekHandover('scribe.note');
+    if (page !== 'notes' || !wanted) return;
+    const n = notes.find((x) => x.id === wanted.noteId && !isTrashed(x));
+    if (!n && loading) return;
+    clearHandover('scribe.note');
+    if (n) open(n);
+    else notify('That note is not in this workspace.');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, notes, loading]);
   const changeDraft = (next: Note) => setDraft((current) => (current?.id === next.id ? next : current));
   const visible = [
     'meetings',
@@ -889,6 +902,23 @@ export function WorkspacePanel(props: Props) {
                       ))}
                     </datalist>
                   </label>
+                  <Slot
+                    name="scribe.note"
+                    surface={native ? 'desktop' : 'web'}
+                    props={{
+                      note: {
+                        id: draft.id,
+                        title: draft.title,
+                        kind: draft.kind,
+                        actions: noteDetails(draft).actions.length,
+                        segments: draft.segments.length,
+                      },
+                      unsaved: dirty,
+                      save: saveDraft,
+                      navigate: onNavigate,
+                      notify,
+                    }}
+                  />
                   <label className="note-label" htmlFor="meeting-own-notes">
                     YOUR NOTES
                   </label>
