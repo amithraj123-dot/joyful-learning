@@ -229,7 +229,9 @@ export function DraftEditor({
   return (
     <div className="mail-editor">
       <div className="mail-editor-head">
-        <span className={'wf-pill ' + (draft.status === 'sent' ? 'green' : draft.outlookSaved ? 'blue' : 'tint')}>
+        <span
+          className={'wf-pill ' + (draft.status === 'sent' ? 'green' : draft.outlookSaved ? 'blue' : 'tint')}
+        >
           {DRAFT_STATUS_LABELS[draft.status]}
         </span>
         <span className="wf-caption">
@@ -271,18 +273,8 @@ export function DraftEditor({
         </div>
       )}
 
-      <RecipientField
-        label="To"
-        list={local.to}
-        disabled={readOnly}
-        onChange={(to) => change({ to })}
-      />
-      <RecipientField
-        label="Cc"
-        list={local.cc}
-        disabled={readOnly}
-        onChange={(cc) => change({ cc })}
-      />
+      <RecipientField label="To" list={local.to} disabled={readOnly} onChange={(to) => change({ to })} />
+      <RecipientField label="Cc" list={local.cc} disabled={readOnly} onChange={(cc) => change({ cc })} />
       {!readOnly && item && others.length > 0 && (
         <Toggle pressed={local.replyAll} onChange={toggleReplyAll}>
           Reply to all ({plural(others.length, 'other person', 'other people')} on the email)
@@ -353,13 +345,12 @@ export function DraftEditor({
           >
             <Send size={15} aria-hidden="true" /> Send
           </button>
-          <button
-            type="button"
-            className="button secondary"
-            disabled={!!busy}
-            onClick={saveToOutlook}
-          >
-            {busy === 'outlook' ? 'Saving to Outlook' : draft.outlookSaved ? 'Update in Outlook' : 'Save to Outlook'}
+          <button type="button" className="button secondary" disabled={!!busy} onClick={saveToOutlook}>
+            {busy === 'outlook'
+              ? 'Saving to Outlook'
+              : draft.outlookSaved
+                ? 'Update in Outlook'
+                : 'Save to Outlook'}
           </button>
           <button type="button" className="button secondary" disabled={!!busy || !dirty} onClick={save}>
             {busy === 'save' ? 'Saving' : 'Save'}
@@ -459,7 +450,9 @@ function SendConfirm({
         {lines.map((l, i) => (
           <p key={i}>{l}</p>
         ))}
-        {draft.body.split('\n').filter((l) => l.trim()).length > lines.length && <p className="wf-caption">…</p>}
+        {draft.body.split('\n').filter((l) => l.trim()).length > lines.length && (
+          <p className="wf-caption">…</p>
+        )}
       </blockquote>
       {busy && (
         <p className="wf-caption" role="status">
@@ -510,7 +503,11 @@ export function RecipientField({
       <label htmlFor={id}>{label}</label>
       <div className={'mail-chipbox' + (disabled ? ' disabled' : '')}>
         {list.map((a) => (
-          <span key={a.address} className={'mail-rcpt' + (isEmail(a.address) ? '' : ' bad')} title={a.address}>
+          <span
+            key={a.address}
+            className={'mail-rcpt' + (isEmail(a.address) ? '' : ' bad')}
+            title={a.address}
+          >
             <span>{senderName(a)}</span>
             {!disabled && (
               <button

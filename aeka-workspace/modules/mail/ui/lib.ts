@@ -92,7 +92,8 @@ export function deadlineBadge(deadline: string) {
   if (deadline < today) return { text: 'Overdue, ' + formatShortDate(deadline), tone: 'red' as const };
   if (deadline === today) return { text: 'Due today', tone: 'red' as const };
   if (deadline === addDays(today, 1)) return { text: 'Due tomorrow', tone: 'amber' as const };
-  if (deadline <= addDays(today, 2)) return { text: 'Due ' + formatShortDate(deadline), tone: 'amber' as const };
+  if (deadline <= addDays(today, 2))
+    return { text: 'Due ' + formatShortDate(deadline), tone: 'amber' as const };
   return { text: 'Due ' + formatShortDate(deadline), tone: 'grey' as const };
 }
 
@@ -114,7 +115,9 @@ const EMAIL = /^[^\s@<>(),;:"[\]]+@[^\s@<>(),;:"[\]]+\.[a-z]{2,}$/i;
 export const isEmail = (s: string) => EMAIL.test(s.trim());
 
 export const isLow = (item: MailItem) =>
-  !!item.triage && item.triage.status === 'done' && (item.triage.tier === 4 || item.triage.handling === 'none');
+  !!item.triage &&
+  item.triage.status === 'done' &&
+  (item.triage.tier === 4 || item.triage.handling === 'none');
 
 // Splits text into plain parts and http(s) links. Anything else stays as text, never as markup.
 const URL_RE = /\bhttps?:\/\/[^\s<>"'()[\]{}]+/gi;

@@ -35,7 +35,11 @@ import {
 import { useMail } from './store';
 import { DeadlineBadge, DelegateChip, MandateChip, TierPill } from './MailCard';
 
-const INSTRUCTION_CHIPS = ['Keep it short', 'Ask for the share purchase agreement', 'Say I will revert by tomorrow'];
+const INSTRUCTION_CHIPS = [
+  'Keep it short',
+  'Ask for the share purchase agreement',
+  'Say I will revert by tomorrow',
+];
 
 export function MessageDrawer({
   item,
@@ -198,7 +202,11 @@ export function MessageDrawer({
           )}
         </section>
 
-        <section ref={draftRef} aria-labelledby="mail-draft-h" className="mail-detail-section mail-draft-area">
+        <section
+          ref={draftRef}
+          aria-labelledby="mail-draft-h"
+          className="mail-detail-section mail-draft-area"
+        >
           <h3 id="mail-draft-h" className="wf-h3">
             Reply
           </h3>
@@ -296,13 +304,15 @@ function TriageSummary({
     }
   };
   if (!t || t.status === 'pending')
-    return <p className="wf-note">This email is waiting to be triaged. It will be sorted at the next sync.</p>;
+    return (
+      <p className="wf-note">This email is waiting to be triaged. It will be sorted at the next sync.</p>
+    );
   if (t.status === 'failed')
     return (
       <div className="wf-note mail-failed" role="status">
         <p>
-          <strong>This email could not be triaged.</strong> {t.error || 'The AI reply was not usable.'} You can
-          sort it yourself below or try again.
+          <strong>This email could not be triaged.</strong> {t.error || 'The AI reply was not usable.'} You
+          can sort it yourself below or try again.
         </p>
         <button type="button" className="button secondary small" disabled={busy} onClick={retry}>
           <RotateCcw size={14} aria-hidden="true" /> {busy ? 'Trying again' : 'Try triage again'}
@@ -383,7 +393,9 @@ function DraftRequest({ item, onDraft }: { item: MailItem; onDraft: (d: Draft) =
   };
   return (
     <div className="mail-draft-request">
-      {declined && <p className="wf-caption">You marked this as needing no reply. You can still draft one.</p>}
+      {declined && (
+        <p className="wf-caption">You marked this as needing no reply. You can still draft one.</p>
+      )}
       <div className="wf-chips" role="group" aria-label="Instructions for the draft">
         {INSTRUCTION_CHIPS.map((c) => (
           <button

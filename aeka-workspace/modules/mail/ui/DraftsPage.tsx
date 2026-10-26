@@ -80,7 +80,9 @@ export function DraftsPage() {
     );
 
   const byNewest = (a: MailItem, b: MailItem) => b.draft!.updatedAt - a.draft!.updatedAt;
-  const waiting = items.filter((i) => i.draft!.status === 'draft' || i.draft!.status === 'saved').sort(byNewest);
+  const waiting = items
+    .filter((i) => i.draft!.status === 'draft' || i.draft!.status === 'saved')
+    .sort(byNewest);
   const sent = items
     .filter((i) => i.draft!.status === 'sent')
     .sort(byNewest)
@@ -141,7 +143,11 @@ export function DraftsPage() {
             onClick={() => setShowSent((s) => !s)}
           >
             <span>Recently sent ({sent.length})</span>
-            {showSent ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+            {showSent ? (
+              <ChevronUp size={16} aria-hidden="true" />
+            ) : (
+              <ChevronDown size={16} aria-hidden="true" />
+            )}
           </button>
           {showSent && (
             <ul className="mail-low-list">

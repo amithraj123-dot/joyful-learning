@@ -194,8 +194,8 @@ export function RulesPage() {
               </ul>
             ) : (
               <p className="wf-caption">
-                No suggestions yet. When you correct the same sender or domain a few times, a rule is suggested
-                here.
+                No suggestions yet. When you correct the same sender or domain a few times, a rule is
+                suggested here.
               </p>
             )}
           </section>
@@ -273,7 +273,9 @@ export function RulesPage() {
           onClose={() => setEditing(null)}
           onSaved={(saved) => {
             setRules((old) =>
-              old.some((x) => x.id === saved.id) ? old.map((x) => (x.id === saved.id ? saved : x)) : [saved, ...old],
+              old.some((x) => x.id === saved.id)
+                ? old.map((x) => (x.id === saved.id ? saved : x))
+                : [saved, ...old],
             );
             setEditing(null);
             notify('Rule saved. It applies to new email.');
@@ -377,7 +379,8 @@ function RuleForm({
     e.preventDefault();
     const p = pattern.trim().toLowerCase().replace(/^@/, '');
     if (!p) return setError('Enter the ' + KIND_LABELS[kind].toLowerCase() + '.');
-    if (kind === 'sender' && !isEmail(p)) return setError('Enter a full email address, such as name@client.com.');
+    if (kind === 'sender' && !isEmail(p))
+      return setError('Enter a full email address, such as name@client.com.');
     if (kind === 'domain' && !DOMAIN.test(p)) return setError('Enter a domain, such as client.com.');
     if (kind === 'subject' && p.length < 3) return setError('Enter a phrase of at least 3 characters.');
     if (!Object.keys(effect).length) return setError('Choose at least one effect.');
@@ -418,7 +421,10 @@ function RuleForm({
             label="Match on"
             value={kind}
             onChange={setKind}
-            options={(Object.keys(KIND_LABELS) as MailRule['kind'][]).map((k) => ({ id: k, label: KIND_LABELS[k] }))}
+            options={(Object.keys(KIND_LABELS) as MailRule['kind'][]).map((k) => ({
+              id: k,
+              label: KIND_LABELS[k],
+            }))}
           />
         </div>
         <Field
@@ -481,7 +487,10 @@ function RuleForm({
             </select>
           </Field>
           <Field label="Mandate">
-            <select value={effect.matterId ?? ''} onChange={(e) => set({ matterId: e.target.value || undefined })}>
+            <select
+              value={effect.matterId ?? ''}
+              onChange={(e) => set({ matterId: e.target.value || undefined })}
+            >
               <option value="">No change</option>
               {effect.matterId && !targets.some((t) => t.matterId === effect.matterId) && (
                 <option value={effect.matterId}>Linked mandate</option>

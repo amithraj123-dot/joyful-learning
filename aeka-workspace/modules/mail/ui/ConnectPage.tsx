@@ -41,16 +41,29 @@ export function takeReturnNotice(): ReturnNotice | null {
       const code = /^[a-z0-9_]{1,40}$/i.test(err) ? err.toLowerCase() : '';
       return {
         ok: false,
-        text: ERROR_TEXT[code] ?? 'Outlook could not be connected. Please try again, or ask an administrator.',
+        text:
+          ERROR_TEXT[code] ?? 'Outlook could not be connected. Please try again, or ask an administrator.',
       };
     }
-    return ok === 'connected' ? { ok: true, text: 'Outlook is connected. Your first sync starts now.' } : null;
+    return ok === 'connected'
+      ? { ok: true, text: 'Outlook is connected. Your first sync starts now.' }
+      : null;
   } catch {
     return null;
   }
 }
 
-function SetupRow({ ready, title, vars, detail }: { ready: boolean | null; title: string; vars: string[]; detail?: string }) {
+function SetupRow({
+  ready,
+  title,
+  vars,
+  detail,
+}: {
+  ready: boolean | null;
+  title: string;
+  vars: string[];
+  detail?: string;
+}) {
   return (
     <li className={'mail-setup-row' + (ready ? ' ready' : '')}>
       {ready ? (
@@ -139,7 +152,10 @@ export function ConnectPage({ notice, onDismiss }: { notice: ReturnNotice | null
   return (
     <div className="wf-stack mail-connect">
       {notice && (
-        <div className={notice.ok ? 'mail-banner ok' : 'wf-note mail-banner'} role={notice.ok ? 'status' : 'alert'}>
+        <div
+          className={notice.ok ? 'mail-banner ok' : 'wf-note mail-banner'}
+          role={notice.ok ? 'status' : 'alert'}
+        >
           <span>{notice.text}</span>
           <button type="button" className="wf-link" onClick={onDismiss}>
             Dismiss
@@ -175,7 +191,9 @@ export function ConnectPage({ notice, onDismiss }: { notice: ReturnNotice | null
               ready={setup.aiReady}
               title="Firm AI service (LiteLLM)"
               vars={['LITELLM_BASE_URL', 'LITELLM_API_KEY', 'LITELLM_MODEL', 'LITELLM_FAST_MODEL']}
-              detail={setup.aiReady ? undefined : setup.aiReason || 'Without it, mail is sorted by rules only.'}
+              detail={
+                setup.aiReady ? undefined : setup.aiReason || 'Without it, mail is sorted by rules only.'
+              }
             />
           </ul>
           <h3 className="wf-h4">Register this redirect address in Entra</h3>
@@ -248,7 +266,8 @@ export function ConnectPage({ notice, onDismiss }: { notice: ReturnNotice | null
               Use AI to triage my mail{!setup.aiReady && ' (the firm AI service is not set up)'}
             </Toggle>
             <p className="wf-caption mail-toggle-help">
-              When off, mail is sorted by built-in checks and your rules only, and no email content is sent to AI.
+              When off, mail is sorted by built-in checks and your rules only, and no email content is sent to
+              AI.
             </p>
             <Toggle
               pressed={account.settings.alertUrgent}
@@ -288,8 +307,8 @@ export function ConnectPage({ notice, onDismiss }: { notice: ReturnNotice | null
         </h2>
         <ul className="mail-ai-list">
           <li>
-            For triage: the subject, sender, recipients, date and up to 2,500 characters of the body, through the
-            firm&apos;s own AI service.
+            For triage: the subject, sender, recipients, date and up to 2,500 characters of the body, through
+            the firm&apos;s own AI service.
           </li>
           <li>For a draft, only when you ask for one: the email thread.</li>
           <li>Never attachments. Senders you mark as Never send to AI are sorted by rules only.</li>

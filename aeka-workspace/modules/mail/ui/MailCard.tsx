@@ -122,7 +122,11 @@ export function MailCard({
           {item.repliedByMe && <span className="wf-pill green">Replied</span>}
           {item.hasAttachments && <Paperclip size={14} aria-label="Has attachments" className="mail-clip" />}
         </div>
-        <time className="mail-time" dateTime={new Date(item.receivedAt).toISOString()} title={formatStamp(item.receivedAt)}>
+        <time
+          className="mail-time"
+          dateTime={new Date(item.receivedAt).toISOString()}
+          title={formatStamp(item.receivedAt)}
+        >
           {formatReceived(item.receivedAt)}
         </time>
       </div>
@@ -176,9 +180,14 @@ export function MailCard({
         </div>
       )}
       {asking && !draft && (
-        <div className="mail-question" role="group" aria-label={'Draft a reply to ' + (item.subject || 'this email')}>
+        <div
+          className="mail-question"
+          role="group"
+          aria-label={'Draft a reply to ' + (item.subject || 'this email')}
+        >
           <span className="mail-question-label">
-            Draft a reply?{t.replyNeeded === 'maybe' && <span className="wf-caption"> A reply may be needed.</span>}
+            Draft a reply?
+            {t.replyNeeded === 'maybe' && <span className="wf-caption"> A reply may be needed.</span>}
           </span>
           <div className="mail-question-actions">
             <button type="button" className="button primary" disabled={!!busy} onClick={onDraft}>

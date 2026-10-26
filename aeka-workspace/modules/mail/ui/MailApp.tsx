@@ -10,7 +10,15 @@ import { MailProvider } from './store';
 import '../../workflow/ui/workflow.css';
 import './mail.css';
 
-function Body({ page, notice, onDismiss }: { page: string; notice: ReturnNotice | null; onDismiss: () => void }) {
+function Body({
+  page,
+  notice,
+  onDismiss,
+}: {
+  page: string;
+  notice: ReturnNotice | null;
+  onDismiss: () => void;
+}) {
   switch (page) {
     case 'mail/drafts':
       return <DraftsPage />;

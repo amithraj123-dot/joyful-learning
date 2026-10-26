@@ -16,10 +16,22 @@ const VIEW_KEY = 'aeka-mail-view';
 type Busy = '' | 'draft' | 'decide' | 'mandate' | 'retry';
 
 const EMPTY_TEXT: Record<MailView, { title: string; body: string }> = {
-  needs_me: { title: 'Nothing needs you right now', body: 'New emails that need your reply or attention appear here.' },
-  review: { title: 'Nothing to review', body: 'Emails asking you to review a document or position appear here.' },
-  delegate: { title: 'Nothing to delegate', body: 'Emails the team can handle appear here, with a suggested person.' },
-  info: { title: 'Nothing for information', body: 'Updates you may want to read, without action, appear here.' },
+  needs_me: {
+    title: 'Nothing needs you right now',
+    body: 'New emails that need your reply or attention appear here.',
+  },
+  review: {
+    title: 'Nothing to review',
+    body: 'Emails asking you to review a document or position appear here.',
+  },
+  delegate: {
+    title: 'Nothing to delegate',
+    body: 'Emails the team can handle appear here, with a suggested person.',
+  },
+  info: {
+    title: 'Nothing for information',
+    body: 'Updates you may want to read, without action, appear here.',
+  },
   low: { title: 'No low-priority mail', body: 'Newsletters, notifications and other noise appear here.' },
   all: { title: 'No email yet', body: 'Your inbox is empty, or the first sync has not finished.' },
   failed: { title: 'Everything was triaged', body: 'Emails that could not be triaged appear here.' },
@@ -198,14 +210,24 @@ export function InboxPage() {
       };
       replace(next);
       setCounts((c) =>
-        c ? { ...c, decisionsAwaiting: Math.max(0, c.decisionsAwaiting - 1), draftsAwaiting: c.draftsAwaiting + 1 } : c,
+        c
+          ? {
+              ...c,
+              decisionsAwaiting: Math.max(0, c.decisionsAwaiting - 1),
+              draftsAwaiting: c.draftsAwaiting + 1,
+            }
+          : c,
       );
       setOpen({ item: next, focus: 'draft' });
     });
   const decline = (item: MailItem) =>
     act(item, 'decide', async () => {
       if (!item.triage) return;
-      const t = await mail('triage.decide', { id: item.id, wantDraft: false, baseRevision: item.triage.revision });
+      const t = await mail('triage.decide', {
+        id: item.id,
+        wantDraft: false,
+        baseRevision: item.triage.revision,
+      });
       replace({ ...item, triage: t });
       setCounts((c) => (c ? { ...c, decisionsAwaiting: Math.max(0, c.decisionsAwaiting - 1) } : c));
     });
@@ -228,7 +250,9 @@ export function InboxPage() {
   const shown = useMemo(() => {
     if (view !== 'needs_me') return items;
     // Urgent first in "Needs me"; otherwise newest first as the server sends them.
-    return [...items].sort((a, b) => (a.triage?.tier ?? 3) - (b.triage?.tier ?? 3) || b.receivedAt - a.receivedAt);
+    return [...items].sort(
+      (a, b) => (a.triage?.tier ?? 3) - (b.triage?.tier ?? 3) || b.receivedAt - a.receivedAt,
+    );
   }, [items, view]);
   const main = view === 'low' ? [] : shown.filter((i) => !isLow(i));
   const low = view === 'low' ? shown : shown.filter(isLow);
@@ -396,7 +420,11 @@ export function InboxPage() {
                   <span>
                     {plural(low.length, 'low-priority email')} {showLow ? 'shown' : 'hidden'}
                   </span>
-                  {showLow ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+                  {showLow ? (
+                    <ChevronUp size={16} aria-hidden="true" />
+                  ) : (
+                    <ChevronDown size={16} aria-hidden="true" />
+                  )}
                 </button>
               )}
               {(view === 'low' || showLow) && (
