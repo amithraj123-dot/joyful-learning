@@ -43,12 +43,10 @@ export default function MailApp({ page, navigate, notify }: ModuleViewProps) {
   const stableNotify = useCallback((m: string) => note.current(m), []);
 
   // Returning from Microsoft sign-in: shown on the connection page, or as a toast elsewhere.
-  const [notice, setNotice] = useState<ReturnNotice | null>(null);
+  const [initial] = useState(() => takeReturnNotice());
+  const [notice, setNotice] = useState(() => (page === 'mail/connect' ? initial : null));
   useEffect(() => {
-    const n = takeReturnNotice();
-    if (!n) return;
-    if (page === 'mail/connect') setNotice(n);
-    else stableNotify(n.text);
+    if (initial && page !== 'mail/connect') stableNotify(initial.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

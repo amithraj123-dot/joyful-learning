@@ -26,9 +26,17 @@ const ERROR_TEXT: Record<string, string> = {
   storage: 'Secure storage is not set up for the firm yet. Ask an administrator.',
 };
 
-// Reads ?mail=connected or ?mail_error=<code> once, then removes them from the address bar.
+// Reads ?mail=connected or ?mail_error=<code> once, then removes them from the address bar. The result
+// is kept for a moment, so a repeated call (React may call initialisers twice) returns the same.
+let taken: { until: number; notice: ReturnNotice } | null = null;
 export function takeReturnNotice(): ReturnNotice | null {
   if (typeof window === 'undefined') return null;
+  if (taken && Date.now() < taken.until) return taken.notice;
+  const notice = readReturnNotice();
+  taken = notice ? { until: Date.now() + 1000, notice } : null;
+  return notice;
+}
+function readReturnNotice(): ReturnNotice | null {
   try {
     const url = new URL(window.location.href);
     const ok = url.searchParams.get('mail');

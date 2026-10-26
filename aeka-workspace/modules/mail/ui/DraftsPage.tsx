@@ -50,7 +50,7 @@ export function DraftsPage() {
     }
   }, []);
   useEffect(() => {
-    void load();
+    void load(true); // the first render already shows loading
   }, [load]);
 
   const replace = useCallback((next: MailItem) => {

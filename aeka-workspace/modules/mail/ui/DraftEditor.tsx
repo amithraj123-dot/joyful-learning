@@ -57,7 +57,6 @@ export function DraftEditor({
   const me = account.account?.address ?? '';
 
   const load = async () => {
-    setLoadError('');
     try {
       const d = await mail('draft.get', { id: draftId });
       setDraft(d);
@@ -85,7 +84,14 @@ export function DraftEditor({
     return (
       <div className="mail-editor" role="alert">
         <p className="wf-error">{loadError}</p>
-        <button type="button" className="button secondary" onClick={load}>
+        <button
+          type="button"
+          className="button secondary"
+          onClick={() => {
+            setLoadError('');
+            void load();
+          }}
+        >
           Try again
         </button>
       </div>

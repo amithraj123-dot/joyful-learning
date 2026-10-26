@@ -70,7 +70,6 @@ export function MessageDrawer({
   );
 
   const load = async () => {
-    setLoadError('');
     try {
       const m = await mail('message.get', { id: item.id });
       setMessage(m);
@@ -188,7 +187,14 @@ export function MessageDrawer({
           ) : loadError ? (
             <div role="alert">
               <p className="wf-error">{loadError}</p>
-              <button type="button" className="button secondary small" onClick={load}>
+              <button
+                type="button"
+                className="button secondary small"
+                onClick={() => {
+                  setLoadError('');
+                  void load();
+                }}
+              >
                 Try again
               </button>
             </div>
