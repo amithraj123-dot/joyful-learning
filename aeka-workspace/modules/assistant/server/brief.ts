@@ -42,7 +42,10 @@ export async function mailSection(ctx: ModuleContext): Promise<BriefLine[]> {
   for (const m of items.slice(0, 5)) {
     const urgent = m.triage?.tier === 1 ? 'Urgent: ' : '';
     const from = m.from.name || m.from.address;
-    lines.push({ text: `${urgent}${from}: ${m.subject || '(no subject)'}`.slice(0, 200), link: `mail/inbox#${m.id}` });
+    lines.push({
+      text: `${urgent}${from}: ${m.subject || '(no subject)'}`.slice(0, 200),
+      link: `mail/inbox#${m.id}`,
+    });
   }
   if (counts.draftsAwaiting) lines.push({ text: 'Drafts waiting for your review', link: 'mail/drafts' });
   return lines;
@@ -60,7 +63,8 @@ export async function buildBrief(ctx: ModuleContext): Promise<Brief> {
   const due: BriefLine[] = [];
   for (const t of await listTodos(ctx)) {
     if (t.dueAt == null || t.dueAt >= endOfToday) continue;
-    const when = t.dueAt < istDayStart(now) ? `overdue since ${dayLabel(t.dueAt)}` : `today ${timeLabel(t.dueAt)}`;
+    const when =
+      t.dueAt < istDayStart(now) ? `overdue since ${dayLabel(t.dueAt)}` : `today ${timeLabel(t.dueAt)}`;
     due.push({ text: `${t.title} (${when})`, link: `assistant/todos#${t.id}` });
   }
   const tasks = (await attempt(() => myOpenTasks(ctx))) ?? [];
@@ -94,7 +98,10 @@ export async function buildBrief(ctx: ModuleContext): Promise<Brief> {
     sections.push({
       title: 'Reminders today',
       lines: capped(
-        reminders.map((r) => ({ text: `${timeLabel(r.dueAt)}: ${r.title}`, link: `assistant/todos#${r.id}` })),
+        reminders.map((r) => ({
+          text: `${timeLabel(r.dueAt)}: ${r.title}`,
+          link: `assistant/todos#${r.id}`,
+        })),
         'assistant/todos',
       ),
     });
@@ -104,12 +111,16 @@ export async function buildBrief(ctx: ModuleContext): Promise<Brief> {
 
 // A few lines for the brief notification (and WhatsApp).
 export function briefSummary(brief: Brief) {
-  if (!brief.sections.length) return 'Nothing is due today, and there is no urgent mail or deadline this week.';
+  if (!brief.sections.length)
+    return 'Nothing is due today, and there is no urgent mail or deadline this week.';
   const lines: string[] = [];
   for (const s of brief.sections) {
-    const items = s.lines.filter((l) => !l.text.startsWith('and '));
-    lines.push(`${s.title}: ${items.length > 1 ? plural(items.length, 'item') : items[0]?.text ?? ''}`);
-    for (const l of items.slice(0, 2)) if (items.length > 1) lines.push('- ' + l.text);
+    const more = s.lines.at(-1)?.text.match(/^and (\d+) more$/);
+    const items = more ? s.lines.slice(0, -1) : s.lines;
+    const total = items.length + (more ? Number(more[1]) : 0);
+    lines.push(s.title + ':');
+    for (const l of items.slice(0, 3)) lines.push('- ' + l.text);
+    if (total > 3) lines.push(`- and ${total - 3} more`);
   }
   return lines.join('\n').slice(0, 1500);
 }

@@ -39,7 +39,8 @@ function MemoryEditor({
   const [busy, setBusy] = useState(false);
   const save = async (e: FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) return setError('Give the memory a short title and the detail to remember.');
+    if (!title.trim() || !content.trim())
+      return setError('Give the memory a short title and the detail to remember.');
     setBusy(true);
     setError('');
     try {
@@ -102,7 +103,9 @@ export function MemoryPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [editing, setEditing] = useState<{ memory: Memory | null } | null>(null);
   const put = (m: Memory) =>
-    list.set((items) => (items.some((x) => x.id === m.id) ? items.map((x) => (x.id === m.id ? m : x)) : [m, ...items]));
+    list.set((items) =>
+      items.some((x) => x.id === m.id) ? items.map((x) => (x.id === m.id ? m : x)) : [m, ...items],
+    );
   const remove = async (m: Memory) => {
     try {
       await assistant('memory.delete', { id: m.id });
@@ -130,11 +133,18 @@ export function MemoryPage() {
     return (
       <div className="as-stack">
         {intro}
-        <LoadError title="Your memory could not be loaded" message={list.error} status={list.status} onRetry={list.retry} />
+        <LoadError
+          title="Your memory could not be loaded"
+          message={list.error}
+          status={list.status}
+          onRetry={list.retry}
+        />
       </div>
     );
   const items = list.data;
-  const counts = Object.fromEntries(MEMORY_CATEGORIES.map((c) => [c, items.filter((m) => m.category === c).length]));
+  const counts = Object.fromEntries(
+    MEMORY_CATEGORIES.map((c) => [c, items.filter((m) => m.category === c).length]),
+  );
   const groups = MEMORY_CATEGORIES.filter((c) => (filter === 'all' || filter === c) && counts[c] > 0);
   return (
     <div className="as-stack">
@@ -160,7 +170,8 @@ export function MemoryPage() {
       <InlineError message={list.error} onRetry={list.retry} />
       {items.length === 0 ? (
         <Empty icon={Brain} title="Nothing remembered yet">
-          Add something here, or tell Aeka in chat, for example: remember that I prefer short replies to clients.
+          Add something here, or tell Aeka in chat, for example: remember that I prefer short replies to
+          clients.
         </Empty>
       ) : (
         groups.map((c) => (

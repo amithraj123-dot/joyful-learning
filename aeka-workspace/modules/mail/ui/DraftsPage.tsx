@@ -14,6 +14,23 @@ const PAGE = 100;
 const MAX_PAGES = 5;
 const SENT_SHOWN = 10;
 
+// Reads newest-first pages until every awaiting draft and a few sent ones are found, or the bound is hit.
+async function scanDrafts() {
+  const found: MailItem[] = [];
+  let before: number | undefined;
+  let expected = Infinity;
+  for (let pages = 0; pages < MAX_PAGES; pages++) {
+    const r = await mail('inbox.list', { view: 'all', limit: PAGE, ...(before ? { before } : {}) });
+    expected = r.counts.draftsAwaiting;
+    found.push(...r.items.filter((i) => i.draft && i.draft.status !== 'discarded'));
+    const waiting = found.filter((i) => i.draft!.status !== 'sent').length;
+    if (r.nextBefore == null || (waiting >= expected && found.length - waiting >= SENT_SHOWN))
+      return { found, partial: false };
+    before = r.nextBefore;
+  }
+  return { found, partial: found.filter((i) => i.draft!.status !== 'sent').length < expected };
+}
+
 export function DraftsPage() {
   const { getEdit, unsavedCount } = useMail();
   const [items, setItems] = useState<MailItem[]>([]);
@@ -23,35 +40,29 @@ export function DraftsPage() {
   const [showSent, setShowSent] = useState(false);
   const [open, setOpen] = useState<MailItem | null>(null);
 
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) setPhase('loading');
-    try {
-      const found: MailItem[] = [];
-      let before: number | undefined;
-      let pages = 0;
-      let expected = Infinity;
-      for (; pages < MAX_PAGES; pages++) {
-        const r = await mail('inbox.list', { view: 'all', limit: PAGE, ...(before ? { before } : {}) });
-        expected = r.counts.draftsAwaiting;
-        found.push(...r.items.filter((i) => i.draft && i.draft.status !== 'discarded'));
-        const waiting = found.filter((i) => i.draft!.status !== 'sent').length;
-        if (r.nextBefore == null || (waiting >= expected && found.length - waiting >= SENT_SHOWN)) {
-          before = undefined;
-          break;
-        }
-        before = r.nextBefore;
-      }
-      setPartial(before != null && found.filter((i) => i.draft!.status !== 'sent').length < expected);
-      setItems(found);
-      setPhase('ready');
-    } catch (e) {
-      setError(errorMessage(e));
-      setPhase('error');
-    }
+  const apply = useCallback((r: { found: MailItem[]; partial: boolean }) => {
+    setItems(r.found);
+    setPartial(r.partial);
+    setPhase('ready');
+  }, []);
+  const fail = useCallback((e: unknown) => {
+    setError(errorMessage(e));
+    setPhase('error');
   }, []);
   useEffect(() => {
-    void load(true); // the first render already shows loading
-  }, [load]);
+    let alive = true;
+    scanDrafts().then(
+      (r) => alive && apply(r),
+      (e) => alive && fail(e),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [apply, fail]);
+  const load = (quiet = false) => {
+    if (!quiet) setPhase('loading');
+    return scanDrafts().then(apply, fail);
+  };
 
   const replace = useCallback((next: MailItem) => {
     setItems((old) => old.map((i) => (i.id === next.id ? { ...i, ...next } : i)));

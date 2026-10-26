@@ -6,7 +6,7 @@ import { assistant } from '../shared/client';
 import { REPEATS, REPEAT_LABELS, type Repeat } from '../shared/types';
 import { useAssistant } from './context';
 import { InlineError } from './Bits';
-import { errorMessage, formatWhen, fromIst, todayIst, addDaysIso } from './lib';
+import { errorMessage, formatWhen, fromIst, nowMs, todayIst, addDaysIso } from './lib';
 
 // The reminder time for a time with an optional date: today if still ahead, otherwise tomorrow.
 export function reminderTime(date: string, time: string, now = Date.now()) {
@@ -41,7 +41,7 @@ export function QuickCapture({ onAdded }: { onAdded?: (kind: 'todo' | 'reminder'
       setError('Type what you want to remember.');
       return;
     }
-    if (isReminder && when! <= Date.now()) {
+    if (isReminder && when! <= nowMs()) {
       setError('Choose a time in the future.');
       return;
     }

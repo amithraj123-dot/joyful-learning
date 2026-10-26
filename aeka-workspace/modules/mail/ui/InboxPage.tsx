@@ -329,9 +329,15 @@ export function InboxPage() {
             <RefreshCw size={15} aria-hidden="true" className={syncing ? 'mail-spin' : ''} />
             {syncing ? 'Syncing' : 'Sync now'}
           </button>
-          <span className="wf-caption" aria-live="polite">
-            {syncMsg && !syncing ? syncMsg + ' ' : ''}
-            {lastSyncAt ? 'Last synced ' + formatWhen(lastSyncAt) : syncing ? '' : 'Not synced yet'}
+          <span className="wf-sr" aria-live="polite">
+            {syncing ? '' : syncMsg}
+          </span>
+          <span className="wf-caption">
+            {syncing
+              ? 'Syncing with Outlook'
+              : lastSyncAt
+                ? 'Last synced ' + formatWhen(lastSyncAt)
+                : 'Not synced yet'}
             {counts && counts.pending > 0 ? `. ${counts.pending} waiting for triage` : ''}
           </span>
         </div>

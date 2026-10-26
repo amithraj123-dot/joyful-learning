@@ -57,8 +57,7 @@ const store = (id: string | null) => {
     else sessionStorage.removeItem(STORE_KEY);
   } catch {}
 };
-const threadId = (t: Thread) =>
-  t.phase === 'ready' ? t.conversation.id : t.phase === 'new' ? null : t.id;
+const threadId = (t: Thread) => (t.phase === 'ready' ? t.conversation.id : t.phase === 'new' ? null : t.id);
 
 function ToolChips({ tools }: { tools: ToolNote[] }) {
   const { open } = useAssistant();
@@ -116,7 +115,9 @@ function Message({ m }: { m: ChatMessage }) {
       )}
       <div className="as-msg-body">
         <span className="wf-sr">{mine ? 'You said' : 'Aeka replied'}</span>
-        <div className="as-bubble">{mine ? <p className="wf-pre">{m.content}</p> : <RichText text={m.content} />}</div>
+        <div className="as-bubble">
+          {mine ? <p className="wf-pre">{m.content}</p> : <RichText text={m.content} />}
+        </div>
         {!mine && <ToolChips tools={m.tools} />}
         <time className="as-msg-time" dateTime={new Date(m.createdAt).toISOString()}>
           {formatClock(m.createdAt)}
@@ -257,8 +258,7 @@ export function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const upsertConv = (c: Conversation) =>
-    convs.set((list) => [c, ...list.filter((x) => x.id !== c.id)]);
+  const upsertConv = (c: Conversation) => convs.set((list) => [c, ...list.filter((x) => x.id !== c.id)]);
 
   const send = (raw: string, convId: string | null) => {
     const body = raw.trim().slice(0, MAX_TEXT);
@@ -321,7 +321,9 @@ export function ChatPage() {
     try {
       const saved = await assistant('chat.rename', { id: c.id, title: t.slice(0, 120) });
       upsertConv(saved);
-      setThread((th) => (th.phase === 'ready' && th.conversation.id === c.id ? { ...th, conversation: saved } : th));
+      setThread((th) =>
+        th.phase === 'ready' && th.conversation.id === c.id ? { ...th, conversation: saved } : th,
+      );
       setRenaming(null);
       setRenameError('');
     } catch (e) {
@@ -347,7 +349,13 @@ export function ChatPage() {
     ) : convs.phase === 'error' ? (
       <InlineError message={convs.error} onRetry={convs.retry} />
     ) : (
-      <ConversationList items={list} current={currentId} busyId={busyId} onSelect={select} onNew={() => select(null)} />
+      <ConversationList
+        items={list}
+        current={currentId}
+        busyId={busyId}
+        onSelect={select}
+        onNew={() => select(null)}
+      />
     );
 
   const conv = thread.phase === 'ready' ? thread.conversation : null;
@@ -426,7 +434,12 @@ export function ChatPage() {
             </div>
           )}
           {phone && thread.phase !== 'new' && (
-            <button type="button" className="wf-icon-btn as-tap" aria-label="New chat" onClick={() => select(null)}>
+            <button
+              type="button"
+              className="wf-icon-btn as-tap"
+              aria-label="New chat"
+              onClick={() => select(null)}
+            >
               <MessageSquarePlus size={18} />
             </button>
           )}
@@ -447,8 +460,8 @@ export function ChatPage() {
               <MessageSquareText size={28} aria-hidden="true" />
               <h3>How can I help?</h3>
               <p>
-                Ask about your mail, tasks, deadlines and notes, or ask for a reminder, a to-do or a draft reply.
-                Anything it creates is listed under the reply for you to check.
+                Ask about your mail, tasks, deadlines and notes, or ask for a reminder, a to-do or a draft
+                reply. Anything it creates is listed under the reply for you to check.
               </p>
               <div className="as-suggestions" role="group" aria-label="Suggestions">
                 {SUGGESTIONS.map((s) => (
@@ -492,7 +505,11 @@ export function ChatPage() {
                 <TriangleAlert size={15} aria-hidden="true" /> {pending!.error}
               </p>
               <div className="wf-row wf-wrap">
-                <button type="button" className="button primary small" onClick={() => send(pending!.text, pending!.convId)}>
+                <button
+                  type="button"
+                  className="button primary small"
+                  onClick={() => send(pending!.text, pending!.convId)}
+                >
                   <RotateCcw size={14} aria-hidden="true" /> Try again
                 </button>
                 <button
@@ -509,7 +526,7 @@ export function ChatPage() {
               </div>
             </div>
           )}
-          <div ref={endRef} />
+          <div ref={endRef} className="as-end" />
         </div>
 
         <form className="as-composer" onSubmit={submit}>
@@ -539,7 +556,9 @@ export function ChatPage() {
             <SendHorizontal size={17} aria-hidden="true" />
           </button>
           <p id="as-composer-hint" className="as-composer-hint">
-            {busy ? 'Working on your message. You can keep reading.' : 'Enter to send, Shift and Enter for a new line.'}
+            {busy
+              ? 'Working on your message. You can keep reading.'
+              : 'Enter to send, Shift and Enter for a new line.'}
           </p>
         </form>
       </section>

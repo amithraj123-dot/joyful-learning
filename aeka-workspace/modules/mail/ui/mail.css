@@ -246,6 +246,27 @@
   display: grid;
   gap: 2px;
 }
+.mail-asks {
+  list-style: disc;
+}
+.mail-ai-list {
+  list-style: disc;
+}
+.mail-placeholders ol {
+  list-style: decimal;
+}
+.mail-connect .mail-meta {
+  margin-top: 10px;
+}
+/* Keep the unsaved-changes status for screen readers, show it only when there are changes. */
+.mail-editor-head .wf-dirty:not(.on) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .mail-asks li {
   overflow-wrap: anywhere;
 }

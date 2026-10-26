@@ -91,6 +91,7 @@ is permitted under Meta's current terms.
 | `WHATSAPP_VERIFY_TOKEN`          | Any long random value, also entered in the Meta dashboard                                                    |
 | `WHATSAPP_ACCESS_TOKEN`          | A system-user access token for the business number                                                           |
 | `WHATSAPP_PHONE_NUMBER_ID`       | The business phone number ID                                                                                 |
+| `WHATSAPP_DISPLAY_NUMBER`        | The business number as members should see it, for example `+91 98200 00000`                                  |
 | `WHATSAPP_GRAPH_VERSION`         | For example `v23.0`                                                                                          |
 | `WHATSAPP_NOTIFICATION_TEMPLATE` | An approved template with one body parameter, for alerts sent more than 24 hours after the member last wrote |
 | `WHATSAPP_TEMPLATE_LANGUAGE`     | The template's language code, for example `en`                                                               |

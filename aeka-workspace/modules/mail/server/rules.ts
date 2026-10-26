@@ -144,7 +144,16 @@ export async function proposeRules(
           `INSERT INTO mail_rules(id,member,kind,pattern,effect,status,evidence,created_at,updated_at)
            VALUES(?,?,?,?,?,'proposed',?,?,?) ON CONFLICT DO NOTHING`,
         )
-        .bind(crypto.randomUUID(), member, kind, pattern, JSON.stringify({ [field]: value }), evidence, now, now)
+        .bind(
+          crypto.randomUUID(),
+          member,
+          kind,
+          pattern,
+          JSON.stringify({ [field]: value }),
+          evidence,
+          now,
+          now,
+        )
         .run();
       continue;
     }
@@ -174,7 +183,8 @@ export const ruleActions: Record<string, ModuleAction> = {
       const kind = r.kind as MailRule['kind'];
       if (!['sender', 'domain', 'subject'].includes(kind)) throw new CloudError('Choose a valid rule kind.');
       const status = r.status as MailRule['status'];
-      if (!['proposed', 'active', 'rejected'].includes(status)) throw new CloudError('Choose a valid rule status.');
+      if (!['proposed', 'active', 'rejected'].includes(status))
+        throw new CloudError('Choose a valid rule status.');
       const pattern = rulePattern(kind, r.pattern);
       const effect = ruleEffect(r.effect);
       await checkMatter(ctx, effect);

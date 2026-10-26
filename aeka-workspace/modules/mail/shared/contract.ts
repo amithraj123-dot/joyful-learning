@@ -56,7 +56,8 @@ export interface MailActions {
     result: { account: MailAccount | null; setup: MailSetup };
   };
   'account.update': { payload: { settings: AccountSettings }; result: MailAccount };
-  // Removes the stored token and this member's mail, triage and drafts from the workspace.
+  // Removes the stored token and this member's mail, triage, drafts, corrections and rules from the
+  // workspace. Outlook itself is untouched.
   'account.disconnect': { payload: Record<string, never>; result: true };
 
   // Fetches new mail and triages a bounded batch now (at most 25 AI-triaged emails per call).
@@ -83,6 +84,12 @@ export interface MailActions {
   'draft.create': {
     payload: { id: string; instructions?: string; replyAll?: boolean };
     result: Draft;
+  };
+  // Drafts not yet sent (draft, saved), newest first, with the email they reply to; includeSent adds
+  // the 20 most recently sent.
+  'drafts.list': {
+    payload: { includeSent?: boolean };
+    result: (Draft & { subject: string; from: Address; receivedAt: number })[];
   };
   'draft.get': { payload: { id: string }; result: Draft }; // draft id
   'draft.update': {

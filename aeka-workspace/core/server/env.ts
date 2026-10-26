@@ -27,6 +27,7 @@ export interface ServerEnv {
   WHATSAPP_VERIFY_TOKEN?: string;
   WHATSAPP_ACCESS_TOKEN?: string;
   WHATSAPP_PHONE_NUMBER_ID?: string;
+  WHATSAPP_DISPLAY_NUMBER?: string; // the business number members message, e.g. +91 98xxx xxxxx
   WHATSAPP_GRAPH_VERSION?: string; // e.g. v23.0
   WHATSAPP_NOTIFICATION_TEMPLATE?: string; // approved template with one body parameter
   WHATSAPP_TEMPLATE_LANGUAGE?: string; // default en

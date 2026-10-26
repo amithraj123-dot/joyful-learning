@@ -56,26 +56,31 @@ export function DraftEditor({
   const bodyId = useId();
   const me = account.account?.address ?? '';
 
-  const load = async () => {
-    try {
-      const d = await mail('draft.get', { id: draftId });
-      setDraft(d);
-      const kept = getEdit(draftId);
-      if (kept && isDirty(kept, d)) {
-        setLocal(kept);
-        setStale(kept.revision !== d.revision);
-      } else {
-        if (kept) setEdit(draftId, null);
-        setLocal(fromDraft(d));
-      }
-    } catch (e) {
-      setLoadError(errorMessage(e));
+  // Unsaved edits kept in memory win over the stored draft; a newer stored revision is flagged.
+  const apply = (d: Draft) => {
+    setDraft(d);
+    const kept = getEdit(draftId);
+    if (kept && isDirty(kept, d)) {
+      setLocal(kept);
+      setStale(kept.revision !== d.revision);
+    } else {
+      if (kept) setEdit(draftId, null);
+      setLocal(fromDraft(d));
     }
   };
+  const fail = (e: unknown) => setLoadError(errorMessage(e));
   useEffect(() => {
-    void load();
+    let alive = true;
+    mail('draft.get', { id: draftId }).then(
+      (d) => alive && apply(d),
+      (e) => alive && fail(e),
+    );
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftId]);
+  const load = () => mail('draft.get', { id: draftId }).then(apply, fail);
 
   const dirty = !!(draft && local && isDirty(local, draft));
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);

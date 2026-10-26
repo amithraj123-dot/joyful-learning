@@ -143,6 +143,14 @@ export function linkParts(text: string): { text: string; href?: string }[] {
   return out;
 }
 
+// Scrolls a section to the top of its dialog body. scrollIntoView would also scroll the fixed overlay.
+export function scrollToInDialog(el: HTMLElement | null, smooth = false) {
+  const body = el?.closest<HTMLElement>('.wf-modal-body');
+  if (!el || !body) return;
+  const top = body.scrollTop + el.getBoundingClientRect().top - body.getBoundingClientRect().top - 8;
+  body.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
+}
+
 // Only Outlook on the web links are opened from the workspace.
 export function safeWebLink(link: string) {
   try {

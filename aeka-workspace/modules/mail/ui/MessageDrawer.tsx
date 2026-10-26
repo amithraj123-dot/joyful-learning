@@ -30,6 +30,7 @@ import {
   linkParts,
   plural,
   safeWebLink,
+  scrollToInDialog,
   senderName,
 } from './lib';
 import { useMail } from './store';
@@ -52,7 +53,7 @@ export function MessageDrawer({
   onClose: () => void;
   onChange: (item: MailItem) => void; // a newer copy of the email (triage or draft changed)
 }) {
-  const { setEdit } = useMail();
+  const { getEdit, setEdit } = useMail();
   const [message, setMessage] = useState<MailMessage | null>(null);
   const [loadError, setLoadError] = useState('');
   const [notice, setNotice] = useState('');
@@ -69,21 +70,25 @@ export function MessageDrawer({
     [onChange],
   );
 
-  const load = async () => {
-    try {
-      const m = await mail('message.get', { id: item.id });
-      setMessage(m);
-      onChange(withoutBody(m));
-    } catch (e) {
-      setLoadError(errorMessage(e));
-    }
+  const apply = (m: MailMessage) => {
+    setMessage(m);
+    onChange(withoutBody(m));
   };
+  const fail = (e: unknown) => setLoadError(errorMessage(e));
   useEffect(() => {
-    void load();
+    let alive = true;
+    mail('message.get', { id: item.id }).then(
+      (m) => alive && apply(m),
+      (e) => alive && fail(e),
+    );
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id]);
+  const load = () => mail('message.get', { id: item.id }).then(apply, fail);
   useEffect(() => {
-    if (focus === 'draft') draftRef.current?.scrollIntoView({ block: 'start' });
+    if (focus === 'draft') scrollToInDialog(draftRef.current);
   }, [focus, message]);
 
   const setTriage = (t: Triage) => update({ ...current, triage: t });
@@ -92,8 +97,9 @@ export function MessageDrawer({
     setNotice('This email was updated elsewhere, so the latest triage has been loaded. Please try again.');
   };
 
-  const close = () => (dirty ? setLeaving(true) : onClose());
   const draftId = current.draft && current.draft.status !== 'discarded' ? current.draft.id : null;
+  // The edit store updates synchronously, so a quick Esc after typing still warns.
+  const close = () => (dirty || (draftId && getEdit(draftId)) ? setLeaving(true) : onClose());
   const web = safeWebLink(current.webLink);
 
   return (
@@ -144,7 +150,7 @@ export function MessageDrawer({
             <button
               type="button"
               className="button secondary small"
-              onClick={() => draftRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              onClick={() => scrollToInDialog(draftRef.current, true)}
             >
               <PencilLine size={14} aria-hidden="true" /> Draft a reply
             </button>

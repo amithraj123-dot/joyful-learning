@@ -51,8 +51,9 @@ async function precheck(request: Request, d: ConnectDeps) {
   const origin = originOf(request, d.env);
   if (!d.user) return { error: fail(origin, 'signin'), origin };
   if (!d.db) return { error: fail(origin, 'storage'), origin };
-  if (!configured(d.env.MS_CLIENT_ID, d.env.MS_CLIENT_SECRET)) return { error: fail(origin, 'not_configured'), origin };
-  if (!sealingAvailable(d.env)) return { error: fail(origin, 'no_encryption_key'), origin };
+  if (!configured(d.env.MS_CLIENT_ID, d.env.MS_CLIENT_SECRET))
+    return { error: fail(origin, 'not_configured'), origin };
+  if (!sealingAvailable(d.env)) return { error: fail(origin, 'storage'), origin };
   const member = await resolveMember(d.db, d.user);
   if (!member) return { error: fail(origin, 'not_member'), origin };
   return { origin, member, db: d.db };
@@ -66,7 +67,10 @@ export async function startConnect(request: Request, d: ConnectDeps): Promise<Re
   const now = d.now ?? Date.now();
   const state = random(32);
   const verifier = random(48);
-  await db.prepare('DELETE FROM mail_oauth_states WHERE created_at < ?').bind(now - STATE_LIFE_MS).run();
+  await db
+    .prepare('DELETE FROM mail_oauth_states WHERE created_at < ?')
+    .bind(now - STATE_LIFE_MS)
+    .run();
   await db
     .prepare('INSERT INTO mail_oauth_states(state,member,verifier_sealed,created_at) VALUES(?,?,?,?)')
     .bind(state, member.email, await seal(d.env, VERIFIER_PURPOSE, state, verifier), now)
@@ -106,12 +110,15 @@ export async function finishConnect(request: Request, d: ConnectDeps): Promise<R
     .prepare('SELECT * FROM mail_oauth_states WHERE state = ?')
     .bind(state)
     .first<{ state: string; member: string; verifier_sealed: string; created_at: number }>();
-  if (!row || row.member !== member.email) return fail(origin, 'state');
+  if (!row) return fail(origin, 'state');
+  if (row.member !== member.email) return fail(origin, 'mismatch');
   // Single use: only the request that deletes the state may continue.
   const taken = await db.prepare('DELETE FROM mail_oauth_states WHERE state = ?').bind(state).run();
   if (!taken.meta.changes) return fail(origin, 'state');
   if (row.created_at < now - STATE_LIFE_MS) return fail(origin, 'expired');
-  if (url.searchParams.get('error')) return fail(origin, 'denied');
+  const msError = url.searchParams.get('error');
+  if (msError)
+    return fail(origin, /consent_required|interaction_required/.test(msError) ? 'consent_required' : 'access_denied');
   if (!code || code.length > 4000) return fail(origin, 'state');
 
   const sys: Sys = { db, env: d.env, fetch: d.fetch, now };
@@ -130,7 +137,7 @@ export async function finishConnect(request: Request, d: ConnectDeps): Promise<R
     .prepare('SELECT member FROM mail_accounts WHERE address = ? AND member != ?')
     .bind(me.address, member.email)
     .first();
-  if (other) return fail(origin, 'mailbox_in_use');
+  if (other) return fail(origin, 'account_mismatch');
 
   const existing = await loadAccount(db, member.email);
   // A different mailbox starts afresh, so two mailboxes are never mixed.

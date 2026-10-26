@@ -9,14 +9,7 @@ import { Toggle } from '../../workflow/ui/components/Bits';
 import { ConfirmButton } from '../../workflow/ui/components/ConfirmButton';
 import { useAssistant } from './context';
 import { Card, InlineError, LoadError, Loading } from './Bits';
-import {
-  core,
-  errorMessage,
-  formatClock,
-  useLoad,
-  type IntegrationsStatus,
-  type Member,
-} from './lib';
+import { core, errorMessage, formatClock, useLoad, type IntegrationsStatus, type Member } from './lib';
 
 const POLL_MS = 4000;
 
@@ -109,8 +102,8 @@ function WhatsAppCard({
     return (
       <Card title="WhatsApp" id="as-set-wa">
         <p className="as-quiet">
-          <MessageCircle size={16} aria-hidden="true" /> The firm has not set up WhatsApp yet. Once an administrator
-          does, you can link your number here to get reminders and ask Aeka from your phone.
+          <MessageCircle size={16} aria-hidden="true" /> The firm has not set up WhatsApp yet. Once an
+          administrator does, you can link your number here to get reminders and ask Aeka from your phone.
         </p>
       </Card>
     );
@@ -146,8 +139,8 @@ function WhatsAppCard({
           <p className="wf-caption">Your code</p>
           <p className="as-code">{linking.code}</p>
           <p>
-            Send <strong>LINK {linking.code}</strong> to <strong>{business}</strong> from your WhatsApp within 15
-            minutes.
+            Send <strong>LINK {linking.code}</strong> to <strong>{business}</strong> from your WhatsApp within
+            15 minutes.
           </p>
           <p className="wf-caption" role="status">
             Waiting for your message. Code expires in {mins}:{String(secs).padStart(2, '0')}.
@@ -160,8 +153,8 @@ function WhatsAppCard({
         <div className="as-wa-link">
           {expired && <p className="wf-error">That code has expired. Get a new one to try again.</p>}
           <p className="wf-caption">
-            Link your WhatsApp to get alerts on your phone and to ask Aeka by message. Only the number you link can
-            reach your assistant.
+            Link your WhatsApp to get alerts on your phone and to ask Aeka by message. Only the number you
+            link can reach your assistant.
           </p>
           <button type="button" className="button primary" onClick={link} disabled={busy}>
             <MessageCircle size={15} aria-hidden="true" /> {expired ? 'Get a new code' : 'Link WhatsApp'}
@@ -206,10 +199,16 @@ function Status({ ready, label }: { ready: boolean; label?: string }) {
 function Vars({ names, optional }: { names: string[]; optional?: string[] }) {
   return (
     <p className="as-vars">
-      <span>Set:</span> {names.map((n) => <code key={n}>{n}</code>)}
+      <span>Set:</span>{' '}
+      {names.map((n) => (
+        <code key={n}>{n}</code>
+      ))}
       {optional?.length ? (
         <>
-          <span>Optional:</span> {optional.map((n) => <code key={n}>{n}</code>)}
+          <span>Optional:</span>{' '}
+          {optional.map((n) => (
+            <code key={n}>{n}</code>
+          ))}
         </>
       ) : null}
     </p>
@@ -275,10 +274,12 @@ function Integrations() {
       ready: s.outlook && !!s.publicOrigin,
       body: (
         <>
-          {!(s.outlook && s.publicOrigin) && <Vars names={['MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_TENANT_ID', 'AEKA_PUBLIC_ORIGIN']} />}
+          {!(s.outlook && s.publicOrigin) && (
+            <Vars names={['MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_TENANT_ID', 'AEKA_PUBLIC_ORIGIN']} />
+          )}
           <p className="wf-caption">
-            Redirect URI to register in Entra: <code className="as-break">{origin}/api/mail/callback</code>. Delegated
-            permissions: offline_access, User.Read, Mail.ReadWrite, Mail.Send.
+            Redirect URI to register in Entra: <code className="as-break">{origin}/api/mail/callback</code>.
+            Delegated permissions: offline_access, User.Read, Mail.ReadWrite, Mail.Send.
           </p>
         </>
       ),
@@ -290,8 +291,9 @@ function Integrations() {
         <>
           {!s.scheduler && <Vars names={['AEKA_TICK_TOKEN']} />}
           <p className="wf-caption">
-            An external scheduler should POST <code>/api/tick</code> with the AEKA_TICK_TOKEN as a bearer token every 5
-            minutes, so reminders, briefs, mail sync and WhatsApp work while nobody has the workspace open.
+            An external scheduler should POST <code>/api/tick</code> with the AEKA_TICK_TOKEN as a bearer
+            token every 5 minutes, so reminders, briefs, mail sync and WhatsApp work while nobody has the
+            workspace open.
           </p>
         </>
       ),
@@ -305,8 +307,18 @@ function Integrations() {
         <>
           <p className="wf-caption">Optional. Uses the WhatsApp Cloud API. Set WHATSAPP_ENABLED to true.</p>
           <Vars
-            names={['WHATSAPP_ENABLED', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID']}
-            optional={['WHATSAPP_NOTIFICATION_TEMPLATE', 'WHATSAPP_TEMPLATE_LANGUAGE', 'WHATSAPP_GRAPH_VERSION']}
+            names={[
+              'WHATSAPP_ENABLED',
+              'WHATSAPP_APP_SECRET',
+              'WHATSAPP_VERIFY_TOKEN',
+              'WHATSAPP_ACCESS_TOKEN',
+              'WHATSAPP_PHONE_NUMBER_ID',
+            ]}
+            optional={[
+              'WHATSAPP_NOTIFICATION_TEMPLATE',
+              'WHATSAPP_TEMPLATE_LANGUAGE',
+              'WHATSAPP_GRAPH_VERSION',
+            ]}
           />
         </>
       ),
@@ -324,8 +336,8 @@ function Integrations() {
       className="as-integrations"
     >
       <p className="wf-caption as-pad">
-        Visible to administrators only. Values are set in the hosting platform&apos;s secret settings and are never
-        shown here.
+        Visible to administrators only. Values are set in the hosting platform&apos;s secret settings and are
+        never shown here.
       </p>
       <ul className="as-int-list">
         {rows.map((r) => (
@@ -339,7 +351,9 @@ function Integrations() {
         ))}
       </ul>
       <h3 className="wf-h3 as-pad">AI use today</h3>
-      <p className="wf-caption as-pad">Daily limit: {s.aiDailyLimit} model calls for each member (India time).</p>
+      <p className="wf-caption as-pad">
+        Daily limit: {s.aiDailyLimit} model calls for each member (India time).
+      </p>
       {usage.length === 0 ? (
         <p className="as-quiet as-pad">No AI calls yet today.</p>
       ) : (
@@ -354,7 +368,9 @@ function Integrations() {
             const near = u.calls >= s.aiDailyLimit * 0.8;
             return (
               <li key={u.actor}>
-                <span className="as-usage-who">{u.actor === 'system' ? 'Background work' : (names.get(u.actor) ?? u.actor)}</span>
+                <span className="as-usage-who">
+                  {u.actor === 'system' ? 'Background work' : (names.get(u.actor) ?? u.actor)}
+                </span>
                 <span>
                   <span className="as-usage-label">Calls </span>
                   <span className={near ? 'wf-overdue' : ''}>
@@ -381,7 +397,11 @@ function Integrations() {
 export function SettingsPage() {
   const { me, notify } = useAssistant();
   const data = useLoad(() => assistant('settings.get', {}));
-  const [saveState, setSaveState] = useState<{ phase: 'idle' | 'saving' | 'saved' | 'error'; at?: number; error?: string }>({
+  const [saveState, setSaveState] = useState<{
+    phase: 'idle' | 'saving' | 'saved' | 'error';
+    at?: number;
+    error?: string;
+  }>({
     phase: 'idle',
   });
 
@@ -413,7 +433,12 @@ export function SettingsPage() {
   if (data.phase === 'error' || !data.data)
     return (
       <div className="as-stack">
-        <LoadError title="Settings could not be loaded" message={data.error} status={data.status} onRetry={data.retry} />
+        <LoadError
+          title="Settings could not be loaded"
+          message={data.error}
+          status={data.status}
+          onRetry={data.retry}
+        />
         {me?.member?.isAdmin && <Integrations />}
       </div>
     );
@@ -439,8 +464,8 @@ export function SettingsPage() {
         id="as-set-brief"
       >
         <p className="wf-caption as-pad">
-          A short summary of urgent mail, tasks, deadlines and reminders, posted to your notifications each morning.
-          It is put together without AI.
+          A short summary of urgent mail, tasks, deadlines and reminders, posted to your notifications each
+          morning. It is put together without AI.
         </p>
         <div className="as-brief-settings">
           <Toggle pressed={prefs.briefEnabled} onChange={(v) => void save({ ...prefs, briefEnabled: v })}>

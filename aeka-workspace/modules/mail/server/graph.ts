@@ -72,7 +72,11 @@ export async function tokenRequest(sys: Sys, form: Record<string, string>) {
   return { status: res.status, data };
 }
 
-export function tokenSetFrom(data: Record<string, unknown>, now: number, previousRefresh = ''): TokenSet | null {
+export function tokenSetFrom(
+  data: Record<string, unknown>,
+  now: number,
+  previousRefresh = '',
+): TokenSet | null {
   const access = typeof data.access_token === 'string' ? data.access_token : '';
   const refresh = typeof data.refresh_token === 'string' ? data.refresh_token : previousRefresh;
   const expiresIn = Number(data.expires_in);
@@ -141,11 +145,14 @@ export class GraphSession {
       throw new ReauthError();
     }
     const next = status === 200 ? tokenSetFrom(data, Date.now(), current.refresh_token) : null;
-    if (!next) throw new GraphError('Outlook sign-in could not be renewed. Will try again shortly.', status || 0);
+    if (!next)
+      throw new GraphError('Outlook sign-in could not be renewed. Will try again shortly.', status || 0);
     this.tokens = next;
     // Refresh tokens rotate: store the new one before using the access token.
     await this.sys.db
-      .prepare('UPDATE mail_accounts SET token_sealed = ?, access_expires = ?, updated_at = ? WHERE member = ?')
+      .prepare(
+        'UPDATE mail_accounts SET token_sealed = ?, access_expires = ?, updated_at = ? WHERE member = ?',
+      )
       .bind(
         await seal(this.sys.env, TOKEN_PURPOSE, this.account.member, JSON.stringify(next)),
         next.expires_at,
@@ -159,7 +166,9 @@ export class GraphSession {
   private async accessToken() {
     if (this.account.status !== 'connected') throw new ReauthError();
     const t = await this.load();
-    return t.expires_at - REFRESH_MARGIN_MS > Date.now() ? t.access_token : (await this.refresh()).access_token;
+    return t.expires_at - REFRESH_MARGIN_MS > Date.now()
+      ? t.access_token
+      : (await this.refresh()).access_token;
   }
 
   // Whether this module created the draft (only those may be changed, sent or deleted).
@@ -173,16 +182,26 @@ export class GraphSession {
 
   private async allowed(method: string, url: URL) {
     if (url.origin !== 'https://graph.microsoft.com' || !url.pathname.startsWith('/v1.0/')) return false;
-    const path = decodeURIComponent(url.pathname.slice(5));
-    const id = path.match(/^\/me\/messages\/([^/]+)(\/send)?$/i);
-    if (method === 'GET')
-      return (
-        /^\/(me|users\/[^/]+)\/mailFolders(\('[^'/]+'\)|\/[^/]+)\/messages\/delta$/i.test(path) ||
-        /^\/me\/messages(\/[^/]+)?$/i.test(path)
-      );
-    if (method === 'POST' && /^\/me\/messages\/[^/]+\/createReply(All)?$/i.test(path)) return true;
-    if (method === 'POST' && id?.[2]) return this.ownsDraft(id[1]);
-    if ((method === 'PATCH' || method === 'DELETE') && id && !id[2]) return this.ownsDraft(id[1]);
+    // Matched segment by segment, so an id can never smuggle in another path.
+    let seg: string[];
+    try {
+      seg = url.pathname.slice(6).split('/').map(decodeURIComponent);
+    } catch {
+      return false;
+    }
+    const lower = seg.map((x) => x.toLowerCase());
+    const messages = lower[0] === 'me' && lower[1] === 'messages';
+    const id = messages && seg.length >= 3 ? seg[2] : '';
+    if (method === 'GET') {
+      const folder =
+        (lower[0] === 'me' || lower[0] === 'users') &&
+        lower.slice(-2).join('/') === 'messages/delta' &&
+        lower.some((x) => x.startsWith('mailfolders'));
+      return (folder && seg.length <= 6) || (messages && seg.length <= 3);
+    }
+    if (method === 'POST' && id && seg.length === 4 && /^createreply(all)?$/.test(lower[3])) return true;
+    if (method === 'POST' && id && seg.length === 4 && lower[3] === 'send') return this.ownsDraft(id);
+    if ((method === 'PATCH' || method === 'DELETE') && id && seg.length === 3) return this.ownsDraft(id);
     return false;
   }
 

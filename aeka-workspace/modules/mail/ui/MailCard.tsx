@@ -120,6 +120,9 @@ export function MailCard({
           {(!t || t.status === 'pending') && <span className="wf-pill grey">Waiting for triage</span>}
           {t?.deadline && <DeadlineBadge deadline={t.deadline} />}
           {item.repliedByMe && <span className="wf-pill green">Replied</span>}
+          {done && t?.draftDecision === 'declined' && !item.repliedByMe && (
+            <span className="wf-pill grey">No reply needed</span>
+          )}
           {item.hasAttachments && <Paperclip size={14} aria-label="Has attachments" className="mail-clip" />}
         </div>
         <time

@@ -1,7 +1,7 @@
 'use client';
 // Today: the morning brief, quick capture, unread notifications and a way into Ask Aeka.
 import { useEffect, useState, type FormEvent } from 'react';
-import { ArrowRight, Bell, ChevronRight, MessageSquareText, RefreshCw, Sun } from 'lucide-react';
+import { ArrowRight, Bell, ChevronRight, RefreshCw, Sun } from 'lucide-react';
 import { assistant } from '../shared/client';
 import { askLater, useAssistant, useTickChange } from './context';
 import { Card, InlineError, LoadError, Loading } from './Bits';
@@ -161,14 +161,12 @@ function AskBox() {
           onChange={(e) => setText(e.target.value)}
           autoComplete="off"
         />
-        <button type="submit" className="button secondary" aria-label={text.trim() ? 'Ask' : 'Open Ask Aeka'}>
-          {text.trim() ? 'Ask' : <MessageSquareText size={16} aria-hidden="true" />}
-          {!text.trim() && <ArrowRight size={14} aria-hidden="true" />}
+        <button type="submit" className="button secondary">
+          Ask <ArrowRight size={14} aria-hidden="true" />
         </button>
       </form>
       <p className="as-quiet small">
-        Reminders, to-dos and drafts it makes are listed for your review. It never sends anything on its
-        own.
+        Reminders, to-dos and drafts it makes are listed for your review. It never sends anything on its own.
       </p>
     </Card>
   );

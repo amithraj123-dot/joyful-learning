@@ -20,7 +20,8 @@ export const EMAIL = /^[^\s@<>()",;]{1,64}@[^\s@<>()",;]{1,190}\.[^\s@<>()",;]{2
 const ID = /^[A-Za-z0-9_-]{1,80}$/;
 
 export const idOf = (value: unknown, label = 'email') => {
-  if (typeof value !== 'string' || !ID.test(value)) throw new CloudError(`This ${label} could not be found.`, 404);
+  if (typeof value !== 'string' || !ID.test(value))
+    throw new CloudError(`This ${label} could not be found.`, 404);
   return value;
 };
 

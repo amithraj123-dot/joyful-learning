@@ -95,7 +95,8 @@ export function trimBody(text: string, subject: string) {
       if (/^on\b.{0,240}\bwrote:\s*$/i.test(t)) break;
       if (/^on\b.{0,200}$/i.test(t) && /^wrote:\s*$/i.test(lines[i + 1]?.trim() || '')) break;
       if (/^_{8,}$/.test(t) && /^from:/i.test(lines[i + 1]?.trim() || '')) break;
-      if (/^from:\s/i.test(t) && lines.slice(i + 1, i + 5).some((l) => /^(sent|date):\s/i.test(l.trim()))) break;
+      if (/^from:\s/i.test(t) && lines.slice(i + 1, i + 5).some((l) => /^(sent|date):\s/i.test(l.trim())))
+        break;
     }
     if (!forward && t.startsWith('>')) continue;
     out.push(line.replace(/\s+$/, ''));
@@ -170,7 +171,8 @@ export async function syncMailbox(s: GraphSession, budgetMs = SYNC_BUDGET_MS): P
       }
       const items = Array.isArray(data.value) ? (data.value as GraphMessage[]) : [];
       const next = typeof data['@odata.nextLink'] === 'string' ? (data['@odata.nextLink'] as string) : null;
-      const delta = typeof data['@odata.deltaLink'] === 'string' ? (data['@odata.deltaLink'] as string) : null;
+      const delta =
+        typeof data['@odata.deltaLink'] === 'string' ? (data['@odata.deltaLink'] as string) : null;
       const counts = await writePage(s, f.folder, items, next || delta, f.column);
       result.fetched += counts.fetched;
       result.removed += counts.removed;
@@ -295,17 +297,22 @@ async function writePage(
   return { fetched, removed };
 }
 
-// Reads headers for inbox messages whose delta reply lacked them (bounded per run).
+// Reads headers for inbox messages whose delta reply lacked them (bounded per run). Throttling or a
+// network failure stops the reads (the rest wait for the next run); a message Outlook cannot return is
+// settled as not bulk, so it is never retried forever.
 export async function readHeaders(s: GraphSession, rows: { id: string; graph_id: string }[]) {
   const out = new Map<string, number>();
   for (const r of rows) {
-    const { data } = await s.request(
-      'GET',
-      `/me/messages/${encodeURIComponent(r.graph_id)}?$select=internetMessageHeaders`,
-    );
-    const bulk = bulkFromHeaders(
-      (data.internetMessageHeaders as { name?: string; value?: string }[] | undefined) ?? [],
-    );
+    let bulk = 0;
+    try {
+      const { data } = await s.request(
+        'GET',
+        `/me/messages/${encodeURIComponent(r.graph_id)}?$select=internetMessageHeaders`,
+      );
+      bulk = bulkFromHeaders((data.internetMessageHeaders as { name?: string; value?: string }[] | undefined) ?? []);
+    } catch (e) {
+      if (!(e instanceof GraphError) || e.busy || e.status === 0 || e.status === 401) break;
+    }
     out.set(r.id, bulk);
     await s.sys.db
       .prepare('UPDATE mail_messages SET bulk = ? WHERE member = ? AND id = ?')

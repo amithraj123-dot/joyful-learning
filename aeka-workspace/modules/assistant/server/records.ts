@@ -58,7 +58,8 @@ export function todoFields(value: unknown): TodoInput {
     details: text(t.details, 'the details', LIMITS.details),
     priority: t.priority == null ? 'normal' : oneOf(t.priority, ['normal', 'high'] as const, 'priority'),
     dueAt: optionalTime(t.dueAt, 'due date and time'),
-    status: t.status == null ? 'open' : oneOf(t.status, ['open', 'done'] as const, 'status'),
+    // Absent on an update: the status stays as it is.
+    status: t.status == null ? undefined : oneOf(t.status, ['open', 'done'] as const, 'status'),
   };
 }
 
@@ -251,7 +252,7 @@ export function reminderFields(value: unknown): ReminderInput {
     title: text(r.title, 'a title', LIMITS.title, true),
     dueAt: time(r.dueAt, 'reminder time'),
     repeat: r.repeat == null ? 'once' : oneOf(r.repeat, REPEATS, 'repeat'),
-    status: r.status == null ? 'active' : oneOf(r.status, ['active', 'paused'] as const, 'status'),
+    status: r.status == null ? undefined : oneOf(r.status, ['active', 'paused'] as const, 'status'),
   };
 }
 
@@ -271,9 +272,7 @@ export async function getReminder(ctx: ModuleContext, id: unknown) {
 
 export async function listReminders(ctx: ModuleContext) {
   const r = await ctx.db
-    .prepare(
-      "SELECT * FROM as_reminders WHERE member = ? ORDER BY status = 'done', due_at LIMIT 1000",
-    )
+    .prepare("SELECT * FROM as_reminders WHERE member = ? ORDER BY status = 'done', due_at LIMIT 1000")
     .bind(owner(ctx))
     .all<Row>();
   return r.results.map(reminderFrom);
@@ -328,7 +327,8 @@ export async function createReminder(ctx: ModuleContext, input: ReminderInput) {
 
 export async function updateReminder(ctx: ModuleContext, id: unknown, input: ReminderInput, base: number) {
   const current = await getReminder(ctx, id);
-  const status = input.status ?? 'active';
+  // Without a status a paused reminder stays paused; a finished one is scheduled again.
+  const status = input.status ?? (current.status === 'paused' ? 'paused' : 'active');
   // A new time, or reactivating, needs a time in the future; a renamed reminder keeps its time.
   if (input.dueAt !== current.dueAt || (status === 'active' && current.status !== 'active'))
     assertFuture(ctx, input.dueAt);
@@ -386,7 +386,9 @@ export function memoryFields(value: unknown): MemoryInput {
     content: text(m.content, 'what to remember', LIMITS.memoryContent, true),
   };
   if (looksSecret(input.title + ' ' + input.content))
-    throw bad('Memory is not a safe place for passwords, PINs or card numbers. Keep them in a password manager.');
+    throw bad(
+      'Memory is not a safe place for passwords, PINs or card numbers. Keep them in a password manager.',
+    );
   return input;
 }
 
@@ -443,4 +445,3 @@ export async function deleteMemory(ctx: ModuleContext, id: unknown) {
   if (!r.meta.changes) throw notFound('memory');
   return true as const;
 }
-

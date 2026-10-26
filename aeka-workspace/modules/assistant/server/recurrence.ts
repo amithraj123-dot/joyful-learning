@@ -27,7 +27,8 @@ export const istDayStart = (ms: number) => {
   return Date.UTC(p.year, p.month, p.day) - IST;
 };
 export const istTimeOfDay = (ms: number) => (((ms + IST) % DAY) + DAY) % DAY;
-export const daysInMonth = (year: number, month: number) => new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+export const daysInMonth = (year: number, month: number) =>
+  new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 
 const clock = (ms: number) => {
   const p = istParts(ms);

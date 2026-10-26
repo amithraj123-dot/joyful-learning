@@ -19,6 +19,8 @@ import {
   isConflict,
   istParts,
   minutesToTomorrowNine,
+  nowMs,
+  useClock,
   useLoad,
 } from './lib';
 
@@ -28,7 +30,15 @@ const SNOOZES = [
   { label: 'Tomorrow 9 am', minutes: () => minutesToTomorrowNine() },
 ];
 
-function RepeatSelect({ value, onChange, id }: { value: Repeat; onChange: (r: Repeat) => void; id?: string }) {
+function RepeatSelect({
+  value,
+  onChange,
+  id,
+}: {
+  value: Repeat;
+  onChange: (r: Repeat) => void;
+  id?: string;
+}) {
   return (
     <select id={id} className="wf-input" value={value} onChange={(e) => onChange(e.target.value as Repeat)}>
       {REPEATS.map((r) => (
@@ -64,7 +74,7 @@ function ReminderEditor({
     if (!title.trim()) return setError('A reminder needs a title.');
     if (!time) return setError('Choose a time.');
     const dueAt = reminderTime(date, time);
-    if (dueAt <= Date.now()) return setError('Choose a time in the future.');
+    if (dueAt <= nowMs()) return setError('Choose a time in the future.');
     setBusy(true);
     setError('');
     try {
@@ -74,7 +84,13 @@ function ReminderEditor({
         repeat,
         status: reminder.status === 'paused' ? 'paused' : 'active',
       };
-      onSaved(await assistant('reminder.update', { id: reminder.id, reminder: input, baseRevision: reminder.revision }));
+      onSaved(
+        await assistant('reminder.update', {
+          id: reminder.id,
+          reminder: input,
+          baseRevision: reminder.revision,
+        }),
+      );
       notify('Reminder saved');
       onClose();
     } catch (err) {
@@ -135,7 +151,7 @@ function AddReminder({ onAdded }: { onAdded: (r: Reminder) => void }) {
     if (!title.trim()) return setError('Type what to remind you about.');
     if (!time) return setError('Choose a time for the reminder.');
     const dueAt = reminderTime(date, time);
-    if (dueAt <= Date.now()) return setError('Choose a time in the future.');
+    if (dueAt <= nowMs()) return setError('Choose a time in the future.');
     setBusy(true);
     setError('');
     try {
@@ -209,7 +225,8 @@ function ReminderItem({
   const [snoozing, setSnoozing] = useState(false);
   const paused = r.status === 'paused';
   const finished = r.status === 'done';
-  const late = !paused && !finished && r.dueAt < Date.now();
+  const now = useClock();
+  const late = !paused && !finished && r.dueAt < now;
   return (
     <li className={'as-item reminder' + (paused || finished ? ' muted' : '')}>
       <span className="as-item-icon" aria-hidden="true">
@@ -278,7 +295,12 @@ function ReminderItem({
         <button type="button" className="wf-icon-btn as-tap" aria-label={'Edit ' + r.title} onClick={onEdit}>
           <Pencil size={16} />
         </button>
-        <ConfirmButton className="wf-icon-btn as-tap" ariaLabel={'Delete ' + r.title} question="Delete?" onConfirm={onDelete}>
+        <ConfirmButton
+          className="wf-icon-btn as-tap"
+          ariaLabel={'Delete ' + r.title}
+          question="Delete?"
+          onConfirm={onDelete}
+        >
           <Trash2 size={16} />
         </ConfirmButton>
       </div>
@@ -294,7 +316,9 @@ export function ReminderSection() {
   // Fired reminders advance on each tick.
   useTickChange(list.reload);
   const put = (r: Reminder) =>
-    list.set((items) => (items.some((x) => x.id === r.id) ? items.map((x) => (x.id === r.id ? r : x)) : [...items, r]));
+    list.set((items) =>
+      items.some((x) => x.id === r.id) ? items.map((x) => (x.id === r.id ? r : x)) : [...items, r],
+    );
   const failed = (e: unknown) => {
     if (isConflict(e)) {
       notify(CONFLICT);
@@ -305,7 +329,7 @@ export function ReminderSection() {
     const next = r.status === 'paused' ? 'active' : 'paused';
     // A reminder resumed after its time has passed moves to the next time that clock time comes round.
     let dueAt = r.dueAt;
-    if (next === 'active' && dueAt <= Date.now()) dueAt = reminderTime('', istParts(dueAt).time);
+    if (next === 'active' && dueAt <= nowMs()) dueAt = reminderTime('', istParts(dueAt).time);
     try {
       const saved = await assistant('reminder.update', {
         id: r.id,
@@ -313,7 +337,9 @@ export function ReminderSection() {
         reminder: { title: r.title, dueAt, repeat: r.repeat, status: next },
       });
       put(saved);
-      setStatus(next === 'paused' ? `Paused: ${r.title}` : `Resumed: ${r.title}, next ${formatWhen(saved.dueAt)}`);
+      setStatus(
+        next === 'paused' ? `Paused: ${r.title}` : `Resumed: ${r.title}, next ${formatWhen(saved.dueAt)}`,
+      );
     } catch (e) {
       failed(e);
     }
@@ -339,7 +365,14 @@ export function ReminderSection() {
 
   if (list.phase === 'loading') return <Loading>Loading your reminders</Loading>;
   if (list.phase === 'error' || !list.data)
-    return <LoadError title="Your reminders could not be loaded" message={list.error} status={list.status} onRetry={list.retry} />;
+    return (
+      <LoadError
+        title="Your reminders could not be loaded"
+        message={list.error}
+        status={list.status}
+        onRetry={list.retry}
+      />
+    );
   const live = list.data.filter((r) => r.status !== 'done').sort((a, b) => a.dueAt - b.dueAt);
   const finished = list.data.filter((r) => r.status === 'done').sort((a, b) => b.updatedAt - a.updatedAt);
   const item = (r: Reminder) => (

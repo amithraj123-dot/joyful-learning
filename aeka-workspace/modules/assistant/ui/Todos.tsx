@@ -21,7 +21,9 @@ import {
   isConflict,
   isDateOnly,
   istParts,
+  nowMs,
   todayIst,
+  useClock,
   useLoad,
   type MandateTarget,
   type Member,
@@ -134,7 +136,15 @@ function TodoEditor({
   );
 }
 
-function MoveToMandate({ todo, onClose, onMoved }: { todo: Todo; onClose: () => void; onMoved: (t: Todo) => void }) {
+function MoveToMandate({
+  todo,
+  onClose,
+  onMoved,
+}: {
+  todo: Todo;
+  onClose: () => void;
+  onMoved: (t: Todo) => void;
+}) {
   const { me, notify } = useAssistant();
   const data = useLoad(async () => {
     const [targets, members] = await Promise.all([
@@ -167,7 +177,12 @@ function MoveToMandate({ todo, onClose, onMoved }: { todo: Todo; onClose: () => 
     setBusy(true);
     setError('');
     try {
-      const r = await assistant('todo.toTask', { id: todo.id, matterId, assignee: assignee || null, dueDate: dueDate || null });
+      const r = await assistant('todo.toTask', {
+        id: todo.id,
+        matterId,
+        assignee: assignee || null,
+        dueDate: dueDate || null,
+      });
       onMoved(r.todo);
       notify('Task created on the mandate. The to-do is marked done.');
       onClose();
@@ -187,7 +202,12 @@ function MoveToMandate({ todo, onClose, onMoved }: { todo: Todo; onClose: () => 
           <button type="button" className="button ghost" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" form={id} className="button primary" disabled={busy || data.phase !== 'ready'}>
+          <button
+            type="submit"
+            form={id}
+            className="button primary"
+            disabled={busy || data.phase !== 'ready'}
+          >
             {busy ? 'Creating task' : 'Create task'}
           </button>
         </div>
@@ -263,7 +283,8 @@ function TodoItem({
 }) {
   const id = useId();
   const done = todo.status === 'done';
-  const overdue = !done && todo.dueAt != null && todo.dueAt < Date.now();
+  const now = useClock();
+  const overdue = !done && todo.dueAt != null && todo.dueAt < now;
   return (
     <li className={'as-item' + (done ? ' done' : '') + (todo.priority === 'high' && !done ? ' high' : '')}>
       <input
@@ -299,7 +320,12 @@ function TodoItem({
       <div className="as-item-actions">
         {!done && (
           <>
-            <button type="button" className="wf-icon-btn as-tap" aria-label={'Edit ' + todo.title} onClick={onEdit}>
+            <button
+              type="button"
+              className="wf-icon-btn as-tap"
+              aria-label={'Edit ' + todo.title}
+              onClick={onEdit}
+            >
               <Pencil size={16} />
             </button>
             <button
@@ -341,7 +367,12 @@ function AddTodo({ onAdded }: { onAdded: (t: Todo) => void }) {
     setError('');
     try {
       const t = await assistant('todo.create', {
-        todo: { title: title.trim(), details: '', priority: high ? 'high' : 'normal', dueAt: dueFrom(date, time) },
+        todo: {
+          title: title.trim(),
+          details: '',
+          priority: high ? 'high' : 'normal',
+          dueAt: dueFrom(date, time),
+        },
       });
       onAdded(t);
       setTitle('');
@@ -398,14 +429,17 @@ export function TodoSection() {
   const [moving, setMoving] = useState<Todo | null>(null);
   const [status, setStatus] = useState('');
 
-  const put = (t: Todo) => todos.set((list) => (list.some((x) => x.id === t.id) ? list.map((x) => (x.id === t.id ? t : x)) : [t, ...list]));
+  const put = (t: Todo) =>
+    todos.set((list) =>
+      list.some((x) => x.id === t.id) ? list.map((x) => (x.id === t.id ? t : x)) : [t, ...list],
+    );
   const conflict = () => {
     notify(CONFLICT);
     void todos.reload();
   };
   // Completing is shown at once and undone if the server refuses.
   const setDone = async (t: Todo, next: Todo['status']) => {
-    put({ ...t, status: next, doneAt: next === 'done' ? Date.now() : null });
+    put({ ...t, status: next, doneAt: next === 'done' ? nowMs() : null });
     try {
       const saved = await assistant('todo.update', {
         id: t.id,
@@ -432,7 +466,14 @@ export function TodoSection() {
 
   if (todos.phase === 'loading') return <Loading>Loading your to-dos</Loading>;
   if (todos.phase === 'error' || !todos.data)
-    return <LoadError title="Your to-dos could not be loaded" message={todos.error} status={todos.status} onRetry={todos.retry} />;
+    return (
+      <LoadError
+        title="Your to-dos could not be loaded"
+        message={todos.error}
+        status={todos.status}
+        onRetry={todos.retry}
+      />
+    );
   const open = todos.data.filter((t) => t.status === 'open').sort(byOrder);
   const done = todos.data
     .filter((t) => t.status === 'done')
@@ -477,12 +518,7 @@ export function TodoSection() {
         </details>
       )}
       {editing && (
-        <TodoEditor
-          todo={editing}
-          onClose={() => setEditing(null)}
-          onSaved={put}
-          onConflict={conflict}
-        />
+        <TodoEditor todo={editing} onClose={() => setEditing(null)} onSaved={put} onConflict={conflict} />
       )}
       {moving && <MoveToMandate todo={moving} onClose={() => setMoving(null)} onMoved={put} />}
     </div>

@@ -207,7 +207,13 @@ export interface Verdict {
 
 // Writes a verdict only while the item is still pending, so a finished item is never overwritten by
 // an overlapping run. Returns whether it was written.
-export async function saveVerdict(db: D1Database, member: string, messageId: string, v: Verdict, now: number) {
+export async function saveVerdict(
+  db: D1Database,
+  member: string,
+  messageId: string,
+  v: Verdict,
+  now: number,
+) {
   const r = await db
     .prepare(
       `UPDATE mail_triage SET status = ?, source = ?, tier = ?, category = ?, handling = ?, why = ?, deadline = ?,
@@ -328,8 +334,7 @@ const ITEM_SELECT = `SELECT m.*, ${TRIAGE_COLS.map((c) => `t.${c} AS t_${c}`).jo
   ${REPLIED} AS replied, ${THREAD} AS thread_count
   FROM mail_messages m LEFT JOIN mail_triage t ON t.message_id = m.id AND t.member = m.member`;
 
-const importanceOf = (s: string): MailItem['importance'] =>
-  s === 'low' || s === 'high' ? s : 'normal';
+const importanceOf = (s: string): MailItem['importance'] => (s === 'low' || s === 'high' ? s : 'normal');
 
 function toItem(r: ItemRow, draft: DraftSummary | null): MailItem {
   const t = r.t_status
@@ -366,7 +371,13 @@ async function latestDrafts(db: D1Database, member: string, ids: string[]) {
          ORDER BY created_at DESC, rowid DESC`,
       )
       .bind(member, ...chunk)
-      .all<{ id: string; message_id: string; status: Draft['status']; placeholders: number; updated_at: number }>();
+      .all<{
+        id: string;
+        message_id: string;
+        status: Draft['status'];
+        placeholders: number;
+        updated_at: number;
+      }>();
     for (const d of r.results)
       if (!out.has(d.message_id))
         out.set(d.message_id, {
@@ -405,7 +416,10 @@ export async function listItems(
     const p = likeWord(w);
     params.push(p, p, p, p);
   }
-  if (o.before) (where.push('m.received_at < ?'), params.push(o.before));
+  if (o.before) {
+    where.push('m.received_at < ?');
+    params.push(o.before);
+  }
   const order = o.urgentFirst ? 'coalesce(t.tier, 3) ASC, m.received_at DESC' : 'm.received_at DESC';
   const r = await db
     .prepare(`${ITEM_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${order}, m.id LIMIT ?`)

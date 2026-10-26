@@ -32,7 +32,10 @@ export function NotificationsPage() {
     setBusy(true);
     try {
       await core('notifications.read', { ids: 'all' });
-      list.set((d) => ({ unread: 0, items: d.items.map((n) => (n.readAt ? n : { ...n, readAt: Date.now() })) }));
+      list.set((d) => ({
+        unread: 0,
+        items: d.items.map((n) => (n.readAt ? n : { ...n, readAt: Date.now() })),
+      }));
       notify('All notifications marked read');
     } catch (e) {
       notify(errorMessage(e));

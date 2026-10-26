@@ -51,7 +51,8 @@ function parseSettings(text: unknown): StoredSettings {
   const a: Partial<AlertSettings> = v.alerts ?? {};
   return {
     briefEnabled: typeof v.briefEnabled === 'boolean' ? v.briefEnabled : DEFAULT_SETTINGS.briefEnabled,
-    briefTime: typeof v.briefTime === 'string' && HHMM.test(v.briefTime) ? v.briefTime : DEFAULT_SETTINGS.briefTime,
+    briefTime:
+      typeof v.briefTime === 'string' && HHMM.test(v.briefTime) ? v.briefTime : DEFAULT_SETTINGS.briefTime,
     alerts: {
       reminders: typeof a.reminders === 'boolean' ? a.reminders : true,
       brief: typeof a.brief === 'boolean' ? a.brief : true,
@@ -89,7 +90,12 @@ const publicSettings = (row: SettingsRow): AssistantSettings => ({
   whatsapp: { phone: row.phone, alerts: row.settings.alerts },
 });
 
-export function whatsappStatus(env: ServerEnv, row: SettingsRow, now: number, businessNumber = ''): WhatsAppStatus {
+export function whatsappStatus(
+  env: ServerEnv,
+  row: SettingsRow,
+  now: number,
+  businessNumber = '',
+): WhatsAppStatus {
   return {
     available: whatsappReady(env),
     businessNumber,
@@ -101,7 +107,15 @@ export function whatsappStatus(env: ServerEnv, row: SettingsRow, now: number, bu
 
 export async function getSettings(ctx: ModuleContext) {
   const row = await readSettings(ctx.db, owner(ctx));
-  return { settings: publicSettings(row), whatsapp: whatsappStatus(ctx.env, row, ctx.now) };
+  return {
+    settings: publicSettings(row),
+    whatsapp: whatsappStatus(
+      ctx.env,
+      row,
+      ctx.now,
+      (ctx.env.WHATSAPP_DISPLAY_NUMBER || '').trim().slice(0, 40),
+    ),
+  };
 }
 
 export async function saveSettings(ctx: ModuleContext, value: unknown) {
@@ -139,9 +153,10 @@ export async function sha256(text: string) {
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const normaliseCode = (code: string) => code.toUpperCase().replace(/[\s-]/g, '');
 
-// The firm's WhatsApp display number, read from the Cloud API when a member links (best effort).
+// The firm's WhatsApp display number: WHATSAPP_DISPLAY_NUMBER, else read from the Cloud API (best effort).
 async function businessNumber(ctx: ModuleContext) {
   const e = ctx.env;
+  if (e.WHATSAPP_DISPLAY_NUMBER?.trim()) return e.WHATSAPP_DISPLAY_NUMBER.trim().slice(0, 40);
   try {
     const res = await ctx.fetch(
       `https://graph.facebook.com/${encodeURIComponent(e.WHATSAPP_GRAPH_VERSION || 'v23.0')}/${encodeURIComponent(

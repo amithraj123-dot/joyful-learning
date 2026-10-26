@@ -87,13 +87,9 @@ export const formatDay = (date: string) =>
     timeZone: 'UTC',
   });
 export const formatLongDay = (date: string) =>
-  new Date(date + 'T00:00:00Z').toLocaleDateString('en-IN', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  new Date(date + 'T00:00:00Z').toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'UTC' }) +
+  ', ' +
+  formatDay(date);
 
 function dayWord(date: string, now: number) {
   const today = todayIst(now);
@@ -170,7 +166,12 @@ export function useLoad<T>(fetcher: () => Promise<T>) {
       },
       (e: unknown) => {
         if (n === seq.current)
-          setState((s) => ({ ...s, phase: s.data ? 'ready' : 'error', error: errorMessage(e), status: errorStatus(e) }));
+          setState((s) => ({
+            ...s,
+            phase: s.data ? 'ready' : 'error',
+            error: errorMessage(e),
+            status: errorStatus(e),
+          }));
         return null;
       },
     );
@@ -209,4 +210,16 @@ export function firstName(name: string | undefined | null) {
 export function greeting(now = Date.now()) {
   const h = Number(istParts(now).time.slice(0, 2));
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+}
+
+// The current time, for event handlers.
+export const nowMs = () => Date.now();
+// The current time for rendering, refreshed every minute.
+export function useClock(ms = 60_000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+  return now;
 }
