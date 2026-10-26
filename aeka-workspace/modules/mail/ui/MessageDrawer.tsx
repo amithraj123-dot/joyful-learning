@@ -162,27 +162,31 @@ export function MessageDrawer({
           </p>
         )}
 
-        <TriageSummary item={current} onTriage={setTriage} onConflict={onConflict} />
+        {(message || current.triage) && (
+          <TriageSummary item={current} onTriage={setTriage} onConflict={onConflict} />
+        )}
 
         <section aria-labelledby="mail-body-h" className="mail-detail-section">
           <h3 id="mail-body-h" className="wf-h3">
             Email
           </h3>
-          <dl className="mail-meta">
-            <dt>To</dt>
-            <dd>{addressLine(current.to) || 'Not shown'}</dd>
-            {current.cc.length > 0 && (
-              <>
-                <dt>Cc</dt>
-                <dd>{addressLine(current.cc)}</dd>
-              </>
-            )}
-            <dt>Thread</dt>
-            <dd>
-              {plural(current.threadCount || 1, 'message')}
-              {current.repliedByMe ? ', you have replied in this thread' : ''}
-            </dd>
-          </dl>
+          {(message || current.to.length > 0) && (
+            <dl className="mail-meta">
+              <dt>To</dt>
+              <dd>{addressLine(current.to) || 'Not shown'}</dd>
+              {current.cc.length > 0 && (
+                <>
+                  <dt>Cc</dt>
+                  <dd>{addressLine(current.cc)}</dd>
+                </>
+              )}
+              <dt>Thread</dt>
+              <dd>
+                {plural(current.threadCount || 1, 'message')}
+                {current.repliedByMe ? ', you have replied in this thread' : ''}
+              </dd>
+            </dl>
+          )}
           {current.hasAttachments && (
             <p className="wf-caption mail-attach">
               <Paperclip size={14} aria-hidden="true" /> Has attachments. Open in Outlook to see them.
