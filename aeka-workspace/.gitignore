@@ -66,3 +66,4 @@ next-env.d.ts
 # Copied from the pinned web PDF worker by build-shared.mjs
 /desktop/assets/pdf.worker.min.mjs
 /desktop/assets/pdfjs-LICENSE.txt
+.dev.vars*

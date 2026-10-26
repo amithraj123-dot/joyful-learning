@@ -5,6 +5,7 @@ const pending = new Map<string, unknown>();
 export interface Handovers {
   'workflow.matter': { matterId: string; tab?: string };
   'scribe.note': { noteId: string };
+  'mail.item': { itemId: string };
 }
 
 export function handOver<K extends keyof Handovers>(key: K, value: Handovers[K]) {

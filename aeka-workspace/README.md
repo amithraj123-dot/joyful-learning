@@ -1,15 +1,17 @@
 # Aeka Workspace
 
-The workspace of Aeka Advisors India LLP. Version 0.7.0.
+The workspace of Aeka Advisors India LLP. Version 0.8.0.
 
 Aeka Workspace is a modular application: a core (sign-in, firm members and roles, permissions, one
 API entry point and a firm activity trail) with independent modules on top. The architecture and the
 steps for adding a module are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-| Module       | Where           | What it does                                                                                                                                                                                                                                |
-| ------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Workflow** | Web             | Clients and mandates, tasks with maker-checker sign-off, deadlines, the deal tracker, engagements and billing, timesheets with export, team access, meeting notes linked from Scribe, and import from the earlier Google Sheet workflow app |
-| **Scribe**   | Web and Windows | Dictation, meeting capture, notes, summaries, sharing and Ask your notes                                                                                                                                                                    |
+| Module        | Where              | What it does                                                                                                                                                                                                                                |
+| ------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Assistant** | Web (and WhatsApp) | A personal assistant: Ask Aeka chat that creates to-dos and reminders and prepares drafts, a morning brief, recurring reminders, notifications, memory, and an optional WhatsApp channel                                                    |
+| **Mail**      | Web                | Outlook inbox triage by priority and handling, "Draft a reply?" on request only, reviewed sending, rules learned from corrections, emails turned into Workflow tasks                                                                        |
+| **Workflow**  | Web                | Clients and mandates, tasks with maker-checker sign-off, deadlines, the deal tracker, engagements and billing, timesheets with export, team access, meeting notes linked from Scribe, and import from the earlier Google Sheet workflow app |
+| **Scribe**    | Web and Windows    | Dictation, meeting capture, notes, summaries, sharing and Ask your notes                                                                                                                                                                    |
 
 The Windows companion app (`desktop/`, Electron) is named **Aeka Scribe**: global dictation shortcuts
 with guarded insertion into the focused field, meeting capture (microphone and system audio), an
@@ -20,7 +22,8 @@ Vinext on Cloudflare Workers with a D1 database.
 The setup guide and feature status are in [`public/desktop-guide.html`](public/desktop-guide.html)
 (packaged with the Windows build as `START-HERE.html`). Administrator and publisher setup is in
 [`desktop/admin/ADMIN-SETUP.txt`](desktop/admin/ADMIN-SETUP.txt). Reviews: [`docs/REVIEW-0.6.md`](docs/REVIEW-0.6.md)
-(Scribe) and [`docs/REVIEW-0.7.md`](docs/REVIEW-0.7.md) (Workflow).
+(Scribe), [`docs/REVIEW-0.7.md`](docs/REVIEW-0.7.md) (Workflow) and [`docs/REVIEW-0.8.md`](docs/REVIEW-0.8.md)
+(Assistant and Mail). Setting up Mail and the Assistant: [`docs/SETUP-ASSISTANT-MAIL.md`](docs/SETUP-ASSISTANT-MAIL.md).
 
 ## Development
 

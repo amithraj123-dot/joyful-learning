@@ -82,6 +82,7 @@ export default function AssistantApp({ page, navigate, notify }: ModuleViewProps
     const ref = link.includes('#') ? link.slice(link.indexOf('#') + 1) : '';
     if (ref && target === 'workflow/matters') handOver('workflow.matter', { matterId: ref });
     if (ref && (target === 'notes' || target === 'meetings')) handOver('scribe.note', { noteId: ref });
+    if (ref && target.startsWith('mail/')) handOver('mail.item', { itemId: ref });
     shell.current.navigate(target);
   }, []);
 

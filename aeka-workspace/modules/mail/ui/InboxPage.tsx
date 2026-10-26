@@ -3,6 +3,7 @@
 // Syncs on open and every 3 minutes while the tab is visible.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Inbox, Plug, RefreshCw, Search, TriangleAlert } from 'lucide-react';
+import { clear, peek } from '../../../core/client/handover';
 import { Empty } from '../../workflow/ui/components/Bits';
 import { mail } from '../shared/client';
 import { VIEWS, VIEW_LABELS, type MailItem, type MailView, type QueueCounts } from '../shared/types';
@@ -66,6 +67,18 @@ export function InboxPage() {
   const [showLow, setShowLow] = useState(false);
   const [open, setOpen] = useState<{ item: MailItem; focus?: 'draft' } | null>(null);
   const seq = useRef(0);
+
+  // Another module (for example the assistant) asked for one email to be opened.
+  useEffect(() => {
+    const wanted = peek('mail.item');
+    if (!wanted) return;
+    clear('mail.item');
+    // No cleanup guard: the hand-over is taken once, so its result must be shown even if React
+    // re-runs this effect (development checks do).
+    void mail('message.get', { id: wanted.itemId })
+      .then((item) => setOpen({ item }))
+      .catch(() => setNotice('That email is no longer in your mailbox.'));
+  }, []);
 
   const acct = account.account;
   const connected = !!acct && acct.status !== 'disconnected';

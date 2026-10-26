@@ -13,11 +13,15 @@ aeka-workspace/
               api.ts (callModule)
     server/   module.ts (server contract), router.ts (POST /api/modules), registry.ts,
               members.ts (firm members and designations), activity.ts (firm activity trail),
-              core-module.ts (me, members, activity actions)
+              core-module.ts (me, members, activity, notifications, tick, integration status),
+              env.ts (server secrets), secrets.ts (sealed credentials), ai.ts (the firm AI service),
+              notifications.ts (member notifications, leases), tick.ts (background work)
   modules/
     scribe/   manifest.ts: dictation, meetings and personal notes (pages rendered by app/page.tsx);
               server/notes.ts: the read service other modules use for a user's own note
     workflow/ manifest.ts, shared/ (types and action contract), server/ (actions), ui/ (pages)
+    mail/     Outlook triage, drafts and sending (same layout; server/service.ts for other modules)
+    assistant/ chat with tools, to-dos, reminders, memory, brief, WhatsApp (same layout)
   app/        the shell (app/page.tsx), API routes, styles
   lib/        Scribe libraries (notes, transcription, AI) shared by web and desktop
   desktop/    Windows companion app (Aeka Scribe), which loads the same shell
@@ -52,7 +56,8 @@ aeka-workspace/
   than breaking the page. Slots today: `scribe.note` (under the title of an open note).
 - **Hand-over.** To open a record in another module, call `handOver(key, value)` from
   `core/client/handover.ts` and navigate; the receiving module reads it once. Keys today:
-  `workflow.matter` (a mandate and tab) and `scribe.note` (one of the user's notes).
+  `workflow.matter` (a mandate and tab), `scribe.note` (one of the user's notes) and `mail.item` (one
+  of the user's emails).
 - **Services.** Server code of one module may import another module's `server/` service, never its
   tables or its action handlers.
 
@@ -60,6 +65,25 @@ Example: Scribe meeting notes linked to Workflow mandates. Workflow fills the `s
 the mandate link panel; its `meetings.*` actions read the caller's own note through Scribe's service and
 keep a shared copy in `wf_meeting_links`; the mandate's Meetings tab hands over to `scribe.note` to
 reopen the note for its owner.
+
+## Shared services in the core
+
+- **Configuration.** Secrets come from the hosting platform as `ctx.env` (`core/server/env.ts`); they
+  are never stored in the database or sent to browsers. `integrations.status` tells administrators
+  what is configured, never the values.
+- **Sealed credentials.** `seal`/`unseal` (AES-GCM, key derived per purpose from
+  `AEKA_ENCRYPTION_KEY`, bound to the record) protect stored tokens such as Outlook sign-ins.
+- **AI.** `chat()` in `core/server/ai.ts` is the only way to call a model: the firm's LiteLLM proxy.
+  Every call, including failures, is recorded in `ai_usage`; a daily limit per member and a firm-wide
+  switch apply before anything is sent. Content from email, notes or memory is always sent as data,
+  and prompts tell the model never to follow instructions inside it.
+- **Notifications.** `notify()` writes a member's notice once per dedupe key; the Assistant delivers
+  chosen kinds to WhatsApp.
+- **Background work.** A module may export `tick(sys, { member })`. `POST /api/tick` (with
+  `AEKA_TICK_TOKEN`, called by an external scheduler) runs every module for every active member;
+  each member's own tick also runs, at most once a minute, while they use the workspace. Ticks are
+  idempotent and take leases so they never overlap.
+- **Outbound requests** go through `ctx.fetch`, so tests replace the network.
 
 ## Data rules
 
@@ -90,10 +114,14 @@ reopen the note for its owner.
 
 ## Current modules
 
-| Module   | Surfaces     | Purpose                                                                                                                                                               |
-| -------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Workflow | Web          | Clients, mandates, tasks with maker-checker sign-off, deadlines, deal tracker, engagements and billing, timesheets, team and import from the earlier Google Sheet app |
-| Scribe   | Web, Windows | Dictation, meeting capture, personal notes, sharing, Ask your notes                                                                                                   |
+| Module    | Surfaces      | Purpose                                                                                                                                                               |
+| --------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workflow  | Web           | Clients, mandates, tasks with maker-checker sign-off, deadlines, deal tracker, engagements and billing, timesheets, team and import from the earlier Google Sheet app |
+| Scribe    | Web, Windows  | Dictation, meeting capture, personal notes, sharing, Ask your notes                                                                                                   |
+| Mail      | Web           | Outlook triage of the member's own mailbox, drafts on request, reviewed sending, rules from corrections, tasks from email                                             |
+| Assistant | Web, WhatsApp | Chat with tools, to-dos, reminders, memory, morning brief, notifications, WhatsApp                                                                                    |
 
-Scribe meeting notes link to Workflow mandates (see Extension points). Natural next layers: a recurring
-statutory compliance calendar with reminders; firm dashboards (pipeline, workload, realisation).
+Scribe meeting notes link to Workflow mandates (see Extension points). Mail and the Assistant use the
+Workflow and Scribe services (mandates, tasks, deadlines, note search) and each other's (mail queue
+and drafting; style notes). Natural next layers: a recurring statutory compliance calendar feeding
+reminders; calendar awareness in the brief; firm dashboards (pipeline, workload, realisation).
