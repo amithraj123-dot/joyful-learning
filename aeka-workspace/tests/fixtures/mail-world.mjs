@@ -233,7 +233,10 @@ export const graphMessage = (e, folder = 'inbox', withHeaders = true) => ({
 });
 
 const json = (value, status = 200, headers = {}) =>
-  new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json', ...headers } });
+  new Response(JSON.stringify(value), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...headers },
+  });
 
 // The fake services. Each mailbox has inbox and sent lists; `changes` are returned by the next delta.
 export function world() {
@@ -242,7 +245,8 @@ export function world() {
     calls: [], // every outbound call: { method, url, body }
     ai: [], // parsed AI request bodies
     aiReply: null, // (body) => Response or content string; default answers from email.ai
-    draftBody: 'Dear Ananya,\n\nThank you. The cap in clause 9 [INPUT REQUIRED: confirm the cap amount].\n\nAmith',
+    draftBody:
+      'Dear Ananya,\n\nThank you. The cap in clause 9 [INPUT REQUIRED: confirm the cap amount].\n\nAmith',
     sendMode: 202, // 202, 'network' or an HTTP status
     deltaStatus: 200, // e.g. 429
     refuseHeaders: false,
@@ -252,7 +256,14 @@ export function world() {
     drafts: new Map(), // graph draft id -> { from: message id, patch }
   };
   w.box = (address) =>
-    (w.boxes[address] ??= { inbox: [], sent: [], changes: [], sentChanges: [], replay: false, deltaRound: 0 });
+    (w.boxes[address] ??= {
+      inbox: [],
+      sent: [],
+      changes: [],
+      sentChanges: [],
+      replay: false,
+      deltaRound: 0,
+    });
 
   const graph = async (method, url, body, auth) => {
     const address = auth.replace(/^Bearer at-/, '').replace(/-\d+$/, '');
@@ -261,7 +272,8 @@ export function world() {
     if (path === '/me') return json({ mail: address, displayName: 'Amith Rao', userPrincipalName: address });
     const delta = path.match(/^\/me\/mailFolders\('(inbox|sentitems)'\)\/messages\/delta$/);
     if (delta && method === 'GET') {
-      if (w.deltaStatus !== 200) return json({ error: { code: 'TooManyRequests' } }, w.deltaStatus, { 'Retry-After': '120' });
+      if (w.deltaStatus !== 200)
+        return json({ error: { code: 'TooManyRequests' } }, w.deltaStatus, { 'Retry-After': '120' });
       const inbox = delta[1] === 'inbox';
       const select = url.searchParams.get('$select') || '';
       if (inbox && w.refuseHeaders && select.includes('internetMessageHeaders'))
@@ -288,7 +300,9 @@ export function world() {
         value: page,
         ...(more
           ? { '@odata.nextLink': `${base}?$skiptoken=${start + 4}&$select=${encodeURIComponent(select)}` }
-          : { '@odata.deltaLink': `${base}?$deltatoken=d${++box.deltaRound}&$select=${encodeURIComponent(select)}` }),
+          : {
+              '@odata.deltaLink': `${base}?$deltatoken=d${++box.deltaRound}&$select=${encodeURIComponent(select)}`,
+            }),
       });
     }
     const one = path.match(/^\/me\/messages\/([^/]+)$/);
@@ -328,7 +342,10 @@ export function world() {
     if (w.aiReply) {
       const r = await w.aiReply(body);
       if (r instanceof Response) return r;
-      return json({ choices: [{ message: { role: 'assistant', content: r } }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
+      return json({
+        choices: [{ message: { role: 'assistant', content: r } }],
+        usage: { prompt_tokens: 10, completion_tokens: 5 },
+      });
     }
     const user = body.messages[1].content;
     let content;
@@ -343,13 +360,17 @@ export function world() {
         }),
       });
     }
-    return json({ choices: [{ message: { role: 'assistant', content } }], usage: { prompt_tokens: 100, completion_tokens: 50 } });
+    return json({
+      choices: [{ message: { role: 'assistant', content } }],
+      usage: { prompt_tokens: 100, completion_tokens: 50 },
+    });
   };
 
   w.fetcher = async (input, init = {}) => {
     const url = new URL(typeof input === 'string' ? input : input.url);
     const method = init.method || 'GET';
-    const body = typeof init.body === 'string' && init.body.startsWith('{') ? JSON.parse(init.body) : init.body;
+    const body =
+      typeof init.body === 'string' && init.body.startsWith('{') ? JSON.parse(init.body) : init.body;
     w.calls.push({ method, url: url.toString(), body });
     if (url.hostname === 'login.microsoftonline.com') {
       const form = new URLSearchParams(init.body);
@@ -369,7 +390,8 @@ export function world() {
         expires_in: w.expiresIn,
       });
     }
-    if (url.hostname === 'graph.microsoft.com') return graph(method, url, body, new Headers(init.headers).get('Authorization') || '');
+    if (url.hostname === 'graph.microsoft.com')
+      return graph(method, url, body, new Headers(init.headers).get('Authorization') || '');
     if (url.hostname === 'ai.aeka.example') return ai(body);
     throw new Error('Unexpected network call to ' + url.hostname);
   };
@@ -425,7 +447,11 @@ export async function mailFirm({ withMail = true } = {}) {
     );
   const rows = (sql, ...params) => f.db.sql.prepare(sql).all(...params);
   const item = async (graphId, key = 'admin') => {
-    const r = rows('SELECT id FROM mail_messages WHERE graph_id = ? AND member = ?', graphId, people[key].email)[0];
+    const r = rows(
+      'SELECT id FROM mail_messages WHERE graph_id = ? AND member = ?',
+      graphId,
+      people[key].email,
+    )[0];
     return r ? ok(key, 'message.get', { id: r.id }) : null;
   };
   return { ...f, w, deps, connect, mail, ok, tick, rows, item };

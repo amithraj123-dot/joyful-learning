@@ -18,12 +18,16 @@ export interface ReturnNotice {
 const ERROR_TEXT: Record<string, string> = {
   access_denied: 'Microsoft sign-in was cancelled, or the permissions were not granted.',
   consent_required: 'Your organisation must approve the permissions first. Ask an administrator.',
-  state: 'The sign-in link expired. Please connect again.',
+  state: 'The sign-in link was not valid or was already used. Please connect again.',
   expired: 'The sign-in link expired. Please connect again.',
-  mismatch: 'You signed in to Microsoft with a different account from your workspace email.',
-  account_mismatch: 'You signed in to Microsoft with a different account from your workspace email.',
+  mismatch: 'This sign-in was started from a different workspace account. Please connect again.',
+  account_mismatch: 'That Outlook mailbox is already connected by another member of the workspace.',
   not_configured: 'Outlook is not set up for the firm yet. Ask an administrator.',
   storage: 'Secure storage is not set up for the firm yet. Ask an administrator.',
+  signin: 'Sign in to the workspace first, then connect Outlook.',
+  not_member: 'Your account is not a member of the firm workspace. Ask an administrator to add you.',
+  token: 'Microsoft did not complete the sign-in. Please try again.',
+  profile: 'Your Outlook profile could not be read. Please try again.',
 };
 
 // Reads ?mail=connected or ?mail_error=<code> once, then removes them from the address bar. The result

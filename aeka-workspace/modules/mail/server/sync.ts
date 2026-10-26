@@ -309,7 +309,9 @@ export async function readHeaders(s: GraphSession, rows: { id: string; graph_id:
         'GET',
         `/me/messages/${encodeURIComponent(r.graph_id)}?$select=internetMessageHeaders`,
       );
-      bulk = bulkFromHeaders((data.internetMessageHeaders as { name?: string; value?: string }[] | undefined) ?? []);
+      bulk = bulkFromHeaders(
+        (data.internetMessageHeaders as { name?: string; value?: string }[] | undefined) ?? [],
+      );
     } catch (e) {
       if (!(e instanceof GraphError) || e.busy || e.status === 0 || e.status === 401) break;
     }

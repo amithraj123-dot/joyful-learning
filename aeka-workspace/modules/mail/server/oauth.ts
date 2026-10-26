@@ -118,7 +118,10 @@ export async function finishConnect(request: Request, d: ConnectDeps): Promise<R
   if (row.created_at < now - STATE_LIFE_MS) return fail(origin, 'expired');
   const msError = url.searchParams.get('error');
   if (msError)
-    return fail(origin, /consent_required|interaction_required/.test(msError) ? 'consent_required' : 'access_denied');
+    return fail(
+      origin,
+      /consent_required|interaction_required/.test(msError) ? 'consent_required' : 'access_denied',
+    );
   if (!code || code.length > 4000) return fail(origin, 'state');
 
   const sys: Sys = { db, env: d.env, fetch: d.fetch, now };

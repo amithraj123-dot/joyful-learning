@@ -101,7 +101,7 @@ function ToolChips({ tools }: { tools: ToolNote[] }) {
 function Message({ m }: { m: ChatMessage }) {
   if (m.role === 'notice')
     return (
-      <li className="as-msg notice">
+      <li className="as-msg as-msg-notice">
         <p>{m.content}</p>
       </li>
     );

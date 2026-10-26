@@ -507,10 +507,10 @@
   font-size: 11px;
   color: var(--caption);
 }
-.as-msg.notice {
+.as-msg.as-msg-notice {
   justify-content: center;
 }
-.as-msg.notice p {
+.as-msg.as-msg-notice p {
   font-size: 12px;
   color: var(--caption);
   background: var(--wf-grey-bg);

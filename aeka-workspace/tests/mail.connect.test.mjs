@@ -32,7 +32,10 @@ test('connect refuses without sign-in, membership, Outlook settings or the encry
 
   const r = await startConnect(new Request(origin + '/api/mail/connect'), f.deps(people.admin));
   const to = new URL(r.headers.get('Location'));
-  assert.equal(to.origin + to.pathname, 'https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize');
+  assert.equal(
+    to.origin + to.pathname,
+    'https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize',
+  );
   assert.equal(to.searchParams.get('code_challenge_method'), 'S256');
   assert.equal(to.searchParams.get('response_mode'), 'query');
   assert.equal(to.searchParams.get('prompt'), 'select_account');
@@ -109,10 +112,12 @@ test('sync is idempotent, keeps the checkpoint, and records deletions without fa
 
   // A deletion entry marks the message removed and never creates a failure.
   f.w.box(people.admin.email).replay = false;
-  f.w.box(people.admin.email).changes.push(
-    { id: 'g-kestrel', '@removed': { reason: 'deleted' } },
-    { id: 'g-unknown', '@removed': { reason: 'deleted' } },
-  );
+  f.w
+    .box(people.admin.email)
+    .changes.push(
+      { id: 'g-kestrel', '@removed': { reason: 'deleted' } },
+      { id: 'g-unknown', '@removed': { reason: 'deleted' } },
+    );
   const third = await f.ok('admin', 'sync');
   assert.equal(third.failed, 0);
   assert.equal(count(), 11);
@@ -127,7 +132,9 @@ test('headers refused by delta are read per message before triage', async () => 
   f.w.refuseHeaders = true;
   await f.connect();
   await f.ok('admin', 'sync');
-  const reads = f.w.graphCalls().filter((c) => c.url.includes('internetMessageHeaders') && !c.url.includes('/delta'));
+  const reads = f.w
+    .graphCalls()
+    .filter((c) => c.url.includes('internetMessageHeaders') && !c.url.includes('/delta'));
   assert.ok(reads.length >= 1 && reads.length <= 10);
   const digest = await f.item('g-digest');
   assert.equal(digest.triage.source, 'rules');
@@ -136,7 +143,10 @@ test('headers refused by delta are read per message before triage', async () => 
 });
 
 test('quoted history and signatures are trimmed; forwards keep their content', () => {
-  assert.equal(trimBody('Thanks, noted.\n\nOn Mon, 20 Oct 2026, A wrote:\n> old text', 'RE: x'), 'Thanks, noted.');
+  assert.equal(
+    trimBody('Thanks, noted.\n\nOn Mon, 20 Oct 2026, A wrote:\n> old text', 'RE: x'),
+    'Thanks, noted.',
+  );
   assert.equal(
     trimBody('Please see below.\n\nFrom: A\nSent: Monday\nTo: B\nSubject: x\n\nOld', 'RE: x'),
     'Please see below.',

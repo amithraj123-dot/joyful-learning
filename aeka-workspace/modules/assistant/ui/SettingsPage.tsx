@@ -365,7 +365,7 @@ function Integrations() {
             <span>Tokens</span>
           </li>
           {usage.map((u) => {
-            const near = u.calls >= s.aiDailyLimit * 0.8;
+            const near = u.actor !== 'system' && u.calls >= s.aiDailyLimit * 0.8;
             return (
               <li key={u.actor}>
                 <span className="as-usage-who">
@@ -374,7 +374,7 @@ function Integrations() {
                 <span>
                   <span className="as-usage-label">Calls </span>
                   <span className={near ? 'wf-overdue' : ''}>
-                    {u.calls} of {s.aiDailyLimit}
+                    {u.actor === 'system' ? u.calls : `${u.calls} of ${s.aiDailyLimit}`}
                   </span>
                 </span>
                 <span>

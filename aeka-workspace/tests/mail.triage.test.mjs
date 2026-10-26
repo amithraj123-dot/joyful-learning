@@ -18,7 +18,9 @@ const extra = (id, subject, from, hoursAgo = 1, body = 'Please see the note belo
 const subjectsSentToAi = (f) =>
   f.w.ai.flatMap((b) => {
     const user = b.messages[1].content;
-    return user.startsWith('Triage') ? JSON.parse(user.slice(user.indexOf('\n') + 1)).emails.map((e) => e.subject) : [];
+    return user.startsWith('Triage')
+      ? JSON.parse(user.slice(user.indexOf('\n') + 1)).emails.map((e) => e.subject)
+      : [];
   });
 
 test('built-in rules keep bulk, no-reply, calendar and receipt mail away from the AI', async () => {
@@ -46,7 +48,13 @@ test('built-in rules keep bulk, no-reply, calendar and receipt mail away from th
   assert.equal(f.w.ai.length, 1);
   assert.equal(f.w.ai[0].response_format.type, 'json_object');
   const system = f.w.ai[0].messages[0].content;
-  for (const phrase of ['Sender seniority alone never makes an email urgent', 'prompt_injection', 'FEMA', 'client_matter', 'delegate'])
+  for (const phrase of [
+    'Sender seniority alone never makes an email urgent',
+    'prompt_injection',
+    'FEMA',
+    'client_matter',
+    'delegate',
+  ])
     assert.ok(system.includes(phrase), phrase);
   // The injection attempt is flagged and handled on its real content.
   const inject = await f.item('g-inject');
@@ -80,7 +88,10 @@ test('an invalid AI item is retried alone with backoff, then fails after 3 attem
     });
   };
   await f.ok('admin', 'sync');
-  const state = () => f.rows("SELECT t.* FROM mail_triage t JOIN mail_messages m ON m.id = t.message_id WHERE m.graph_id = 'g-kestrel'")[0];
+  const state = () =>
+    f.rows(
+      "SELECT t.* FROM mail_triage t JOIN mail_messages m ON m.id = t.message_id WHERE m.graph_id = 'g-kestrel'",
+    )[0];
   assert.equal(state().status, 'pending');
   assert.equal(state().attempts, 1);
   assert.equal(f.w.ai.length, 1);
@@ -143,13 +154,24 @@ test('at most 25 emails go to the AI per sync, in batches of up to 8', async () 
   const f = await mailFirm({ withMail: false });
   const box = f.w.box(people.admin.email);
   for (let i = 0; i < 30; i++)
-    box.inbox.push(extra(`g-x${i}`, `Query ${i} on the share swap`, person(`Client ${i}`, `c${i}@client${i}.example`), 1 + i / 10));
+    box.inbox.push(
+      extra(
+        `g-x${i}`,
+        `Query ${i} on the share swap`,
+        person(`Client ${i}`, `c${i}@client${i}.example`),
+        1 + i / 10,
+      ),
+    );
   await f.connect();
   const r = await f.ok('admin', 'sync');
-  const sizes = f.w.ai.map((b) => JSON.parse(b.messages[1].content.split('\n').slice(1).join('\n')).emails.length);
+  const sizes = f.w.ai.map(
+    (b) => JSON.parse(b.messages[1].content.split('\n').slice(1).join('\n')).emails.length,
+  );
   assert.deepEqual(sizes, [8, 8, 8, 1]);
   assert.equal(r.pending, 5);
-  for (const b of f.w.ai) for (const e of JSON.parse(b.messages[1].content.split('\n').slice(1).join('\n')).emails) assert.ok(e.body.length <= 2500);
+  for (const b of f.w.ai)
+    for (const e of JSON.parse(b.messages[1].content.split('\n').slice(1).join('\n')).emails)
+      assert.ok(e.body.length <= 2500);
 });
 
 test('corrections teach: examples in later prompts, a proposed rule after 3, applied without AI once accepted', async () => {
@@ -167,7 +189,11 @@ test('corrections teach: examples in later prompts, a proposed rule after 3, app
   for (const [i, id] of ['g-c1', 'g-c2', 'g-c3'].entries()) {
     const item = await f.item(id);
     assert.equal(item.triage.tier, 3);
-    const t = await f.ok('admin', 'triage.correct', { id: item.id, changes: { tier: 4, handling: 'none' }, baseRevision: item.triage.revision });
+    const t = await f.ok('admin', 'triage.correct', {
+      id: item.id,
+      changes: { tier: 4, handling: 'none' },
+      baseRevision: item.triage.revision,
+    });
     assert.equal(t.tier, 4);
     assert.equal(t.source, 'manual');
     assert.equal(t.corrected, true);
@@ -176,7 +202,10 @@ test('corrections teach: examples in later prompts, a proposed rule after 3, app
   }
   // A stale revision is refused.
   const c1 = await f.item('g-c1');
-  assert.equal((await f.mail('admin', 'triage.correct', { id: c1.id, changes: { tier: 2 }, baseRevision: 0 })).status, 409);
+  assert.equal(
+    (await f.mail('admin', 'triage.correct', { id: c1.id, changes: { tier: 2 }, baseRevision: 0 })).status,
+    409,
+  );
   const [rule] = await f.ok('admin', 'rules.list');
   assert.equal(rule.status, 'proposed');
   assert.equal(rule.kind, 'sender');
@@ -211,9 +240,17 @@ test('a neverAi rule keeps a sender out of every AI request, including drafting'
   await f.ok('admin', 'rules.save', {
     rule: { kind: 'domain', pattern: '@Secret-Client.example', effect: { neverAi: true }, status: 'active' },
   });
-  f.w.box(people.admin.email).inbox.push(
-    extra('g-secret', 'Board note on the confidential merger', person('Neha', 'neha@secret-client.example'), 1, 'Merger ratio 3:2, please advise urgently.'),
-  );
+  f.w
+    .box(people.admin.email)
+    .inbox.push(
+      extra(
+        'g-secret',
+        'Board note on the confidential merger',
+        person('Neha', 'neha@secret-client.example'),
+        1,
+        'Merger ratio 3:2, please advise urgently.',
+      ),
+    );
   await f.ok('admin', 'sync');
   assert.ok(f.w.ai.length >= 1);
   assert.ok(!f.w.aiText().includes('secret-client'));
@@ -274,7 +311,9 @@ test('a revoked sign-in pauses syncing and notifies once; throttling waits for R
   await f.connect();
   const first = await f.ok('admin', 'sync');
   assert.equal(first.fetched, 11);
-  const refreshes = f.w.calls.filter((c) => c.url.includes('/token') && String(c.body).includes('refresh_token'));
+  const refreshes = f.w.calls.filter(
+    (c) => c.url.includes('/token') && String(c.body).includes('refresh_token'),
+  );
   assert.ok(refreshes.length >= 1);
   // The rotated refresh token was stored (the newest one is used next).
   const usedLast = new URLSearchParams(refreshes.at(-1).body).get('refresh_token');

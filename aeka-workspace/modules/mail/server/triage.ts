@@ -11,7 +11,7 @@ import { notify } from '../../../core/server/notifications.ts';
 import { matterTargets } from '../../workflow/server/services.ts';
 import type { MeetingTarget } from '../../workflow/shared/types.ts';
 import type { MailRule, RuleEffect, Tier } from '../shared/types.ts';
-import { GraphError, type GraphSession } from './graph.ts';
+import type { GraphSession } from './graph.ts';
 import { indiaDate, indiaTime, triageSystemPrompt } from './prompts.ts';
 import { confirmedLink, matchRules } from './rules.ts';
 import {

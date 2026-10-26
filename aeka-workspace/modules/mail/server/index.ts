@@ -376,7 +376,12 @@ const triageActions: Record<string, ModuleAction> = {
   },
 };
 
-type DraftListRow = DraftRow & { subject: string; from_name: string; from_address: string; received_at: number };
+type DraftListRow = DraftRow & {
+  subject: string;
+  from_name: string;
+  from_address: string;
+  received_at: number;
+};
 
 const draftActions: Record<string, ModuleAction> = {
   'draft.create': { handler: (ctx, p) => createDraft(ctx, idOf(p.id), p.instructions, p.replyAll) },
