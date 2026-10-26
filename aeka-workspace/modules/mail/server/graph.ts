@@ -240,6 +240,22 @@ export class GraphSession {
   }
 }
 
+// The signed-in mailbox, read once while connecting (before an account row exists).
+export async function readMe(sys: Sys, accessToken: string) {
+  try {
+    const res = await sys.fetch(`${GRAPH}/me?$select=mail,userPrincipalName,displayName`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const me = (await res.json()) as { mail?: string; userPrincipalName?: string; displayName?: string };
+    const address = (me.mail || me.userPrincipalName || '').trim().toLowerCase();
+    return address ? { address, displayName: (me.displayName || '').trim().slice(0, 120) } : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function openSession(sys: Sys, member: string) {
   const account = await loadAccount(sys.db, member);
   if (!account) throw new CloudError('Connect Outlook first.', 409);
