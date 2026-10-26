@@ -384,7 +384,7 @@ export async function runTool(env: ToolEnv, name: string, rawArgs: string): Prom
     return { content, note: { name: label, ok: true, summary: outcome.summary, ...(outcome.ref ? { ref: outcome.ref } : {}) } };
   } catch (e) {
     const message =
-      e instanceof CloudError ? e.message : 'The action failed because of an internal error. Nothing was changed.';
+      e instanceof CloudError ? e.message : 'The action could not be completed because of an internal error.';
     if (!(e instanceof CloudError)) console.error('Assistant tool failed', label, e instanceof Error ? e.name : '');
     return {
       content: JSON.stringify({ ok: false, error: message }),

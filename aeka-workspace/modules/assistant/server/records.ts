@@ -25,7 +25,6 @@ import {
   optionalTime,
   owner,
   recordId,
-  revision,
   text,
   time,
 } from './validate.ts';
@@ -399,10 +398,10 @@ export async function listMemory(ctx: ModuleContext, limit = LIMITS.memories) {
   return r.results.map(memoryFrom);
 }
 
-async function getMemory(ctx: ModuleContext, id: string) {
+export async function getMemory(ctx: ModuleContext, id: unknown) {
   const r = await ctx.db
     .prepare('SELECT * FROM as_memory WHERE id = ? AND member = ?')
-    .bind(id, owner(ctx))
+    .bind(recordId(id, 'memory'), owner(ctx))
     .first<Row>();
   if (!r) throw notFound('memory');
   return memoryFrom(r);
@@ -410,7 +409,7 @@ async function getMemory(ctx: ModuleContext, id: string) {
 
 export async function saveMemory(ctx: ModuleContext, id: unknown, input: MemoryInput) {
   if (id != null) {
-    const current = await getMemory(ctx, recordId(id, 'memory'));
+    const current = await getMemory(ctx, id);
     await ctx.db
       .prepare(
         'UPDATE as_memory SET category = ?, title = ?, content = ?, updated_at = ? WHERE id = ? AND member = ?',
@@ -445,4 +444,3 @@ export async function deleteMemory(ctx: ModuleContext, id: unknown) {
   return true as const;
 }
 
-export { revision };

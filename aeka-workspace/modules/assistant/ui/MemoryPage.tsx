@@ -14,7 +14,7 @@ import { errorMessage, formatWhen, useLoad } from './lib';
 
 const HINTS: Record<MemoryCategory, string> = {
   preference: 'For example: I prefer calls before 11 am.',
-  style: 'For example: sign off as "Regards, Amith"; keep replies to clients short and formal.',
+  style: 'For example: sign off as "Warm regards"; keep replies to clients short and formal.',
   person: 'For example: Rahul Mehta is the CFO of Vista Earth.',
   client: 'For example: Vista Earth wants every advice note reviewed by a partner.',
   general: 'Anything else the assistant should keep in mind.',
@@ -160,7 +160,7 @@ export function MemoryPage() {
       <InlineError message={list.error} onRetry={list.retry} />
       {items.length === 0 ? (
         <Empty icon={Brain} title="Nothing remembered yet">
-          Add something here, or tell Aeka in chat, for example: remember that I sign emails as Amith.
+          Add something here, or tell Aeka in chat, for example: remember that I prefer short replies to clients.
         </Empty>
       ) : (
         groups.map((c) => (
