@@ -34,7 +34,8 @@ recorded with its token counts; Integrations shows today's use by member.
 What is sent to the AI: for triage, the sender, recipients, date, subject and up to 2,500 characters of
 the email body (quoted history removed), plus candidate mandate names; for a draft (only when a member
 asks), the email, up to four earlier messages of the thread, the mandate's client and title and the
-member's style notes; for chat, the conversation and the results of the tools it uses. Attachments are
+member's style notes; for chat, the conversation and the results of the tools it uses (which can include meeting titles,
+times and attendee names from the calendar). Attachments are
 never sent. A member can keep a sender's mail away from AI with a "Never send to AI" rule, or switch AI
 triage off for their mailbox.
 
@@ -45,7 +46,7 @@ triage off for their mailbox.
 2. Redirect URI (platform **Web**): `https://<workspace address>/api/mail/callback`.
 3. **Certificates and secrets > New client secret**; copy the value once.
 4. **API permissions > Microsoft Graph > Delegated**: `offline_access`, `openid`, `email`, `User.Read`,
-   `Mail.ReadWrite`, `Mail.Send`. Grant admin consent for the organisation.
+   `Mail.ReadWrite`, `Mail.Send`, `Calendars.Read`. Grant admin consent for the organisation.
 5. Set the secrets:
 
 | Secret               | Value                                                |
@@ -102,4 +103,4 @@ by sending the code shown there; STOP unlinks it. Only text messages are handled
 
 ## 6. Deploying
 
-Apply migrations `0006` and `0007` to the hosted database before deploying this version.
+Apply migrations `0006`, `0007` and `0008` to the hosted database before deploying this version.

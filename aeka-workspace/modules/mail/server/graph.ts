@@ -1,5 +1,5 @@
 // The only path to Microsoft Graph. Requests are checked against a short allow-list: read messages,
-// delta and conversation queries; create a reply draft; and patch, send or delete only drafts this
+// delta and conversation queries; read the calendar view; create a reply draft; and patch, send or delete only drafts this
 // module created (recorded in mail_drafts). Tokens are refreshed before expiry and the rotated refresh
 // token is always stored. 429 and 503 stop the batch; 401 refreshes once.
 import { CloudError } from '../../../lib/cloud-store.ts';
@@ -9,7 +9,9 @@ import type { ServerEnv } from '../../../core/server/env.ts';
 import { loadAccount, type AccountRow, type Sys } from './store.ts';
 
 export const GRAPH = 'https://graph.microsoft.com/v1.0';
-export const SCOPES = 'offline_access openid email User.Read Mail.ReadWrite Mail.Send';
+export const SCOPES = 'offline_access openid email User.Read Mail.ReadWrite Mail.Send Calendars.Read';
+// What sign-ins made before calendar access was added were granted; their refreshes keep to it.
+const EARLIER_SCOPES = 'offline_access openid email User.Read Mail.ReadWrite Mail.Send';
 export const TOKEN_PURPOSE = 'mail-token';
 const TIMEOUT_MS = 20000;
 const REFRESH_MARGIN_MS = 2 * 60000;
@@ -39,7 +41,21 @@ export interface TokenSet {
   access_token: string;
   refresh_token: string;
   expires_at: number;
+  scope?: string; // what Microsoft granted (absent for tokens stored before it was recorded)
 }
+
+// Whether the stored sign-in includes calendar access.
+export const calendarGranted = (t: Pick<TokenSet, 'scope'>) =>
+  /(^|\s|\/)Calendars\.Read(\s|$)/i.test(t.scope || '');
+// Refresh with what was granted, so an account connected earlier is not asked for new permissions.
+const refreshScope = (t: TokenSet) =>
+  t.scope
+    ? 'offline_access ' +
+      t.scope
+        .split(/\s+/)
+        .filter((x) => x && x !== 'offline_access')
+        .join(' ')
+    : EARLIER_SCOPES;
 
 export const tenantOf = (env: ServerEnv) => env.MS_TENANT_ID?.trim() || 'organizations';
 export const tokenUrl = (env: ServerEnv) =>
@@ -76,15 +92,18 @@ export function tokenSetFrom(
   data: Record<string, unknown>,
   now: number,
   previousRefresh = '',
+  previousScope = '',
 ): TokenSet | null {
   const access = typeof data.access_token === 'string' ? data.access_token : '';
   const refresh = typeof data.refresh_token === 'string' ? data.refresh_token : previousRefresh;
   const expiresIn = Number(data.expires_in);
   if (!access || !refresh) return null;
+  const scope = typeof data.scope === 'string' ? data.scope.slice(0, 1000) : previousScope;
   return {
     access_token: access,
     refresh_token: refresh,
     expires_at: now + (Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 3600) * 1000,
+    ...(scope ? { scope } : {}),
   };
 }
 
@@ -139,12 +158,14 @@ export class GraphSession {
     const { status, data } = await tokenRequest(this.sys, {
       grant_type: 'refresh_token',
       refresh_token: current.refresh_token,
+      scope: refreshScope(current),
     });
     if (status === 400 && (data.error === 'invalid_grant' || data.error === 'interaction_required')) {
       await markReauth(this.sys, this.account);
       throw new ReauthError();
     }
-    const next = status === 200 ? tokenSetFrom(data, Date.now(), current.refresh_token) : null;
+    const next =
+      status === 200 ? tokenSetFrom(data, Date.now(), current.refresh_token, current.scope || '') : null;
     if (!next)
       throw new GraphError('Outlook sign-in could not be renewed. Will try again shortly.', status || 0);
     this.tokens = next;
@@ -169,6 +190,11 @@ export class GraphSession {
     return t.expires_at - REFRESH_MARGIN_MS > Date.now()
       ? t.access_token
       : (await this.refresh()).access_token;
+  }
+
+  // The permissions of the stored sign-in.
+  async granted() {
+    return (await this.load()).scope || '';
   }
 
   // Whether this module created the draft (only those may be changed, sent or deleted).
@@ -197,7 +223,8 @@ export class GraphSession {
         (lower[0] === 'me' || lower[0] === 'users') &&
         lower.slice(-2).join('/') === 'messages/delta' &&
         lower.some((x) => x.startsWith('mailfolders'));
-      return (folder && seg.length <= 6) || (messages && seg.length <= 3);
+      const calendarView = seg.length === 2 && lower[0] === 'me' && lower[1] === 'calendarview';
+      return (folder && seg.length <= 6) || (messages && seg.length <= 3) || calendarView;
     }
     if (method === 'POST' && id && seg.length === 4 && /^createreply(all)?$/.test(lower[3])) return true;
     if (method === 'POST' && id && seg.length === 4 && lower[3] === 'send') return this.ownsDraft(id);

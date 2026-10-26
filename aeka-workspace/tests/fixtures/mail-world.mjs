@@ -254,6 +254,8 @@ export function world() {
     expiresIn: 3600,
     tokenSeq: 0,
     drafts: new Map(), // graph draft id -> { from: message id, patch }
+    scope: '', // the scope string Microsoft reports granting; '' leaves it out (older sign-ins)
+    calendarStatus: 200, // e.g. 403
   };
   w.box = (address) =>
     (w.boxes[address] ??= {
@@ -261,11 +263,13 @@ export function world() {
       sent: [],
       changes: [],
       sentChanges: [],
+      events: [], // calendar events in Graph shape (times in India Standard Time)
       replay: false,
       deltaRound: 0,
     });
 
-  const graph = async (method, url, body, auth) => {
+  const graph = async (method, url, body, auth, headers = {}) => {
+    w.lastPrefer = new Headers(headers).get('Prefer') || '';
     const address = auth.replace(/^Bearer at-/, '').replace(/-\d+$/, '');
     const box = w.box(address);
     const path = decodeURIComponent(url.pathname.replace(/^\/v1\.0/, ''));
@@ -304,6 +308,13 @@ export function world() {
               '@odata.deltaLink': `${base}?$deltatoken=d${++box.deltaRound}&$select=${encodeURIComponent(select)}`,
             }),
       });
+    }
+    if (path === '/me/calendarView' && method === 'GET') {
+      if (w.calendarStatus !== 200) return json({ error: { code: 'ErrorAccessDenied' } }, w.calendarStatus);
+      const from = Date.parse(url.searchParams.get('startDateTime'));
+      const to = Date.parse(url.searchParams.get('endDateTime'));
+      const ist = (t) => Date.parse(t.dateTime.slice(0, 19) + '+05:30');
+      return json({ value: box.events.filter((e) => ist(e.start) < to && ist(e.end) > from) });
     }
     const one = path.match(/^\/me\/messages\/([^/]+)$/);
     if (one && method === 'GET') {
@@ -380,6 +391,7 @@ export function world() {
           access_token: `at-${address}-${++w.tokenSeq}`,
           refresh_token: `rt-${address}-${w.tokenSeq}`,
           expires_in: w.expiresIn,
+          ...(w.scope ? { scope: w.scope } : {}),
         });
       }
       if (w.refresh === 'invalid_grant') return json({ error: 'invalid_grant' }, 400);
@@ -388,10 +400,11 @@ export function world() {
         access_token: `at-${address}-${++w.tokenSeq}`,
         refresh_token: `rt-${address}-${w.tokenSeq}`,
         expires_in: w.expiresIn,
+        ...(w.scope ? { scope: w.scope } : {}),
       });
     }
     if (url.hostname === 'graph.microsoft.com')
-      return graph(method, url, body, new Headers(init.headers).get('Authorization') || '');
+      return graph(method, url, body, new Headers(init.headers).get('Authorization') || '', init.headers);
     if (url.hostname === 'ai.aeka.example') return ai(body);
     throw new Error('Unexpected network call to ' + url.hostname);
   };

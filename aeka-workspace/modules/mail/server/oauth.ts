@@ -5,7 +5,15 @@ import { configured, type ServerEnv } from '../../../core/server/env.ts';
 import { recordActivity } from '../../../core/server/activity.ts';
 import { resolveMember, type SignedInUser } from '../../../core/server/members.ts';
 import { seal, sealingAvailable, unseal } from '../../../core/server/secrets.ts';
-import { readMe, SCOPES, tenantOf, TOKEN_PURPOSE, tokenRequest, tokenSetFrom } from './graph.ts';
+import {
+  calendarGranted,
+  readMe,
+  SCOPES,
+  tenantOf,
+  TOKEN_PURPOSE,
+  tokenRequest,
+  tokenSetFrom,
+} from './graph.ts';
 import { DEFAULT_SETTINGS, loadAccount, type Sys } from './store.ts';
 import { deleteMailData } from './sync.ts';
 
@@ -149,11 +157,13 @@ export async function finishConnect(request: Request, d: ConnectDeps): Promise<R
   await db
     .prepare(
       `INSERT INTO mail_accounts(member,address,display_name,token_sealed,access_expires,status,inbox_delta,sent_delta,
-       last_sync_at,last_error,settings,created_at,updated_at) VALUES(?,?,?,?,?,'connected',?,?,?,'',?,?,?)
+       last_sync_at,last_error,settings,calendar_status,calendar_synced_at,created_at,updated_at)
+       VALUES(?,?,?,?,?,'connected',?,?,?,'',?,?,NULL,?,?)
        ON CONFLICT(member) DO UPDATE SET address = excluded.address, display_name = excluded.display_name,
        token_sealed = excluded.token_sealed, access_expires = excluded.access_expires, status = 'connected',
        inbox_delta = excluded.inbox_delta, sent_delta = excluded.sent_delta, last_sync_at = excluded.last_sync_at,
-       last_error = '', settings = excluded.settings, created_at = excluded.created_at, updated_at = excluded.updated_at`,
+       last_error = '', settings = excluded.settings, calendar_status = excluded.calendar_status,
+       calendar_synced_at = NULL, created_at = excluded.created_at, updated_at = excluded.updated_at`,
     )
     .bind(
       member.email,
@@ -165,6 +175,7 @@ export async function finishConnect(request: Request, d: ConnectDeps): Promise<R
       sameMailbox ? existing.sent_delta : null,
       sameMailbox ? existing.last_sync_at : null,
       existing && sameMailbox ? existing.settings : JSON.stringify(DEFAULT_SETTINGS),
+      calendarGranted(tokens) ? 'pending' : 'needs_consent',
       now,
       now,
     )

@@ -1,9 +1,11 @@
-// The morning brief, assembled without AI from mail triage, tasks, to-dos, reminders and deadlines.
+// The morning brief, assembled without AI from the calendar, mail triage, tasks, to-dos, reminders
+// and deadlines.
 // Sections with nothing in them are left out.
 import type { ModuleContext } from '../../../core/server/module.ts';
 import { mailConnected, mailCounts, mailQueue } from '../../mail/server/service.ts';
 import { myOpenTasks, upcomingDeadlines } from '../../workflow/server/services.ts';
 import type { Brief, BriefLine } from '../shared/types.ts';
+import { calendarSection } from './calendar.ts';
 import { listReminders, listTodos } from './records.ts';
 import { DAY, calendarLabel, dayLabel, istDate, istDayStart, timeLabel } from './recurrence.ts';
 
@@ -51,11 +53,16 @@ export async function mailSection(ctx: ModuleContext): Promise<BriefLine[]> {
   return lines;
 }
 
-export async function buildBrief(ctx: ModuleContext): Promise<Brief> {
+// `fresh` refreshes the calendar first when it is older than a few minutes (when a member opens the
+// brief); background runs use the calendar Mail refreshed moments before.
+export async function buildBrief(ctx: ModuleContext, fresh = false): Promise<Brief> {
   const now = ctx.now;
   const today = istDate(now);
   const endOfToday = istDayStart(now) + DAY;
   const sections: Brief['sections'] = [];
+
+  const meetings = await calendarSection(ctx, fresh);
+  if (meetings.length) sections.push({ title: 'Your calendar today', lines: meetings });
 
   const mail = await mailSection(ctx);
   if (mail.length) sections.push({ title: 'Needs you in mail', lines: mail });

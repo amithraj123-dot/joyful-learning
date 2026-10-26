@@ -8,6 +8,7 @@ import {
   HANDLING,
   type AccountSettings,
   type Address,
+  type CalendarStatus,
   type Category,
   type Draft,
   type DraftSummary,
@@ -40,7 +41,7 @@ export const conflict = (label: string) =>
   new CloudError(`This ${label} changed since you opened it. Reload and try again.`, 409);
 
 export const DEFAULT_SETTINGS: AccountSettings = { aiTriage: true, alertUrgent: true };
-const MINUTE = 60000;
+export const MINUTE = 60000;
 export const HOUR = 60 * MINUTE;
 export const DAY = 24 * HOUR;
 
@@ -96,6 +97,8 @@ export interface AccountRow {
   last_sync_at: number | null;
   last_error: string;
   settings: string;
+  calendar_status: CalendarStatus;
+  calendar_synced_at: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -112,6 +115,8 @@ export const toAccount = (r: AccountRow): MailAccount => ({
   lastSyncAt: r.last_sync_at,
   lastError: r.last_error,
   settings: settingsOf(r),
+  calendar: r.calendar_status ?? 'pending',
+  calendarSyncedAt: r.calendar_synced_at ?? null,
   connectedAt: r.created_at,
 });
 

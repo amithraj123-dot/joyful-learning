@@ -6,6 +6,7 @@ import type { Member } from '../../../core/server/members.ts';
 import { releaseLease, takeLease } from '../../../core/server/notifications.ts';
 import { GraphError, GraphSession, ReauthError } from './graph.ts';
 import { loadAccount, queueCounts, setAccountError, type Sys } from './store.ts';
+import { CALENDAR_REFRESH_MS, syncCalendar } from './calendar.ts';
 import { syncMailbox } from './sync.ts';
 import { runTriage, type RunOptions } from './triage.ts';
 
@@ -64,6 +65,12 @@ export async function mailboxPass(
           e.status === 0 ? 'Outlook could not be reached. Mail will be checked again shortly.' : e.message;
       }
     }
+    // The calendar is refreshed at most every 15 minutes; its failures never affect mail.
+    const calendarDue =
+      !o.only &&
+      account.calendar_status !== 'needs_consent' &&
+      (!account.calendar_synced_at || account.calendar_synced_at <= sys.now - CALENDAR_REFRESH_MS);
+    if (calendarDue && !(await outlookWaiting(sys, email))) await syncCalendar(session);
     const t = await runTriage(sys, member, account, session, o);
     result.triaged = t.triaged;
     if (t.aiError) problem ||= `AI triage is paused for now: ${t.aiError}`;

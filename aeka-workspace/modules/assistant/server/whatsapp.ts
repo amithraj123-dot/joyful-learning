@@ -242,7 +242,7 @@ export async function sendOutbox(sys: SystemContext, member: string, limit = SEN
   return sent;
 }
 
-// Notices the member chose (reminders, briefs, urgent mail) created since linking, queued once each.
+// Notices the member chose (reminders, briefs, urgent mail, meetings) created since linking, queued once each.
 export async function queueNotices(sys: SystemContext, row: SettingsRow) {
   const linkedAt = row.settings.linkedAt;
   if (!row.phone || linkedAt == null) return 0;
@@ -250,6 +250,7 @@ export async function queueNotices(sys: SystemContext, row: SettingsRow) {
     row.settings.alerts.reminders ? 'reminder' : '',
     row.settings.alerts.brief ? 'brief' : '',
     row.settings.alerts.urgentMail ? 'mail.urgent' : '',
+    row.settings.alerts.meetings ? 'meeting' : '',
   ].filter(Boolean);
   if (!kinds.length) return 0;
   const notices = (

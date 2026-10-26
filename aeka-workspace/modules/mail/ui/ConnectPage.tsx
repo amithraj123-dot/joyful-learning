@@ -218,7 +218,7 @@ export function ConnectPage({ notice, onDismiss }: { notice: ReturnNotice | null
           <p className="wf-caption">
             Use the public address of the workspace if it differs from this one. Delegated permissions:{' '}
             <code>offline_access</code>, <code>User.Read</code>, <code>Mail.ReadWrite</code>,{' '}
-            <code>Mail.Send</code>.
+            <code>Mail.Send</code>, <code>Calendars.Read</code>.
           </p>
         </section>
       )}
@@ -254,6 +254,16 @@ export function ConnectPage({ notice, onDismiss }: { notice: ReturnNotice | null
             <dd>{formatStamp(account.connectedAt)}</dd>
             <dt>Last sync</dt>
             <dd>{account.lastSyncAt ? formatWhen(account.lastSyncAt) : 'Not yet'}</dd>
+            <dt>Calendar</dt>
+            <dd>
+              {account.calendar === 'ready'
+                ? `Read only, updated ${account.calendarSyncedAt ? formatWhen(account.calendarSyncedAt) : 'recently'}`
+                : account.calendar === 'needs_consent'
+                  ? 'Not allowed yet'
+                  : account.calendar === 'error'
+                    ? 'Could not be read last time; it will be tried again'
+                    : 'Will be read at the next sync'}
+            </dd>
             {account.lastError && (
               <>
                 <dt>Last problem</dt>
@@ -261,6 +271,16 @@ export function ConnectPage({ notice, onDismiss }: { notice: ReturnNotice | null
               </>
             )}
           </dl>
+          {account.status === 'connected' && account.calendar === 'needs_consent' && (
+            <div className="wf-note mail-banner">
+              <span>
+                Allow read-only calendar access so the brief and Ask Aeka can see your meetings and free time.
+              </span>
+              <a className="button primary small" href="/api/mail/connect">
+                Allow calendar access
+              </a>
+            </div>
+          )}
           {account.status === 'reauth' && (
             <div className="wf-note mail-banner">
               <span>Microsoft asks you to sign in again before mail can sync.</span>

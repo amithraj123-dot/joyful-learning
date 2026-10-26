@@ -333,9 +333,35 @@ export const mailAccounts = sqliteTable('mail_accounts', {
   lastSyncAt: integer('last_sync_at'),
   lastError: text('last_error').notNull().default(''),
   settings: text('settings').notNull(), // JSON: aiTriage, alertUrgent
+  calendarStatus: text('calendar_status').notNull().default('pending'),
+  calendarSyncedAt: integer('calendar_synced_at'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });
+// Mail: a cached window of the member's Outlook calendar (yesterday to 14 days ahead), replaced on
+// each refresh. Read only; event bodies are never fetched.
+export const mailEvents = sqliteTable(
+  'mail_events',
+  {
+    member: text('member').notNull(),
+    id: text('id').notNull(),
+    subject: text('subject').notNull(),
+    startAt: integer('start_at').notNull(),
+    endAt: integer('end_at').notNull(),
+    allDay: integer('all_day').notNull(),
+    location: text('location').notNull(),
+    onlineUrl: text('online_url').notNull(),
+    organizerJson: text('organizer_json').notNull(),
+    attendeesJson: text('attendees_json').notNull(),
+    isOrganizer: integer('is_organizer').notNull(),
+    response: text('response').notNull(),
+    showAs: text('show_as').notNull(),
+    cancelled: integer('cancelled').notNull(),
+    webLink: text('web_link').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.member, t.id] }), index('mail_events_start').on(t.member, t.startAt)],
+);
 // Mail: pending OAuth sign-ins (PKCE verifier sealed), kept for ten minutes.
 export const mailOauthStates = sqliteTable('mail_oauth_states', {
   state: text('state').primaryKey(),

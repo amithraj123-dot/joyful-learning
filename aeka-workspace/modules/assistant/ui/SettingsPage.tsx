@@ -19,10 +19,11 @@ interface Linking {
   businessNumber: string;
 }
 
-type Prefs = { briefEnabled: boolean; briefTime: string; alerts: AlertSettings };
+type Prefs = { briefEnabled: boolean; briefTime: string; meetingAlerts: boolean; alerts: AlertSettings };
 const prefsOf = (s: AssistantSettings): Prefs => ({
   briefEnabled: s.briefEnabled,
   briefTime: s.briefTime,
+  meetingAlerts: s.meetingAlerts,
   alerts: s.whatsapp.alerts,
 });
 
@@ -96,6 +97,7 @@ function WhatsAppCard({
     { key: 'reminders', label: 'Reminders', hint: 'When a reminder is due' },
     { key: 'brief', label: 'Morning brief', hint: 'A short summary at your brief time' },
     { key: 'urgentMail', label: 'Urgent mail', hint: 'When an email is triaged as urgent' },
+    { key: 'meetings', label: 'Meetings', hint: '10 minutes before each meeting in your Outlook calendar' },
   ];
 
   if (!status.available)
@@ -279,7 +281,7 @@ function Integrations() {
           )}
           <p className="wf-caption">
             Redirect URI to register in Entra: <code className="as-break">{origin}/api/mail/callback</code>.
-            Delegated permissions: offline_access, User.Read, Mail.ReadWrite, Mail.Send.
+            Delegated permissions: offline_access, User.Read, Mail.ReadWrite, Mail.Send, Calendars.Read.
           </p>
         </>
       ),
@@ -414,6 +416,7 @@ export function SettingsPage() {
         ...d.settings,
         briefEnabled: prefs.briefEnabled,
         briefTime: prefs.briefTime,
+        meetingAlerts: prefs.meetingAlerts,
         whatsapp: { ...d.settings.whatsapp, alerts: prefs.alerts },
       },
     }));
@@ -458,14 +461,14 @@ export function SettingsPage() {
       <Card
         title={
           <>
-            <Sunrise size={17} aria-hidden="true" /> Morning brief
+            <Sunrise size={17} aria-hidden="true" /> Brief and meetings
           </>
         }
         id="as-set-brief"
       >
         <p className="wf-caption as-pad">
-          A short summary of urgent mail, tasks, deadlines and reminders, posted to your notifications each
-          morning. It is put together without AI.
+          A short summary of today&apos;s meetings, urgent mail, tasks, deadlines and reminders, posted to your
+          notifications each morning. It is put together without AI.
         </p>
         <div className="as-brief-settings">
           <Toggle pressed={prefs.briefEnabled} onChange={(v) => void save({ ...prefs, briefEnabled: v })}>
@@ -484,6 +487,15 @@ export function SettingsPage() {
             />
           </label>
         </div>
+        <div className="as-brief-settings">
+          <Toggle pressed={prefs.meetingAlerts} onChange={(v) => void save({ ...prefs, meetingAlerts: v })}>
+            Notify me 10 minutes before each meeting
+          </Toggle>
+        </div>
+        <p className="wf-caption as-pad">
+          Meetings come from your Outlook calendar, read only, once Outlook is connected with calendar access
+          under Mail &gt; Outlook connection.
+        </p>
       </Card>
       <WhatsAppCard
         status={whatsapp}

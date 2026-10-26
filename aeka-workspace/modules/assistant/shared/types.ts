@@ -96,10 +96,12 @@ export interface AlertSettings {
   reminders: boolean;
   brief: boolean;
   urgentMail: boolean;
+  meetings: boolean;
 }
 export interface AssistantSettings {
   briefEnabled: boolean;
   briefTime: string; // HH:MM, India time
+  meetingAlerts: boolean; // a notification 10 minutes before each meeting (Outlook calendar)
   whatsapp: {
     phone: string | null; // linked, verified number (digits only), shown masked
     alerts: AlertSettings; // what is also sent to WhatsApp

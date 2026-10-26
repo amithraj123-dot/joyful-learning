@@ -1,10 +1,22 @@
 // Mail's services for other modules (the assistant). Each works on the caller's own mailbox and
-// reads only stored triage (no Graph call), except draftReplyFor, which drafts with the AI.
+// reads only stored data (no Graph call), except draftReplyFor, which drafts with the AI, and the
+// calendar functions, which may refresh the cached calendar first.
 // SIGNATURES ARE FIXED.
 import type { ModuleContext } from '../../../core/server/module.ts';
-import type { Draft, MailItem, MailView, QueueCounts } from '../shared/types.ts';
+import { matterTargets } from '../../workflow/server/services.ts';
+import type {
+  CalendarEvent,
+  CalendarStatus,
+  Draft,
+  MailItem,
+  MailView,
+  QueueCounts,
+} from '../shared/types.ts';
 import { VIEWS } from '../shared/types.ts';
+import { cachedEvents, freeSlots, istDayStart, syncCalendar } from './calendar.ts';
 import { createDraft } from './drafts.ts';
+import { GraphSession, ReauthError } from './graph.ts';
+import { confirmedLink } from './rules.ts';
 import { listItems, loadAccount, queueCounts } from './store.ts';
 
 const memberEmail = (ctx: ModuleContext) => ctx.member?.email ?? '';
@@ -43,4 +55,60 @@ export async function draftReplyFor(
   instructions?: string,
 ): Promise<Draft> {
   return createDraft(ctx, mailId, instructions);
+}
+
+// Calendar access for the caller: 'not_connected' without an Outlook account.
+export async function calendarStatus(ctx: ModuleContext): Promise<CalendarStatus | 'not_connected'> {
+  const email = memberEmail(ctx);
+  const account = email ? await loadAccount(ctx.db, email) : null;
+  if (!account || account.status !== 'connected') return 'not_connected';
+  return account.calendar_status ?? 'pending';
+}
+
+// The caller's calendar events overlapping [from, to), earliest first, from the cached window
+// (yesterday to 14 days ahead). With `fresh`, a cache older than 5 minutes is refreshed first when
+// possible; a failed refresh falls back to the cache.
+export async function eventsBetween(
+  ctx: ModuleContext,
+  from: number,
+  to: number,
+  fresh = false,
+): Promise<CalendarEvent[]> {
+  const email = memberEmail(ctx);
+  const account = email ? await loadAccount(ctx.db, email) : null;
+  if (!account || account.status !== 'connected' || account.calendar_status === 'needs_consent') return [];
+  if (fresh && (!account.calendar_synced_at || account.calendar_synced_at < ctx.now - 5 * 60000)) {
+    try {
+      await syncCalendar(
+        new GraphSession({ db: ctx.db, env: ctx.env, fetch: ctx.fetch, now: ctx.now }, account),
+      );
+    } catch (e) {
+      if (!(e instanceof ReauthError)) console.error('Calendar refresh failed');
+    }
+  }
+  const targets = await matterTargets(ctx).catch(() => []);
+  const labels = new Map(targets.map((t) => [t.matterId, `${t.clientName}: ${t.title}`]));
+  const visible = new Set(labels.keys());
+  const seen = new Map<string, { id: string; label: string } | null>();
+  const link = async (address: string) => {
+    if (!seen.has(address)) {
+      const id = await confirmedLink(ctx.db, email, address, visible);
+      seen.set(address, id ? { id, label: labels.get(id) ?? '' } : null);
+    }
+    return seen.get(address)!;
+  };
+  return cachedEvents(ctx.db, email, from, to, link);
+}
+
+// Free periods of at least `minutes` on the India day containing `day`, within working hours
+// (default 09:30 to 19:00), not before now.
+export async function freeTime(
+  ctx: ModuleContext,
+  day: number,
+  minutes: number,
+  hours = { from: 9 * 60 + 30, to: 19 * 60 },
+) {
+  const start = istDayStart(day);
+  const events = await eventsBetween(ctx, start, start + 24 * 3600000, true);
+  return freeSlots(events, start, minutes, hours, ctx.now);
 }

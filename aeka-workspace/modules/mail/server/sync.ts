@@ -327,7 +327,7 @@ export async function readHeaders(s: GraphSession, rows: { id: string; graph_id:
 // Removes the member's stored mail. With the account (disconnecting), corrections, rules, sign-in
 // states, the token and settings go too; without it (another mailbox connected), the learning stays.
 export async function deleteMailData(db: D1Database, member: string, withAccount: boolean) {
-  const tables = ['mail_drafts', 'mail_triage', 'mail_messages'];
+  const tables = ['mail_drafts', 'mail_triage', 'mail_messages', 'mail_events'];
   if (withAccount) tables.push('mail_corrections', 'mail_rules', 'mail_oauth_states', 'mail_accounts');
   await db.batch(tables.map((t) => db.prepare(`DELETE FROM ${t} WHERE member = ?`).bind(member)));
 }

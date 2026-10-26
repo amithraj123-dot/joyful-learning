@@ -67,6 +67,23 @@ Setup for administrators is in `SETUP-ASSISTANT-MAIL.md`.
   alerts then work on WhatsApp. Signed webhooks, duplicate suppression, STOP, the 24-hour window and
   delivery states are handled.
 
+## Calendar awareness
+
+With read-only access to the member's Outlook calendar (`Calendars.Read`, granted at the same
+Microsoft sign-in), the workspace keeps a copy of yesterday to 14 days ahead, refreshed every 15
+minutes in the background. Event bodies are never read, and nothing can be created, changed, accepted
+or declined.
+
+- **Brief:** "Your calendar today" lists the meetings with times, online or place, and the mandate
+  linked to an attendee the member has confirmed before; it flags clashes and shows free time.
+  Declined and cancelled meetings are left out.
+- **Ask Aeka:** can read the calendar for up to a week and find free periods of a given length; it
+  suggests times but the member sends the invitation.
+- **Meeting alerts:** a notification 10 minutes before each meeting not declined, on by default, and
+  on WhatsApp if chosen.
+- A mailbox connected before calendar access existed keeps working; Outlook connection offers
+  "Allow calendar access", and its token refreshes never ask for the new permission.
+
 ## Platform additions
 
 Sealed credentials, a single metered AI client with a daily limit and a kill switch, member
@@ -97,7 +114,6 @@ panel, `?page=` links, and a `mail.item` hand-over. See `ARCHITECTURE.md`.
 
 ## Known limitations
 
-- Calendar is not yet read by the brief or the assistant.
 - Attachments are not read.
 - WhatsApp handles text only, and a linked phone can use the full assistant.
 - Snoozing a recurring reminder moves the series.

@@ -2,7 +2,9 @@
 // own mailbox only; no member can read another member's mail, administrators included.
 //
 // Connecting: the browser opens GET /api/mail/connect (Microsoft sign-in, delegated permissions
-// offline_access User.Read Mail.ReadWrite Mail.Send); Microsoft returns to GET /api/mail/callback.
+// offline_access User.Read Mail.ReadWrite Mail.Send Calendars.Read); Microsoft returns to
+// GET /api/mail/callback. The calendar is read only and cached for yesterday to 14 days ahead; it is
+// used by the assistant through server/service.ts (calendarStatus, eventsBetween, freeTime).
 //
 // Triage pipeline (server, on 'sync' and on background ticks):
 //   1. Delta sync of Inbox and Sent Items (deletions are recorded as removed, never as failures).

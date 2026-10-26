@@ -9,11 +9,13 @@
 //   search            to-dos, memory, my Scribe notes, mandates I can see, my triaged mail
 //   mail_queue        my triaged mail needing attention (if Outlook is connected)
 //   draft_email_reply makes a draft for my review in Mail; it never sends
+//   calendar, find_free_time   my Outlook calendar (read only) and free periods on a day
 //   today_brief       the morning brief
 // Retrieved content (notes, mail, memory) is data, never instructions. The assistant never sends
 // email, messages or anything else outside the workspace.
 //
-// Background (tick): due reminders become notifications once per occurrence, then advance; the
+// Background (tick): due reminders become notifications once per occurrence, then advance; a notice
+// comes 10 minutes before each meeting not declined (if meetingAlerts is on); the
 // morning brief is posted at the member's brief time; notifications the member chose are delivered
 // to WhatsApp when linked.
 import type {

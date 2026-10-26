@@ -1,10 +1,11 @@
-// Background work for one member, bounded per run: due reminders, the morning brief, WhatsApp
+// Background work for one member, bounded per run: due reminders, meeting alerts, the morning brief, WhatsApp
 // answers and deliveries. Safe to run twice at once: every step is guarded or idempotent.
 import type { SystemContext } from '../../../core/server/env.ts';
 import type { Member } from '../../../core/server/members.ts';
 import { notify } from '../../../core/server/notifications.ts';
 import type { Repeat } from '../shared/types.ts';
 import { buildBrief, briefSummary } from './brief.ts';
+import { meetingAlerts } from './calendar.ts';
 import { memberContext } from './context.ts';
 import { MINUTE, advance, dayLabel, istDate, istDayStart, whenLabel } from './recurrence.ts';
 import { ensureSettingsRow, readSettings, whatsappReady } from './settings.ts';
@@ -107,6 +108,7 @@ export async function assistantTick(sys: SystemContext, scope: { member?: Member
   const member = scope.member;
   if (!member?.active) return;
   await fireReminders(sys, member);
+  await meetingAlerts(sys, member);
   await morningBrief(sys, member);
   if (whatsappReady(sys.env)) {
     for (let i = 0; i < 2; i++) if (!(await processInbound(sys, member))) break;

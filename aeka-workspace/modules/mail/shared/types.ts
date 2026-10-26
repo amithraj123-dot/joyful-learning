@@ -161,10 +161,15 @@ export interface AccountSettings {
   aiTriage: boolean; // false: built-in rules only, no email content sent to AI
   alertUrgent: boolean; // notify (and WhatsApp, if linked) for tier 1 mail
 }
+// Calendar access for the connected account: ready; needs_consent (connected before calendar access
+// was added, or the permission was not granted: reconnect to allow it); pending (not read yet); error.
+export type CalendarStatus = 'ready' | 'needs_consent' | 'pending' | 'error';
 export interface MailAccount {
   address: string;
   displayName: string;
   status: 'connected' | 'reauth' | 'disconnected';
+  calendar: CalendarStatus;
+  calendarSyncedAt: number | null;
   lastSyncAt: number | null;
   lastError: string;
   settings: AccountSettings;
@@ -193,3 +198,26 @@ export interface MailRule {
 // Placeholders the drafter inserts where a fact is missing; Send is refused while any remain.
 export const PLACEHOLDER = /\[INPUT REQUIRED:[^\]]*\]/g;
 export const countPlaceholders = (body: string) => (body.match(PLACEHOLDER) || []).length;
+
+// A calendar event from the member's Outlook calendar (read only; the event body is never read).
+export interface CalendarEvent {
+  id: string;
+  subject: string;
+  start: number; // ms; all-day events start at 00:00 India time
+  end: number;
+  allDay: boolean;
+  location: string;
+  onlineUrl: string; // Teams or other meeting link, if any
+  organizer: Address;
+  attendees: Address[]; // at most 30
+  isOrganizer: boolean;
+  response: 'organizer' | 'accepted' | 'tentative' | 'declined' | 'none';
+  showAs: 'free' | 'tentative' | 'busy' | 'oof' | 'workingElsewhere' | 'unknown';
+  cancelled: boolean;
+  webLink: string;
+  matterId: string | null; // a mandate the member confirmed for an attendee's address or domain
+  matterLabel: string;
+}
+// Counts as busy time: not cancelled, not declined, not marked free.
+export const isBusy = (e: Pick<CalendarEvent, 'cancelled' | 'response' | 'showAs'>) =>
+  !e.cancelled && e.response !== 'declined' && e.showAs !== 'free' && e.showAs !== 'workingElsewhere';

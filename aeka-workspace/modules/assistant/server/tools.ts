@@ -6,7 +6,10 @@ import type { ToolSchema } from '../../../core/server/ai.ts';
 import type { ModuleContext } from '../../../core/server/module.ts';
 import { searchOwnNotes } from '../../scribe/server/notes.ts';
 import {
+  calendarStatus,
   draftReplyFor,
+  eventsBetween,
+  freeTime,
   mailConnected,
   mailCounts,
   mailQueue,
@@ -29,7 +32,8 @@ import {
   snoozeReminder,
   memoryFields,
 } from './records.ts';
-import { DAY, istDate, whenLabel } from './recurrence.ts';
+import { eventSpan } from './calendar.ts';
+import { DAY, dateLabel, istDate, istDayStart, timeLabel, whenLabel } from './recurrence.ts';
 import { LIMITS, isoTime } from './validate.ts';
 
 export interface ToolEnv {
@@ -87,6 +91,38 @@ const mailLine = (m: MailItem) => ({
   asks: (m.triage?.asks ?? []).slice(0, 3).map((a) => clip(a, 160)),
   draft: m.draft ? m.draft.status : null,
 });
+
+// The start (India time) of the requested day, after checking the calendar can be read.
+async function calendarStart(ctx: ModuleContext, date: string | number | undefined) {
+  const status = await mail(() => calendarStatus(ctx));
+  if (status === 'not_connected')
+    throw new CloudError(
+      'Outlook is not connected, so the calendar cannot be read. Connect it under Mail > Outlook connection.',
+      409,
+    );
+  if (status === 'needs_consent')
+    throw new CloudError(
+      'Calendar access has not been allowed yet. Reconnect under Mail > Outlook connection to allow it.',
+      409,
+    );
+  if (date == null) return istDayStart(ctx.now);
+  if (
+    typeof date !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    !Number.isFinite(Date.parse(date + 'T00:00:00+05:30'))
+  )
+    throw new CloudError('Give the date as YYYY-MM-DD. Nothing was checked.');
+  const start = Date.parse(date + 'T00:00:00+05:30');
+  if (start < istDayStart(ctx.now) - DAY || start > istDayStart(ctx.now) + 13 * DAY)
+    throw new CloudError('The calendar can be read from yesterday to 13 days ahead. Nothing was checked.');
+  return start;
+}
+const hhmm = (v: string | number | undefined, fallback: number) => {
+  if (v == null) return fallback;
+  const m = String(v).match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!m) throw new CloudError('Give times as HH:MM (24-hour). Nothing was checked.');
+  return Number(m[1]) * 60 + Number(m[2]);
+};
 
 export const TOOLS: Record<string, Tool> = {
   my_work: {
@@ -349,11 +385,74 @@ export const TOOLS: Record<string, Tool> = {
       };
     },
   },
+  calendar: {
+    description:
+      "The member's Outlook calendar (read only) for a day or a few days: meetings with times in India time, place or online, attendees and any linked mandate. It cannot create, change, accept or decline meetings.",
+    fields: {
+      date: { type: 'string', description: 'First day, YYYY-MM-DD in India time; default today', max: 10 },
+      days: { type: 'integer', description: 'Number of days, 1 to 7; default 1', min: 1, max: 7 },
+    },
+    run: async ({ ctx }, a) => {
+      const from = await calendarStart(ctx, a.date);
+      const days = (a.days as number | undefined) ?? 1;
+      const events = await mail(() => eventsBetween(ctx, from, from + days * DAY, true));
+      const shown = events.filter((e) => !e.cancelled).slice(0, 40);
+      return {
+        result: {
+          note: UNTRUSTED,
+          from: dateLabel(from),
+          days,
+          events: shown.map((e) => ({
+            date: dateLabel(e.start),
+            when: eventSpan(e),
+            subject: clip(e.subject, 200),
+            place: e.onlineUrl ? 'online' : clip(e.location, 120),
+            response: e.response,
+            attendees: e.attendees.slice(0, 8).map((p) => p.name || p.address),
+            mandate: e.matterLabel || null,
+          })),
+        },
+        summary: `Checked your calendar from ${dateLabel(from)}${days > 1 ? ` for ${days} days` : ''}: ${shown.length} ${shown.length === 1 ? 'meeting' : 'meetings'}`,
+        ref: 'assistant/today',
+      };
+    },
+  },
+  find_free_time: {
+    description:
+      "Free periods in the member's Outlook calendar on one day, within working hours (default 09:30 to 19:00 India time), of at least the given length. Use it to suggest times; it does not book anything.",
+    fields: {
+      date: { type: 'string', description: 'The day, YYYY-MM-DD in India time', max: 10, required: true },
+      minutes: {
+        type: 'integer',
+        description: 'Length needed in minutes',
+        min: 15,
+        max: 480,
+        required: true,
+      },
+      from: { type: 'string', description: 'Earliest time, HH:MM (24-hour); default 09:30', max: 5 },
+      to: { type: 'string', description: 'Latest time, HH:MM (24-hour); default 19:00', max: 5 },
+    },
+    run: async ({ ctx }, a) => {
+      const day = await calendarStart(ctx, a.date);
+      const hours = { from: hhmm(a.from, 9 * 60 + 30), to: hhmm(a.to, 19 * 60) };
+      if (hours.to <= hours.from)
+        throw new CloudError('The latest time must be after the earliest. Nothing was checked.');
+      const slots = await mail(() => freeTime(ctx, day, a.minutes as number, hours));
+      return {
+        result: {
+          date: dateLabel(day),
+          free: slots.map((s) => `${timeLabel(s.start)} to ${timeLabel(s.end)}`),
+        },
+        summary: `Found ${slots.length} free ${slots.length === 1 ? 'period' : 'periods'} of ${a.minutes} minutes on ${dateLabel(day)}`,
+        ref: 'assistant/today',
+      };
+    },
+  },
   today_brief: {
     description: "The member's brief for today: urgent mail, due and overdue items, deadlines and reminders.",
     fields: {},
     run: async ({ ctx }) => {
-      const brief = await buildBrief(ctx);
+      const brief = await buildBrief(ctx, true);
       return {
         result: {
           note: UNTRUSTED,

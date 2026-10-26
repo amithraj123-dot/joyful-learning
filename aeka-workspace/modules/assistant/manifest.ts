@@ -15,7 +15,7 @@ export const assistantModule: ClientModule = {
       label: 'Today',
       icon: Sun,
       title: 'Today',
-      subtitle: 'Your brief: urgent mail, tasks, deadlines and reminders',
+      subtitle: 'Your brief: meetings, urgent mail, tasks, deadlines and reminders',
     },
     {
       id: 'assistant/chat',
@@ -50,7 +50,7 @@ export const assistantModule: ClientModule = {
       label: 'Assistant settings',
       icon: Settings,
       title: 'Assistant Settings',
-      subtitle: 'Morning brief, WhatsApp and, for administrators, integrations',
+      subtitle: 'Brief, meeting alerts, WhatsApp and, for administrators, integrations',
     },
   ],
 };

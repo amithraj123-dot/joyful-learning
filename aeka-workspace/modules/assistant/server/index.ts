@@ -70,7 +70,7 @@ export const assistantServer: ServerModule = {
     'memory.save': { handler: (ctx, p) => saveMemory(ctx, p.id, memoryFields(p.memory)) },
     'memory.delete': { handler: (ctx, p) => deleteMemory(ctx, p.id) },
 
-    'brief.get': { handler: (ctx) => buildBrief(ctx) },
+    'brief.get': { handler: (ctx) => buildBrief(ctx, true) },
 
     'settings.get': { handler: (ctx) => getSettings(ctx) },
     'settings.save': { handler: (ctx, p) => saveSettings(ctx, p.settings) },

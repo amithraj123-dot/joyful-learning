@@ -57,6 +57,13 @@
       "when": 1793029626690,
       "tag": "0007_assistant_mail",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793038184544,
+      "tag": "0008_calendar",
+      "breakpoints": true
     }
   ]
 }

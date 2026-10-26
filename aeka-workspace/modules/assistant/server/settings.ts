@@ -11,6 +11,7 @@ import { HHMM, bad, bool, obj, owner } from './validate.ts';
 export interface StoredSettings {
   briefEnabled: boolean;
   briefTime: string;
+  meetingAlerts: boolean;
   alerts: AlertSettings;
   linkedAt?: number | null;
 }
@@ -25,7 +26,8 @@ export interface SettingsRow {
 export const DEFAULT_SETTINGS: StoredSettings = {
   briefEnabled: true,
   briefTime: '08:30',
-  alerts: { reminders: true, brief: true, urgentMail: true },
+  meetingAlerts: true,
+  alerts: { reminders: true, brief: true, urgentMail: true, meetings: false },
 };
 const LINK_MINUTES = 15;
 export const REPLY_WINDOW = 24 * HOUR;
@@ -53,10 +55,12 @@ function parseSettings(text: unknown): StoredSettings {
     briefEnabled: typeof v.briefEnabled === 'boolean' ? v.briefEnabled : DEFAULT_SETTINGS.briefEnabled,
     briefTime:
       typeof v.briefTime === 'string' && HHMM.test(v.briefTime) ? v.briefTime : DEFAULT_SETTINGS.briefTime,
+    meetingAlerts: typeof v.meetingAlerts === 'boolean' ? v.meetingAlerts : DEFAULT_SETTINGS.meetingAlerts,
     alerts: {
       reminders: typeof a.reminders === 'boolean' ? a.reminders : true,
       brief: typeof a.brief === 'boolean' ? a.brief : true,
       urgentMail: typeof a.urgentMail === 'boolean' ? a.urgentMail : true,
+      meetings: typeof a.meetings === 'boolean' ? a.meetings : false,
     },
     linkedAt: typeof v.linkedAt === 'number' ? v.linkedAt : null,
   };
@@ -87,6 +91,7 @@ export const ensureSettingsRow = (db: D1Database, member: string, now: number) =
 const publicSettings = (row: SettingsRow): AssistantSettings => ({
   briefEnabled: row.settings.briefEnabled,
   briefTime: row.settings.briefTime,
+  meetingAlerts: row.settings.meetingAlerts,
   whatsapp: { phone: row.phone, alerts: row.settings.alerts },
 });
 
@@ -128,10 +133,17 @@ export async function saveSettings(ctx: ModuleContext, value: unknown) {
   const next: StoredSettings = {
     briefEnabled: bool(s.briefEnabled, 'the morning brief'),
     briefTime: s.briefTime,
+    // Optional so that browsers loaded before meeting alerts existed can still save settings.
+    meetingAlerts:
+      s.meetingAlerts === undefined
+        ? current.settings.meetingAlerts
+        : bool(s.meetingAlerts, 'meeting alerts'),
     alerts: {
       reminders: bool(a.reminders, 'reminder alerts'),
       brief: bool(a.brief, 'brief alerts'),
       urgentMail: bool(a.urgentMail, 'urgent mail alerts'),
+      meetings:
+        a.meetings === undefined ? current.settings.alerts.meetings : bool(a.meetings, 'meeting alerts'),
     },
     linkedAt: current.settings.linkedAt ?? null,
   };
