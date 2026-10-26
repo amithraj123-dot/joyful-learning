@@ -251,7 +251,14 @@ export default function AekaScribe() {
   useEffect(() => {
     if (isDesktop()) return;
     try {
-      const last = localStorage.getItem('aeka-workspace-page');
+      // A link such as /?page=mail/connect (for example after Outlook sign-in) opens that page once.
+      const url = new URL(window.location.href);
+      const wanted = url.searchParams.get('page');
+      if (wanted) {
+        url.searchParams.delete('page');
+        window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+      }
+      const last = wanted || localStorage.getItem('aeka-workspace-page');
       const found = last && findPage(last);
       if (found && found.module.surfaces.includes('web')) setPage(last);
     } catch {}
