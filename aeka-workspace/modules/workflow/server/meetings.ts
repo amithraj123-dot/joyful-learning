@@ -21,6 +21,7 @@ import {
 } from './db.ts';
 import { loadPeople } from './people.ts';
 import { forbidden, isManager, me, visibleChild, visibleMatter, visibleMatters } from './permissions.ts';
+import { matterTargets } from './services.ts';
 import { newTask } from './tasks.ts';
 import { baseRevision, bool, obj, optionalDate, text } from './validate.ts';
 
@@ -90,21 +91,7 @@ export const meetingActions: Record<string, ModuleAction> = {
         );
     },
   },
-  'meetings.targets': {
-    handler: async (ctx): Promise<MeetingTarget[]> => {
-      const names = new Map((await all(ctx.db, clients, 'deleted_at IS NULL')).map((c) => [c.id, c.name]));
-      return (await visibleMatters(ctx))
-        .filter((m) => names.has(m.clientId))
-        .map((m) => ({
-          matterId: m.id,
-          title: m.title,
-          clientName: names.get(m.clientId)!,
-          status: m.status,
-          restricted: m.restricted,
-        }))
-        .sort((a, b) => a.clientName.localeCompare(b.clientName) || a.title.localeCompare(b.title));
-    },
-  },
+  'meetings.targets': { handler: (ctx) => matterTargets(ctx) },
   'meetings.link': {
     handler: async (ctx, p) => {
       const member = me(ctx);

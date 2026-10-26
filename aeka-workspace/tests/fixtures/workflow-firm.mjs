@@ -55,8 +55,14 @@ export const taskInput = (matterId, over = {}) => ({
   ...over,
 });
 
-export async function firm() {
+// options.env: server configuration (ctx.env); options.fetcher: replaces outbound fetch (ctx.fetch).
+// Both can be changed during a test through the returned `options` object.
+export async function firm(opts = {}) {
   const db = database();
+  const options = {
+    env: opts.env ?? {},
+    fetcher: opts.fetcher ?? (() => Promise.reject(new Error('No network in tests'))),
+  };
   const send = async (who, module, action, payload = {}) => {
     const user = typeof who === 'string' ? people[who] : who;
     const r = await moduleRequest(
@@ -68,6 +74,7 @@ export async function firm() {
       db,
       user,
       serverModules,
+      { env: options.env, fetcher: (...a) => options.fetcher(...a) },
     );
     const body = await r.json();
     return { status: r.status, value: body.value, error: body.error };
@@ -96,5 +103,5 @@ export async function firm() {
       team: [people.associate.email],
     }),
   });
-  return { db, wf, ok, send, client, open, walled };
+  return { db, wf, ok, send, client, open, walled, options };
 }

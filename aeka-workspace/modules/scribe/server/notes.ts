@@ -1,7 +1,7 @@
 // Scribe's read service for other modules. A note is private to its owner; other modules never read
 // Scribe's tables. They ask for one of the caller's own notes here and receive only the parts the
 // caller chose to share.
-import { CloudError, getNote } from '../../../lib/cloud-store.ts';
+import { CloudError, getNote, listNotes } from '../../../lib/cloud-store.ts';
 import { isTrashed, noteDetails } from '../../../lib/note-details.ts';
 import type { Note } from '../../../lib/workspace-core.ts';
 
@@ -55,4 +55,30 @@ export function sharedCopy(note: Note, includeTranscript: boolean) {
     actions: d.actions.map((a) => ({ id: a.id, text: a.text, owner: a.owner, due: a.due })),
     transcript,
   };
+}
+
+// The signed-in user's own live notes matching every word of `query` (title, summary, own notes),
+// newest first, as short results for search tools. Transcripts are not searched.
+export async function searchOwnNotes(db: D1Database, userId: string, query: string, limit = 8) {
+  const words = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 1)
+    .slice(0, 6);
+  if (!words.length) return [];
+  const notes = await listNotes(db, userId);
+  return notes
+    .filter((n) => !isTrashed(n))
+    .filter((n) => {
+      const hay = `${n.title}\n${n.summary}\n${n.body}`.toLowerCase();
+      return words.every((w) => hay.includes(w));
+    })
+    .slice(0, limit)
+    .map((n) => ({
+      id: n.id,
+      title: n.title || 'Untitled note',
+      kind: n.kind,
+      createdAt: n.createdAt,
+      snippet: (n.summary || n.body).replace(/\s+/g, ' ').slice(0, 240),
+    }));
 }

@@ -2,6 +2,7 @@
 import { CloudError, clientError, declaredTooLarge } from '../../lib/cloud-store.ts';
 import { recordActivity } from './activity.ts';
 import { resolveMember, type SignedInUser } from './members.ts';
+import type { ServerEnv } from './env.ts';
 import type { ModuleContext, ServerModule } from './module.ts';
 
 const MAX_BODY = 1_800_000;
@@ -14,6 +15,7 @@ export async function moduleRequest(
   db: D1Database | undefined,
   user: SignedInUser | null,
   modules: ServerModule[],
+  options: { env?: ServerEnv; fetcher?: typeof fetch } = {},
 ) {
   if (!user) return reply('Sign in to use the workspace.', 401);
   if (request.headers.get('Origin') !== new URL(request.url).origin)
@@ -36,6 +38,8 @@ export async function moduleRequest(
       user,
       member,
       now: Date.now(),
+      env: options.env ?? {},
+      fetch: options.fetcher ?? fetch,
       log: (act, target, summary) =>
         recordActivity(db, {
           actor: member?.email || user.email,

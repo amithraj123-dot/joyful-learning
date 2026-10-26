@@ -1,10 +1,12 @@
 // Browser-side module registry. Order here is the order of navigation groups.
+import { assistantModule } from '../../modules/assistant/manifest';
+import { mailModule } from '../../modules/mail/manifest';
 import { scribeModule } from '../../modules/scribe/manifest';
 import { workflowModule } from '../../modules/workflow/manifest';
 import type { ClientModule, ModulePage, SlotName, SlotProps, Surface } from './module';
 import type { ComponentType } from 'react';
 
-export const clientModules: ClientModule[] = [workflowModule, scribeModule];
+export const clientModules: ClientModule[] = [assistantModule, mailModule, workflowModule, scribeModule];
 
 export function modulesFor(surface: Surface) {
   return clientModules.filter((m) => m.surfaces.includes(surface));
