@@ -84,9 +84,9 @@ export function NotificationsPage() {
                   type="button"
                   className={'as-notice' + (n.readAt ? '' : ' unread')}
                   onClick={() => openNotice(n)}
-                  aria-label={`${n.readAt ? '' : 'Unread. '}${n.title}${linked ? '. Open' : n.readAt ? '' : '. Mark read'}`}
                 >
                   <span className="as-notice-dot" aria-hidden="true" />
+                  {!n.readAt && <span className="wf-sr">Unread.</span>}
                   <span className="as-notice-main">
                     <span className="as-notice-meta">
                       <span className="as-tag">{MODULE_LABELS[n.module] ?? n.module}</span>
