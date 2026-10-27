@@ -13,6 +13,9 @@ export async function callModule<T = unknown>(
   action: string,
   payload: object = {},
 ): Promise<T> {
+  // The envelope's own keys would silently overwrite payload fields of the same name.
+  if (Object.hasOwn(payload, 'module') || Object.hasOwn(payload, 'action'))
+    throw new ModuleError('A workspace request used a reserved field name (module or action).', 0);
   let r: Response;
   try {
     r = await fetch('/api/modules', {

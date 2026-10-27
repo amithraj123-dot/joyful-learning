@@ -46,7 +46,7 @@ async function followUpFirm() {
     msg('g-s-w2a', 'c-w2', AMITH, [ANANYA], 6 * 24),
     msg('g-s-w2b', 'c-w2', AMITH, [ANANYA], 5.5 * 24),
     msg('g-s-w3', 'c-w3', AMITH, [VIKRAM], 11 * 24, { cc: [person('Mona Iyer', 'mona@aeka.example')] }),
-    msg('g-s-w4', 'c-w4', AMITH, [RAHUL], 24),
+    msg('g-s-w4', 'c-w4', AMITH, [RAHUL], 25),
     msg('g-s-w5', 'c-w5', AMITH, [AMITH], 4 * 24),
     msg('g-s-w6', 'c-w6', AMITH, [ANANYA], 4 * 24, { subject: 'Accepted: Kestrel call' }),
     msg('g-s-w7', 'c-w7', AMITH, [person('Portal', 'no-reply@portal.example')], 4 * 24),
@@ -111,7 +111,7 @@ test('follow-ups: waiting escalates by age, chasing by count, with clear exclusi
   await f.connect('partner');
   assert.deepEqual(await f.ok('partner', 'followups.list', {}), []);
   assert.equal(
-    (await f.mail('partner', 'followups.update', { conversationId: 'c-w1', kind: 'waiting', action: 'done' }))
+    (await f.mail('partner', 'followups.update', { conversationId: 'c-w1', kind: 'waiting', op: 'done' }))
       .status,
     404,
   );
@@ -125,7 +125,7 @@ test('snooze, done and reopen; done holds only until the thread moves again', as
   await f.ok('admin', 'followups.update', {
     conversationId: 'c-w1',
     kind: 'waiting',
-    action: 'snooze',
+    op: 'snooze',
     days: 3,
   });
   assert.ok(!(await ids()).includes('c-w1'));
@@ -133,22 +133,22 @@ test('snooze, done and reopen; done holds only until the thread moves again', as
   const snoozed = hidden.find((x) => x.conversationId === 'c-w1');
   assert.ok(snoozed.snoozedUntil > Date.now() + 2.9 * DAY);
   assert.equal(snoozed.done, false);
-  await f.ok('admin', 'followups.update', { conversationId: 'c-w1', kind: 'waiting', action: 'reopen' });
+  await f.ok('admin', 'followups.update', { conversationId: 'c-w1', kind: 'waiting', op: 'reopen' });
   assert.ok((await ids()).includes('c-w1'));
   for (const bad of [
-    { conversationId: 'c-w1', kind: 'waiting', action: 'snooze', days: 0 },
-    { conversationId: 'c-w1', kind: 'waiting', action: 'snooze', days: 31 },
-    { conversationId: 'c-w1', kind: 'other', action: 'done' },
-    { conversationId: 'c-w1', kind: 'waiting', action: 'archive' },
+    { conversationId: 'c-w1', kind: 'waiting', op: 'snooze', days: 0 },
+    { conversationId: 'c-w1', kind: 'waiting', op: 'snooze', days: 31 },
+    { conversationId: 'c-w1', kind: 'other', op: 'done' },
+    { conversationId: 'c-w1', kind: 'waiting', op: 'archive' },
   ])
     assert.equal((await f.mail('admin', 'followups.update', bad)).status, 400);
   assert.equal(
-    (await f.mail('admin', 'followups.update', { conversationId: 'c-none', kind: 'waiting', action: 'done' }))
+    (await f.mail('admin', 'followups.update', { conversationId: 'c-none', kind: 'waiting', op: 'done' }))
       .status,
     404,
   );
 
-  await f.ok('admin', 'followups.update', { conversationId: 'c-chase', kind: 'chasing', action: 'done' });
+  await f.ok('admin', 'followups.update', { conversationId: 'c-chase', kind: 'chasing', op: 'done' });
   assert.ok(!(await ids()).includes('c-chase'));
   assert.equal(
     (await f.ok('admin', 'followups.list', { includeClosed: true })).find(
@@ -171,7 +171,7 @@ test('snooze, done and reopen; done holds only until the thread moves again', as
       await f.mail('admin', 'followups.update', {
         conversationId: 'c-chase2',
         kind: 'chasing',
-        action: 'snooze',
+        op: 'snooze',
         days: 2,
       })
     ).status,

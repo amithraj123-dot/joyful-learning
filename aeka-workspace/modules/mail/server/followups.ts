@@ -270,7 +270,7 @@ export const followUpActions: Record<string, ModuleAction> = {
       const conversationId = conversationOf(p.conversationId);
       if (!KINDS.includes(p.kind as string)) throw new CloudError('Choose a valid kind.');
       const kind = p.kind as FollowUpKind;
-      const action = p.action;
+      const action = p.op;
       const known = await ctx.db
         .prepare('SELECT 1 AS ok FROM mail_messages WHERE member = ? AND conversation_id = ? LIMIT 1')
         .bind(member, conversationId)

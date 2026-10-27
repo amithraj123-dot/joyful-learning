@@ -115,11 +115,12 @@ export interface MailActions {
   // includeClosed adds snoozed and done threads (most recent first after the open ones), to reopen them.
   'followups.list': { payload: { kind?: FollowUpKind; includeClosed?: boolean }; result: FollowUp[] };
   // Snooze a waiting thread (days 1 to 30), mark it done, or clear both.
+  // `op`, not `action`: the request envelope already uses the `module` and `action` keys.
   'followups.update': {
     payload: {
       conversationId: string;
       kind: FollowUpKind;
-      action: 'snooze' | 'done' | 'reopen';
+      op: 'snooze' | 'done' | 'reopen';
       days?: number;
     };
     result: true;
@@ -175,6 +176,7 @@ export interface MailActions {
       correctionsByField: Record<string, number>;
       aiCallsToday: number;
       aiLimit: number;
+      archived30d: number; // moved to Outlook's Archive in the last 30 days (by me or automatically)
     };
   };
 }

@@ -114,11 +114,11 @@ export function FollowUpsPage() {
       setBusy((b) => ({ ...b, [k]: '' }));
     }
   };
-  const update = (f: FollowUp, action: 'snooze' | 'done' | 'reopen', days?: number) =>
+  const update = (f: FollowUp, op: 'snooze' | 'done' | 'reopen', days?: number) =>
     mail('followups.update', {
       conversationId: f.conversationId,
       kind: f.kind,
-      action,
+      op,
       ...(days ? { days } : {}),
     });
 
