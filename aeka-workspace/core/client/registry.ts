@@ -1,4 +1,5 @@
 // Browser-side module registry. Order here is the order of navigation groups.
+import { agentsModule } from '../../modules/agents/manifest';
 import { assistantModule } from '../../modules/assistant/manifest';
 import { chatsModule } from '../../modules/chats/manifest';
 import { mailModule } from '../../modules/mail/manifest';
@@ -11,6 +12,7 @@ export const clientModules: ClientModule[] = [
   assistantModule,
   mailModule,
   chatsModule,
+  agentsModule,
   workflowModule,
   scribeModule,
 ];

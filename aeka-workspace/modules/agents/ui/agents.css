@@ -1,0 +1,513 @@
+/* Agents module styles, on top of workflow.css. Drawers render in a portal outside .agents, so rules for
+   their contents are not scoped under .agents. Phone first: touch targets of at least 40 px; two columns
+   of cards from 900 px. */
+
+.ag-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  max-width: 1100px;
+}
+.ag-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px 16px;
+  min-width: 0;
+}
+.ag-card h2,
+.ag-card h3 {
+  margin: 0 0 6px;
+}
+.ag-card h3 {
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.ag-card p {
+  margin: 0 0 8px;
+}
+.ag-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.ag-section > h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+.ag-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--aeka-red);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.ag-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  background: #fff8ec;
+  border-color: #f0d7a6;
+}
+.ag-banner > svg {
+  flex: none;
+  color: #b26a00;
+}
+.ag-banner > div {
+  flex: 1;
+  min-width: 180px;
+}
+.ag-banner p {
+  margin: 2px 0 0;
+  color: var(--caption);
+  font-size: 13px;
+}
+.ag-note,
+.ag-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--caption);
+}
+.ag-error,
+.ag-problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--aeka-red);
+}
+.ag-problem {
+  font-size: 12px;
+  font-weight: 600;
+}
+.ag-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--caption);
+}
+.ag-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ag-quote {
+  padding: 8px 10px;
+  background: #fafafa;
+  border-left: 3px solid var(--aeka-rule);
+  border-radius: 4px;
+}
+.ag-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Touch targets, on the pages and in the drawers */
+:where(.agents, .ag-d, .ag-foot) .button,
+:where(.agents, .ag-d) .wf-chip,
+:where(.agents, .ag-d) .wf-toggle {
+  min-height: 40px;
+}
+:where(.agents, .ag-d) .wf-field input:not([type='checkbox']),
+:where(.agents, .ag-d) .wf-field select {
+  min-height: 40px;
+}
+
+/* Command box */
+.ag-command {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 3px solid var(--aeka-red);
+}
+.ag-command-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--aeka-red);
+}
+.ag-command textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid var(--aeka-rule);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  background: #fff;
+}
+.ag-command textarea:disabled {
+  background: var(--wf-grey-bg);
+}
+.ag-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.ag-plan .wf-field {
+  margin: 6px 0;
+}
+.ag-reads {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--aeka-tint);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* Trigger editor */
+.ag-trigger {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0;
+}
+.ag-legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ag-schedule {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 12px;
+}
+.ag-schedule .wf-field,
+.ag-events .wf-field {
+  margin: 4px 0;
+}
+.ag-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px 12px;
+}
+.ag-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ag-check input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--aeka-red);
+}
+
+/* Lists of agents, runs and templates */
+.ag-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ag-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.ag-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.ag-row:hover,
+.ag-row:focus-visible {
+  border-color: var(--aeka-rule);
+}
+.ag-row.paused {
+  background: #fafafa;
+}
+.ag-row-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ag-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ag-when {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  color: var(--caption);
+}
+.ag-tag {
+  display: inline-flex;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f1f1f1;
+  color: #404040;
+}
+.ag-trigger-line {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+.ag-text {
+  font-size: 13px;
+  color: var(--caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.ag-template {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+}
+.ag-template .ag-actions {
+  margin-top: auto;
+  padding-top: 6px;
+}
+.ag-details summary {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--aeka-red);
+  cursor: pointer;
+}
+.ag-details .ag-pre {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+/* Approvals */
+.ag-approval {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ag-approval.pending {
+  border-left: 4px solid #b26a00;
+}
+.ag-approval-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.ag-approval-head > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--aeka-red);
+}
+.ag-approval-head > div {
+  flex: 1;
+  min-width: 0;
+}
+.ag-approval-head h3 {
+  margin: 0;
+}
+.ag-detail {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  background: #fafafa;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ag-why {
+  margin: 0;
+  font-size: 13px;
+}
+.ag-reject .wf-field {
+  margin: 0 0 8px;
+}
+
+/* Lessons */
+.ag-lessons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ag-card.ag-lessons {
+  padding: 4px 16px;
+}
+.ag-lessons li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.ag-lessons li:first-child {
+  border-top: 0;
+}
+.ag-lesson-text {
+  flex: 1 1 100%;
+  overflow-wrap: anywhere;
+}
+.ag-lessons .ag-meta {
+  flex: 1;
+  min-width: 0;
+}
+.ag-explain p {
+  color: var(--ink);
+}
+
+/* Drawers */
+.ag-d {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+}
+.ag-d .wf-field {
+  margin: 4px 0;
+}
+.ag-sub {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--caption);
+}
+.ag-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.ag-sec > h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--aeka-red);
+}
+.ag-sec > .button,
+.ag-sec > .wf-confirm {
+  align-self: flex-start;
+}
+.ag-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ag-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ag-steps li > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.ag-steps li.ok > svg {
+  color: var(--success, #1e5a23);
+}
+.ag-steps li.failed > svg {
+  color: var(--aeka-red);
+}
+.ag-step-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ag-step-main code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: var(--caption);
+}
+.ag-learnt {
+  padding: 10px 12px;
+  background: #f4faf6;
+  border: 1px solid #bfe0cb;
+  border-radius: 6px;
+}
+.ag-learnt ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.ag-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ag-publish .wf-field {
+  margin: 0 0 8px;
+}
+
+/* A drawer is narrow at every width: one column of choices. */
+.ag-d .ag-checks {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+@media (min-width: 640px) {
+  .ag-schedule {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ag-checks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 900px) {
+  .ag-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
