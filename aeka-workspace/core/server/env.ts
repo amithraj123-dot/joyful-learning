@@ -6,7 +6,7 @@ export interface ServerEnv {
   // any mailbox can be connected.
   AEKA_ENCRYPTION_KEY?: string;
   // The firm's AI service, OpenAI-compatible: the LiteLLM proxy, or OpenRouter (base URL
-  // https://openrouter.ai/api/v1, LITELLM_MODEL an OpenRouter id such as anthropic/claude-sonnet-4.5).
+  // https://openrouter.ai/api/v1, LITELLM_MODEL an OpenRouter id; it defaults there to anthropic/claude-sonnet-6).
   // Base URL ends with /v1 or is the proxy root.
   LITELLM_BASE_URL?: string;
   LITELLM_API_KEY?: string;

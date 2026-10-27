@@ -11,8 +11,14 @@ const env = {
   AEKA_PUBLIC_ORIGIN: 'https://aeka.example',
 };
 
-test('OpenRouter needs a provider-prefixed model; requests carry the app name', async () => {
-  assert.match(aiStatus(env).reason, /OpenRouter model id/);
+test('OpenRouter uses Sonnet 6 by default, needs provider-prefixed ids and sends the app name', async () => {
+  // No model set: Sonnet 6, the deck engine's model, for both kinds of call.
+  assert.deepEqual(
+    [aiStatus(env).ready, aiStatus(env).model, aiStatus(env).fastModel],
+    [true, 'anthropic/claude-sonnet-6', 'anthropic/claude-sonnet-6'],
+  );
+  assert.match(aiStatus({ ...env, LITELLM_MODEL: 'claude-sonnet-6' }).reason, /OpenRouter model id/);
+  assert.match(aiStatus({ ...env, LITELLM_FAST_MODEL: 'haiku' }).reason, /OpenRouter model id/);
   const ready = {
     ...env,
     LITELLM_MODEL: 'anthropic/claude-sonnet-4.5',
@@ -52,4 +58,16 @@ test('OpenRouter needs a provider-prefixed model; requests carry the app name', 
   );
   assert.equal(seen[1].url, 'https://ai.aeka.example/v1/chat/completions');
   assert.equal(seen[1].headers['X-Title'], undefined);
+  assert.equal(seen[1].body.model, 'claude-sonnet-4.6');
+});
+
+test('OpenRouter refusing the model id says which model and where to check', async () => {
+  const fetch = async () => Response.json({ error: { message: 'not a valid model ID' } }, { status: 400 });
+  await assert.rejects(
+    chat(
+      { db: database(), env, fetch, now: Date.now() },
+      { purpose: 'other', module: 'core', actor: 'system', messages: [{ role: 'user', content: 'hi' }] },
+    ),
+    /did not accept the request for the model "anthropic\/claude-sonnet-6".*openrouter\.ai\/models/,
+  );
 });

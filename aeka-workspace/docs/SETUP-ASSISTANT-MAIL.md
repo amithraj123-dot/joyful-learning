@@ -28,11 +28,12 @@ or changed, every member must connect Outlook again (their mail data is unaffect
 | `AEKA_AI_DISABLED`    | Optional. `true` stops every AI call at once                                     |
 
 **OpenRouter instead of the proxy** (the same service the firm's deck engine uses): set
-`LITELLM_BASE_URL` to `https://openrouter.ai/api/v1`, `LITELLM_API_KEY` to an OpenRouter key made for
-Aeka Workspace, and `LITELLM_MODEL` to an OpenRouter model id with its provider, for example
-`anthropic/claude-sonnet-4.5` (optionally `LITELLM_FAST_MODEL`, for example
-`anthropic/claude-haiku-4.5`, for triage). Without a provider-prefixed model the workspace reports AI as
-not configured rather than failing call by call. Set a monthly credit limit on the key in OpenRouter.
+`LITELLM_BASE_URL` to `https://openrouter.ai/api/v1` and `LITELLM_API_KEY` to an OpenRouter key made for
+Aeka Workspace. The workspace then uses Sonnet 6 (`anthropic/claude-sonnet-6`), the deck engine's model,
+for every call. To use another model set `LITELLM_MODEL` (and optionally `LITELLM_FAST_MODEL`, used for
+triage) to an OpenRouter model id with its provider, exactly as listed on openrouter.ai/models. A model
+id without its provider is reported as not configured; an id OpenRouter does not accept is named in the
+error. Set a monthly credit limit on the key in OpenRouter.
 Keys go only into the hosting secrets, never into the repository (it is public) or a chat.
 
 Before real client mail is sent, confirm in writing the proxy's and the model provider's data retention

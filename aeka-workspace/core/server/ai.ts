@@ -47,6 +47,9 @@ export interface AiDeps {
 }
 
 const DEFAULT_MODEL = 'claude-sonnet-4.6';
+// On OpenRouter the workspace uses Sonnet 6, the model the firm's deck engine uses, unless
+// LITELLM_MODEL names another.
+export const OPENROUTER_MODEL = 'anthropic/claude-sonnet-6';
 const TIMEOUT_MS = 60000;
 const dayStartIST = (now: number) => {
   const d = new Date(now + 330 * 60000);
@@ -57,7 +60,7 @@ export const aiConfigured = (env: ServerEnv) =>
   configured(env.LITELLM_BASE_URL, env.LITELLM_API_KEY) && env.AEKA_AI_DISABLED !== 'true';
 
 // OpenRouter (https://openrouter.ai/api/v1) speaks the same protocol as LiteLLM; its model ids name the
-// provider ("anthropic/claude-sonnet-4.5"), so the model must be set explicitly there.
+// provider ("anthropic/claude-sonnet-6"), so a model id without one is refused there.
 export const isOpenRouter = (base: string | undefined) => {
   try {
     return !!base && new URL(base.trim()).hostname.endsWith('openrouter.ai');
@@ -70,17 +73,16 @@ export function aiStatus(env: ServerEnv) {
   if (env.AEKA_AI_DISABLED === 'true') return { ready: false, reason: 'AI is switched off for the firm.' };
   if (!configured(env.LITELLM_BASE_URL, env.LITELLM_API_KEY))
     return { ready: false, reason: 'The firm AI service (LiteLLM or OpenRouter) is not configured.' };
-  if (isOpenRouter(env.LITELLM_BASE_URL) && !(env.LITELLM_MODEL ?? '').includes('/'))
+  const openRouter = isOpenRouter(env.LITELLM_BASE_URL);
+  const fallback = openRouter ? OPENROUTER_MODEL : DEFAULT_MODEL;
+  const model = env.LITELLM_MODEL?.trim() || fallback;
+  const fastModel = env.LITELLM_FAST_MODEL?.trim() || model;
+  if (openRouter && !(model.includes('/') && fastModel.includes('/')))
     return {
       ready: false,
-      reason: 'Set LITELLM_MODEL to an OpenRouter model id, for example anthropic/claude-sonnet-4.5.',
+      reason: `Set LITELLM_MODEL to an OpenRouter model id with its provider, for example ${OPENROUTER_MODEL}.`,
     };
-  return {
-    ready: true,
-    reason: '',
-    model: env.LITELLM_MODEL || DEFAULT_MODEL,
-    fastModel: env.LITELLM_FAST_MODEL || env.LITELLM_MODEL || DEFAULT_MODEL,
-  };
+  return { ready: true, reason: '', model, fastModel };
 }
 
 function endpoint(base: string) {
@@ -178,7 +180,9 @@ export async function chat(deps: AiDeps, req: AiRequest): Promise<AiResult> {
         ? 'The firm AI key was refused. An administrator must renew LITELLM_API_KEY.'
         : res.status === 429
           ? 'The AI service is busy or over its limit. Try again shortly.'
-          : `The AI service returned an error (${res.status}).`,
+          : (res.status === 400 || res.status === 404) && isOpenRouter(deps.env.LITELLM_BASE_URL)
+            ? `The AI service did not accept the request for the model "${model}". Check LITELLM_MODEL against openrouter.ai/models.`
+            : `The AI service returned an error (${res.status}).`,
       res.status === 401 || res.status === 403 ? 503 : 502,
     );
   }
