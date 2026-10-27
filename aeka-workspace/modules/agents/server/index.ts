@@ -135,7 +135,8 @@ const actions: Record<string, ModuleAction> = {
       return {
         agent,
         runs: await listRuns(ctx.db, member, agent.id, 20),
-        lessons: (await listLessons(ctx.db, member, agent.id)).filter((l) => l.agentId === agent.id),
+        // Its own lessons and those for every agent: all that it follows.
+        lessons: await listLessons(ctx.db, member, agent.id),
       };
     },
   },

@@ -36,6 +36,7 @@ export interface AgentsActions {
   'command.run': { payload: { command: string }; result: Run };
 
   'agents.list': { payload: Record<string, never>; result: { agents: Agent[]; pendingApprovals: number } };
+  // lessons: the agent's own and those for every agent (agentId null), all that it follows.
   'agent.get': {
     payload: { id: string };
     result: { agent: Agent; runs: Run[]; lessons: Lesson[] };
