@@ -370,8 +370,8 @@ export const mailThreads = sqliteTable(
     member: text('member').notNull(),
     conversationId: text('conversation_id').notNull(),
     waitingSnoozedUntil: integer('waiting_snoozed_until'),
-    waitingDone: integer('waiting_done').notNull().default(0),
-    chasingDone: integer('chasing_done').notNull().default(0),
+    waitingDone: integer('waiting_done').notNull().default(0), // when marked done (ms); 0: not done
+    chasingDone: integer('chasing_done').notNull().default(0), // when marked done (ms); 0: not done
     updatedAt: integer('updated_at').notNull(),
   },
   (t) => [primaryKey({ columns: [t.member, t.conversationId] })],
@@ -538,6 +538,7 @@ export const asTodos = sqliteTable(
     list: text('list').notNull().default(''), // a list label, e.g. "Falcon" from "#Falcon"
     sourceLabel: text('source_label').notNull().default(''), // e.g. the email subject
     repeat: text('repeat').notNull().default('none'), // none | daily | weekly | fortnightly | monthly
+    repeatDay: integer('repeat_day').notNull().default(0), // day of the month a monthly to-do keeps to
   },
   (t) => [
     index('as_todos_member').on(t.member, t.status, t.dueAt),

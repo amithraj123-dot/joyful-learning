@@ -1,5 +1,5 @@
 // India time (UTC+5:30, no daylight saving) and reminder recurrence.
-import type { Repeat } from '../shared/types.ts';
+import type { Repeat, TodoRepeat } from '../shared/types.ts';
 
 export const IST = 330 * 60000;
 export const MINUTE = 60000;
@@ -82,15 +82,34 @@ export function nextOccurrence(dueAt: number, repeat: Repeat, previous: number |
       while ([0, 6].includes(istParts(t).weekday)) t += DAY;
       return t;
     }
-    case 'monthly': {
-      const p = istParts(dueAt);
-      const anchor = monthlyAnchor(dueAt, previous);
-      const year = p.month === 11 ? p.year + 1 : p.year;
-      const month = (p.month + 1) % 12;
-      const day = Math.min(anchor, daysInMonth(year, month));
-      return Date.UTC(year, month, day) - IST + istTimeOfDay(dueAt);
-    }
+    case 'monthly':
+      return nextMonth(dueAt, monthlyAnchor(dueAt, previous));
   }
+}
+
+// The same time of day in the next month, on `anchor` (the day of the month kept to) or the last
+// day of a shorter month.
+export function nextMonth(dueAt: number, anchor: number) {
+  const p = istParts(dueAt);
+  const year = p.month === 11 ? p.year + 1 : p.year;
+  const month = (p.month + 1) % 12;
+  const day = Math.min(anchor, daysInMonth(year, month));
+  return Date.UTC(year, month, day) - IST + istTimeOfDay(dueAt);
+}
+
+// The due time of the next to-do of a repeating one: the first occurrence after now (a late
+// completion skips the occurrences missed in between), at the same time of day in India time.
+// `anchorDay` is the day of the month a monthly to-do keeps to (31 Jan, 28 Feb, then 31 Mar); 0 means
+// the day of `dueAt`.
+export function nextTodoDue(dueAt: number, repeat: TodoRepeat, now: number, anchorDay = 0) {
+  if (repeat === 'none') return null;
+  const anchor = anchorDay || istParts(dueAt).day;
+  const step =
+    repeat === 'daily' ? DAY : repeat === 'weekly' ? 7 * DAY : repeat === 'fortnightly' ? 14 * DAY : 0;
+  let next = step ? dueAt + step : nextMonth(dueAt, anchor);
+  if (step && next <= now) next += Math.ceil((now - next + 1) / step) * step;
+  for (let i = 0; i < 2000 && next <= now; i++) next = nextMonth(next, anchor);
+  return next;
 }
 
 // After an occurrence at `dueAt` fires at `now`: the latest occurrence at or before now (recorded as

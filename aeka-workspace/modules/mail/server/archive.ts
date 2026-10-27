@@ -78,7 +78,7 @@ export async function archiveMessages(ctx: ModuleContext, ids: unknown) {
   if (archived)
     await ctx.log(
       'message.archived',
-      member,
+      String(archived), // the count, as for automatic archiving (the stats add both up)
       `Archived ${archived} email${archived === 1 ? '' : 's'} to Outlook`,
     );
   return { archived };

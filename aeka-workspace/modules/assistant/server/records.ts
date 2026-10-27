@@ -16,7 +16,7 @@ import {
   type TodoSource,
 } from '../shared/types.ts';
 import { QUICK_ADD_MAX, parseQuickAdd } from './quickadd.ts';
-import { DAY, nextOccurrence } from './recurrence.ts';
+import { DAY, istParts, nextTodoDue } from './recurrence.ts';
 import {
   LIMITS,
   bad,
@@ -102,14 +102,18 @@ const assertRepeatable = (repeat: TodoRepeat, dueAt: number | null) => {
   if (repeat !== 'none' && dueAt == null) throw bad('Give a repeating to-do a due date.');
 };
 
-export async function getTodo(ctx: ModuleContext, id: unknown) {
+async function todoRow(ctx: ModuleContext, id: unknown) {
   const key = recordId(id, 'to-do');
   const r = await ctx.db
     .prepare(`SELECT * FROM as_todos WHERE id = ? AND member = ? AND ${VISIBLE}`)
     .bind(key, owner(ctx))
     .first<Row>();
   if (!r) throw notFound('to-do');
-  return todoFrom(r, ctx.now);
+  return r;
+}
+
+export async function getTodo(ctx: ModuleContext, id: unknown) {
+  return todoFrom(await todoRow(ctx, id), ctx.now);
 }
 
 // Open and in-progress to-dos (with includeDone, done ones too), earliest due first.
@@ -137,7 +141,11 @@ async function assertOpenRoom(ctx: ModuleContext) {
 }
 
 const INSERT_TODO =
-  'INTO as_todos(id,member,title,details,status,priority,due_at,source,source_ref,source_label,list,repeat,task_id,created_at,updated_at,done_at,revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
+  'INTO as_todos(id,member,title,details,status,priority,due_at,source,source_ref,source_label,list,repeat,repeat_day,task_id,created_at,updated_at,done_at,revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
+// The day of the month a monthly to-do keeps to, taken from its due date (0 when it does not repeat
+// monthly). Its successors keep it, so a to-do due on 31 Jan falls on 28 Feb and then 31 Mar.
+const repeatDay = (repeat: TodoRepeat, dueAt: number | null) =>
+  repeat === 'monthly' && dueAt != null ? istParts(dueAt).day : 0;
 const insertTodo = (ctx: ModuleContext, t: Todo, verb = 'INSERT') =>
   ctx.db
     .prepare(`${verb} ${INSERT_TODO}`)
@@ -154,6 +162,7 @@ const insertTodo = (ctx: ModuleContext, t: Todo, verb = 'INSERT') =>
       t.sourceLabel,
       t.list,
       t.repeat,
+      repeatDay(t.repeat, t.dueAt),
       null,
       t.createdAt,
       t.updatedAt,
@@ -225,39 +234,26 @@ export async function createSourcedTodo(
   return r.meta.changes ? todo : null;
 }
 
-// The due time of the next to-do of a repeating one: the first occurrence after now (a late
-// completion skips the occurrences missed in between), at the same time of day in India time.
-export function nextTodoDue(dueAt: number, repeat: TodoRepeat, now: number) {
-  if (repeat === 'none') return null;
-  let next = dueAt;
-  let prev: number | null = null;
-  for (let i = 0; i < 2000 && (next === dueAt || next <= now); i++) {
-    const step: number | null =
-      repeat === 'daily'
-        ? next + DAY
-        : repeat === 'weekly'
-          ? next + 7 * DAY
-          : repeat === 'fortnightly'
-            ? next + 14 * DAY
-            : nextOccurrence(next, 'monthly', prev);
-    prev = next;
-    next = step!;
-  }
-  return next;
-}
+export { nextTodoDue };
 
 export async function updateTodo(ctx: ModuleContext, id: unknown, input: TodoInput, base: number) {
-  const current = await getTodo(ctx, id);
+  const row = await todoRow(ctx, id);
+  const current = todoFrom(row, ctx.now);
   const status = input.status ?? current.status;
   const list = input.list ?? current.list;
   const repeat = input.repeat ?? current.repeat;
   assertRepeatable(repeat, input.dueAt);
+  // A new due date or repeat sets the day of the month again; otherwise the stored one is kept.
+  const anchor =
+    input.dueAt === current.dueAt && repeat === current.repeat && Number(row.repeat_day) > 0
+      ? Number(row.repeat_day)
+      : repeatDay(repeat, input.dueAt);
   if (status !== 'done' && current.status === 'done') await assertOpenRoom(ctx);
   const doneAt = status === 'done' ? (current.doneAt ?? ctx.now) : null;
   const statements = [
     ctx.db
       .prepare(
-        'UPDATE as_todos SET title = ?, details = ?, priority = ?, due_at = ?, status = ?, list = ?, repeat = ?, done_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ? AND member = ? AND revision = ?',
+        'UPDATE as_todos SET title = ?, details = ?, priority = ?, due_at = ?, status = ?, list = ?, repeat = ?, repeat_day = ?, done_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ? AND member = ? AND revision = ?',
       )
       .bind(
         input.title,
@@ -267,6 +263,7 @@ export async function updateTodo(ctx: ModuleContext, id: unknown, input: TodoInp
         status,
         list,
         repeat,
+        anchor,
         doneAt,
         ctx.now,
         current.id,
@@ -283,7 +280,7 @@ export async function updateTodo(ctx: ModuleContext, id: unknown, input: TodoInp
         title: input.title,
         details: input.details,
         priority: input.priority,
-        dueAt: nextTodoDue(input.dueAt, repeat, ctx.now),
+        dueAt: nextTodoDue(input.dueAt, repeat, ctx.now, anchor),
         list,
         repeat,
       },
@@ -295,8 +292,8 @@ export async function updateTodo(ctx: ModuleContext, id: unknown, input: TodoInp
     statements.push(
       ctx.db
         .prepare(
-          `INSERT OR IGNORE INTO as_todos(id,member,title,details,status,priority,due_at,source,source_ref,source_label,list,repeat,task_id,created_at,updated_at,done_at,revision)
-           SELECT ?,?,?,?,'open',?,?,?,?,'',?,?,NULL,?,?,NULL,1 WHERE EXISTS (SELECT 1 FROM as_todos WHERE id = ? AND member = ? AND status = 'done' AND revision = ?)`,
+          `INSERT OR IGNORE INTO as_todos(id,member,title,details,status,priority,due_at,source,source_ref,source_label,list,repeat,repeat_day,task_id,created_at,updated_at,done_at,revision)
+           SELECT ?,?,?,?,'open',?,?,?,?,'',?,?,?,NULL,?,?,NULL,1 WHERE EXISTS (SELECT 1 FROM as_todos WHERE id = ? AND member = ? AND status = 'done' AND revision = ?)`,
         )
         .bind(
           next.id,
@@ -309,6 +306,7 @@ export async function updateTodo(ctx: ModuleContext, id: unknown, input: TodoInp
           REPEAT_REF + current.id,
           next.list,
           next.repeat,
+          anchor,
           ctx.now,
           ctx.now,
           current.id,

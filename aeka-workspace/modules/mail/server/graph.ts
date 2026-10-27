@@ -4,7 +4,7 @@
 // stored inbox to the Archive folder (nothing else can be moved, and to nowhere else). Tokens are refreshed before expiry and the rotated refresh
 // token is always stored. 429 and 503 stop the batch; 401 refreshes once.
 import { CloudError } from '../../../lib/cloud-store.ts';
-import { notify } from '../../../core/server/notifications.ts';
+import { notify, takeLease } from '../../../core/server/notifications.ts';
 import { seal, unseal } from '../../../core/server/secrets.ts';
 import type { ServerEnv } from '../../../core/server/env.ts';
 import { loadAccount, type AccountRow, type Sys } from './store.ts';
@@ -291,13 +291,23 @@ export class GraphSession {
       if (res.ok) return { status: res.status, data };
       const retry = Number(res.headers.get('Retry-After'));
       const code = (data.error as { code?: string } | undefined)?.code || '';
-      throw new GraphError(
+      const error = new GraphError(
         res.status === 429 || res.status === 503
           ? 'Outlook asked the workspace to slow down. Mail will be checked again shortly.'
           : `Outlook returned an error (${res.status}${code ? ' ' + code.slice(0, 60) : ''}).`,
         res.status,
         Number.isFinite(retry) && retry > 0 ? Math.min(retry, 3600) : 60,
       );
+      // Whatever asked (sync, archive, calendar, a draft), nothing calls Outlook again for this
+      // member until the wait is over.
+      if (error.busy)
+        await takeLease(
+          this.sys.db,
+          `mail-busy:${this.account.member}`,
+          this.sys.now,
+          error.retryAfter * 1000,
+        );
+      throw error;
     }
   }
 }

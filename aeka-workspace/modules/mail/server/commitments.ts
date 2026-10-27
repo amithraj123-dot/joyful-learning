@@ -4,6 +4,7 @@
 // (commitments_at), including those the phrase check or a rule kept from AI, so nothing is examined
 // twice. When the AI or the to-do service fails, the messages stay unstamped and the step pauses for an
 // hour, so a failure never becomes a retry storm.
+import { CloudError } from '../../../lib/cloud-store.ts';
 import { aiStatus, chat, parseJsonObject } from '../../../core/server/ai.ts';
 import type { ModuleContext } from '../../../core/server/module.ts';
 import { takeLease } from '../../../core/server/notifications.ts';
@@ -142,6 +143,7 @@ export async function trackCommitments(ctx: ModuleContext, account: AccountRow):
     return result;
   }
   const done: string[] = [];
+  let full = false;
   for (const [id, m] of short) {
     const list = found.get(id) ?? [];
     let ok = true;
@@ -158,13 +160,17 @@ export async function trackCommitments(ctx: ModuleContext, account: AccountRow):
           sourceLabel: m.subject.slice(0, 200) || '(no subject)',
         });
         if (todo) result.added++;
-      } catch {
-        ok = false;
+      } catch (e) {
+        // A full to-do list (409) will not clear by asking AI again: the email counts as examined and
+        // its remaining promises are not added. Any other failure is retried later.
+        if (e instanceof CloudError && e.status === 409) full = true;
+        else ok = false;
         break;
       }
     }
     if (ok) done.push(m.id);
   }
+  if (full) console.error('Mail: the to-do list is full; some commitments were not added');
   await stamp(db, member, done, now);
   result.examined += done.length;
   if (done.length < short.size) {

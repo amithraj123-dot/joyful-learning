@@ -6,7 +6,16 @@
 // Times are read only with "at", am or pm, or a colon (16:30), so a number in a title ("Form 15CA",
 // "Section 194") is never taken as a time. Anything not understood stays in the title.
 import type { TodoPriority, TodoRepeat } from '../shared/types.ts';
-import { DAY, HOUR, MINUTE, daysInMonth, istDayStart, istParts, longLabel } from './recurrence.ts';
+import {
+  DAY,
+  HOUR,
+  MINUTE,
+  daysInMonth,
+  istDayStart,
+  istParts,
+  longLabel,
+  nextTodoDue,
+} from './recurrence.ts';
 import { bad } from './validate.ts';
 
 export const EOD_MINUTES = 18 * 60;
@@ -144,12 +153,16 @@ export function parseQuickAdd(input: string, now: number): QuickAdd {
     (m = take(new RegExp(`${LEAD}\\b(\\d{4})-(\\d{2})-(\\d{2})\\b`, 'i')))
   )
     day = dayOf(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  // Day first, as in India: 3/11 is 3 November.
+  // Day first, as in India: 3/11 is 3 November. Without a year it needs "by", "on" or "due" before it,
+  // or to end the line, so "review 1/2 of the deck" keeps its fraction.
   if (day == null && absolute == null) {
-    const re = new RegExp(`${LEAD}(?<![\\w/])(\\d{1,2})/(\\d{1,2})(?:/(\\d{4}|\\d{2}))?(?![\\w/])`, 'i');
+    const re = new RegExp(
+      `(?:\\b(by|on|before|due|for)\\s+)?(?<![\\w/])(\\d{1,2})/(\\d{1,2})(?:/(\\d{4}|\\d{2}))?(?![\\w/])`,
+      'i',
+    );
     const found = s.match(re);
-    if (found) {
-      const d = explicit(year(found[3]), Number(found[2]) - 1, Number(found[1]));
+    if (found && (found[1] || found[4] || !s.slice(found.index! + found[0].length).trim())) {
+      const d = explicit(year(found[4]), Number(found[3]) - 1, Number(found[2]));
       if (d != null) {
         take(re);
         day = d;
@@ -183,8 +196,11 @@ export function parseQuickAdd(input: string, now: number): QuickAdd {
   if (dueAt == null) {
     if (day != null) {
       dueAt = day + (minutes ?? EOD_MINUTES) * MINUTE;
-      // "every Friday" said on a Friday evening starts next Friday.
-      if (repeat !== 'none' && dueAt <= now) dueAt += 7 * DAY;
+      // A repeating to-do whose first time has passed starts at its next occurrence ("every Friday"
+      // said on a Friday evening starts next Friday; "every day today" starts tomorrow).
+      if (repeat !== 'none' && dueAt <= now) dueAt = nextTodoDue(dueAt, repeat, now)!;
+      // "today" said after the end of the working day is due by midnight, not already overdue.
+      else if (minutes == null && day === today && dueAt <= now) dueAt = today + DAY - MINUTE;
     } else if (minutes != null) {
       dueAt = today + minutes * MINUTE;
       if (dueAt <= now) dueAt += DAY;

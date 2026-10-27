@@ -127,6 +127,8 @@ test('day health follows the published formula, counting only busy timed meeting
   assert.equal(packed.focusMinutes, 0);
   assert.equal(packed.label, 'Overloaded');
   assert.equal(dayHealth([ev(10, 12), ev(14, 15)], DAY0).label, 'Light');
+  // A short meeting inside a long one does not hide the next one starting as the long one ends.
+  assert.equal(dayHealth([ev(10, 12), ev(10.5, 11), ev(12, 13)], DAY0).backToBack, 1);
 });
 
 test('meetings.upcoming and schedule.week read the cached calendar and explain an empty one', async () => {

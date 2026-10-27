@@ -13,7 +13,8 @@ import { trackCommitments } from './commitments.ts';
 import { readMeetingTimes, syncMailbox } from './sync.ts';
 import { contextFor, runTriage, type RunOptions } from './triage.ts';
 
-const LEASE_MS = 3 * 60000;
+// Longer than a full pass takes, so a slow pass is never overlapped by the next tick.
+const LEASE_MS = 6 * 60000;
 const TICK_INTERVAL_MS = 2 * 60000;
 
 export interface PassResult {
@@ -58,10 +59,8 @@ export async function mailboxPass(
       try {
         const s = await syncMailbox(session);
         result.fetched = s.fetched;
-        if (s.busy) {
-          await takeLease(sys.db, `mail-busy:${email}`, sys.now, s.busy.retryAfter * 1000);
-          problem = s.busy.message;
-        }
+        // The busy wait itself is set by GraphSession.
+        if (s.busy) problem = s.busy.message;
       } catch (e) {
         if (!(e instanceof GraphError)) throw e;
         problem =

@@ -105,4 +105,4 @@ by sending the code shown there; STOP unlinks it. Only text messages are handled
 
 ## 6. Deploying
 
-Apply migrations `0006` to `0009` to the hosted database before deploying this version.
+Apply migrations `0006` to `0010` to the hosted database before deploying this version.

@@ -7,7 +7,7 @@ import { listMembers } from '../../../core/server/members.ts';
 import type { ModuleContext } from '../../../core/server/module.ts';
 import { releaseLease, takeLease } from '../../../core/server/notifications.ts';
 import { searchOwnNotes } from '../../scribe/server/notes.ts';
-import { calendarStatus, eventsBetween, followUps, mailWith } from '../../mail/server/service.ts';
+import { calendarStatus, eventsBetween, followUps, keptFromAi, mailWith } from '../../mail/server/service.ts';
 import { isBusy, type CalendarEvent, type FollowUp, type MailItem } from '../../mail/shared/types.ts';
 import { matterTargets, openTasksOn, upcomingDeadlines } from '../../workflow/server/services.ts';
 import type { DayHealth, MeetingPrep, MeetingPrepPerson } from '../shared/types.ts';
@@ -69,13 +69,14 @@ export function dayHealth(events: CalendarEvent[], dayStart: number): DayHealth 
   const longestFocus = Math.round((focus.length ? Math.max(...focus) : 0) / MINUTE);
   let clashes = 0;
   let backToBack = 0;
+  // Back to back is measured from the latest end so far, so a short meeting inside a long one does
+  // not hide the next meeting starting just after the long one ends.
+  let latestEnd = -Infinity;
   for (let i = 0; i < meetings.length; i++) {
     for (let j = i + 1; j < meetings.length && meetings[j].start < meetings[i].end; j++) clashes++;
-    const next = meetings[i + 1];
-    if (next) {
-      const gap = next.start - meetings[i].end;
-      if (gap >= 0 && gap < BACK_TO_BACK) backToBack++;
-    }
+    const gap = meetings[i].start - latestEnd;
+    if (gap >= 0 && gap < BACK_TO_BACK) backToBack++;
+    latestEnd = Math.max(latestEnd, meetings[i].end);
   }
   const raw =
     100 -
@@ -324,7 +325,8 @@ export function tidySummary(text: string) {
     .join('\n');
 }
 
-function prepData(prep: MeetingPrep) {
+// What the AI briefing is given. Emails kept from AI by the member's rules are left out.
+function prepData(prep: MeetingPrep, kept: Set<string> | null) {
   const day = (ms: number) => longLabel(ms);
   return {
     meeting: {
@@ -337,7 +339,10 @@ function prepData(prep: MeetingPrep) {
     people: prep.people.map((p) => ({
       name: p.name,
       organisation: p.colleague ? 'Aeka Advisors (colleague)' : (p.address.split('@')[1] ?? ''),
-      lastEmail: p.lastMail ? `${p.lastMail.subject} (${day(p.lastMail.at)})` : null,
+      lastEmail:
+        p.lastMail && kept && !kept.has(p.lastMail.mailId)
+          ? `${p.lastMail.subject} (${day(p.lastMail.at)})`
+          : null,
       iAmWaitingOnThem: p.waitingOnThem,
       theyAreChasingMe: p.chasingMe,
     })),
@@ -351,12 +356,14 @@ function prepData(prep: MeetingPrep) {
           deadlines: prep.mandate.deadlines.map((d) => `${d.title}, ${d.dueDate}`),
         }
       : null,
-    recentEmails: prep.recentMail.map((m) => ({
-      subject: m.subject,
-      from: m.from,
-      when: day(m.at),
-      note: m.why,
-    })),
+    recentEmails: prep.recentMail
+      .filter((m) => kept && !kept.has(m.mailId))
+      .map((m) => ({
+        subject: m.subject,
+        from: m.from,
+        when: day(m.at),
+        note: m.why,
+      })),
     myNotes: prep.notes.map((n) => ({ title: n.title, extract: n.snippet })),
     myToDos: prep.todos.map((t) => t.title),
   };
@@ -374,6 +381,18 @@ export async function prepSummary(ctx: ModuleContext, eventId: unknown, refresh:
     throw new CloudError('A meeting briefing is already being prepared. Try again in a moment.', 409);
   try {
     const m = ctx.member!;
+    // The pack's emails are checked against the member's "Never send to AI" rules; if that cannot be
+    // done, the briefing is made without any email.
+    const kept = await attempt(async () =>
+      keptFromAi(
+        ctx,
+        await mailWith(
+          ctx,
+          prep.people.map((p) => p.address),
+          30,
+        ),
+      ),
+    );
     const res = await chat(
       { db: ctx.db, env: ctx.env, fetch: ctx.fetch, now: ctx.now },
       {
@@ -395,7 +414,7 @@ export async function prepSummary(ctx: ModuleContext, eventId: unknown, refresh:
           },
           {
             role: 'user',
-            content: `<data>\n${JSON.stringify(prepData(prep)).replace(/<\/?data>/gi, '')}\n</data>`,
+            content: `<data>\n${JSON.stringify(prepData(prep, kept)).replace(/<\/?data>/gi, '')}\n</data>`,
           },
         ],
       },

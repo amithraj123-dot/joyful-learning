@@ -169,6 +169,8 @@ export const TOOLS: Record<string, Tool> = {
       const deadlines = (await attempt(() => upcomingDeadlines(ctx, istDate(ctx.now + 14 * DAY)))) ?? [];
       return {
         result: {
+          // To-do titles can come from email, so they are data too.
+          note: UNTRUSTED,
           todos: todos.map((t) => ({
             id: t.id,
             title: t.title,

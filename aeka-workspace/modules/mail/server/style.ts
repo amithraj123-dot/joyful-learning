@@ -1,6 +1,7 @@
 // Writing style: a profile learned from the member's sent mail in one AI call (proposed, then accepted or
 // edited by the member), the greeting and sign-off last used with each recipient (no AI), and examples
-// of how the member edits drafts before sending (the 3 most recent pairs, bodies only and capped).
+// of how the member edits drafts before sending (the 12 most recent pairs, bodies only and capped; a
+// draft sees at most 3, from drafts to the same person or organisation).
 // Everything lives in mail_style.profile for the member; status 'none' means nothing learned yet.
 import { CloudError } from '../../../lib/cloud-store.ts';
 import { aiStatus, chat, parseJsonObject } from '../../../core/server/ai.ts';
@@ -8,21 +9,34 @@ import type { ModuleAction, ModuleContext } from '../../../core/server/module.ts
 import type { MailRule, StyleProfile } from '../shared/types.ts';
 import { STYLE_PROMPT } from './prompts.ts';
 import { matchRules } from './rules.ts';
-import { addresses, listRules, memberOf, type MessageRow } from './store.ts';
+import { addresses, domainOf, isPublicDomain, listRules, memberOf, type MessageRow } from './store.ts';
 import { houseDashes, obj, text } from './validate.ts';
 
 const SAMPLES = 40;
 const SAMPLE_CHARS = 1200;
 const MIN_SAMPLES = 5;
 const EDIT_CHARS = 1500;
-const MAX_EDITS = 3;
+const MAX_EDITS = 3; // shown per draft
+const STORED_EDITS = 12; // kept, across recipients
 const MAX_ORIGINALS = 10;
 
 export interface EditPair {
   before: string;
   after: string;
   at: number;
+  // Whom the reply went to (lower case). Examples are shown only for drafts to the same person or
+  // organisation, so one client's wording never reaches another client's draft. Pairs stored before
+  // this field existed have none and are never shown.
+  to?: string;
 }
+
+// Whether an example written for `to` may be shown when drafting for `counterpart`.
+const sameParty = (to: string | undefined, counterpart: string) => {
+  if (!to || !counterpart) return false;
+  if (to === counterpart) return true;
+  const d = domainOf(to);
+  return !isPublicDomain(d) && d === domainOf(counterpart);
+};
 interface Stored {
   greeting: string;
   signOff: string;
@@ -84,15 +98,19 @@ const toProfile = (row: StyleRow, s: Stored): StyleProfile | null =>
         updatedAt: row.updated_at,
       };
 
-// What the drafter receives: the accepted profile (if any) and the latest edit examples.
-export async function styleForDraft(db: D1Database, member: string) {
+// What the drafter receives: the accepted profile (if any) and the latest edit examples from drafts to
+// the same person or organisation as this one.
+export async function styleForDraft(db: D1Database, member: string, counterpart: string) {
   const { row, stored } = await loadStyle(db, member);
   return {
     style:
       row?.status === 'active'
         ? { greeting: stored.greeting, signOff: stored.signOff, tone: stored.tone, notes: stored.notes }
         : null,
-    editExamples: (stored.edits ?? []).slice(0, MAX_EDITS).map((e) => ({ before: e.before, after: e.after })),
+    editExamples: (stored.edits ?? [])
+      .filter((e) => sameParty(e.to, counterpart.toLowerCase()))
+      .slice(0, MAX_EDITS)
+      .map((e) => ({ before: e.before, after: e.after })),
   };
 }
 
@@ -202,6 +220,7 @@ export async function learnFromSend(
   draftId: string,
   sent: string,
   now: number,
+  to: string,
 ) {
   const { row, stored } = await loadStyle(db, member);
   const original = stored.originals?.[draftId];
@@ -211,7 +230,10 @@ export async function learnFromSend(
   const after = sent.slice(0, EDIT_CHARS);
   const learn = materialEdit(original.body, after);
   const edits = learn
-    ? [{ before: original.body, after, at: now }, ...(stored.edits ?? [])].slice(0, MAX_EDITS)
+    ? [{ before: original.body, after, at: now, to: to.toLowerCase() }, ...(stored.edits ?? [])].slice(
+        0,
+        STORED_EDITS,
+      )
     : (stored.edits ?? []);
   await writeStyle(db, member, { ...stored, originals, edits }, row.status, row.sample_count, row.updated_at);
   return learn;

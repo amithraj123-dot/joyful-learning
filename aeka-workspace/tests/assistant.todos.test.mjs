@@ -93,6 +93,22 @@ test('quick add reads dates, times, lists, priority and repeats in India time, w
   assert.deepEqual(read('Partner review every week', ist('2026-10-27T19:00:00')).slice(1, 2), [
     '2026-10-28T18:00',
   ]);
+  // A repeating to-do whose first time has passed starts at its next occurrence, whatever the period.
+  assert.deepEqual(read('Standup every day today at 9am').slice(1, 2), ['2026-10-28T09:00']);
+  assert.deepEqual(read('Invoice run every month on 27 Oct', ist('2026-10-27T19:00:00')).slice(1, 2), [
+    '2026-11-27T18:00',
+  ]);
+  // "today" said after 6 pm is due by midnight, not created overdue.
+  assert.deepEqual(read('Call the bank today', ist('2026-10-27T19:00:00')).slice(0, 2), [
+    'Call the bank',
+    '2026-10-27T23:59',
+  ]);
+  // A day-first date without a year needs "by", "on" or "due", or to end the line; a fraction stays.
+  assert.deepEqual(read('Review 1/2 of the deck').slice(0, 2), ['Review 1/2 of the deck', null]);
+  assert.deepEqual(read('File TDS return by 7/11 for Kite').slice(0, 2), [
+    'File TDS return for Kite',
+    '2026-11-07T18:00',
+  ]);
   assert.equal(
     parseQuickAdd('Send Rahul the valuation note tomorrow 4pm #Falcon ! every week', NOW).understood,
     'Read as "Send Rahul the valuation note"; due Wednesday, 28 Oct 2026, 4:00 pm; list Falcon; high priority; repeats every week.',
@@ -266,6 +282,45 @@ test('the next due date of a repeating to-do keeps the time in India time and sk
     '2027-03-31T00:30',
   );
   assert.equal(nextTodoDue(at('2026-10-27T18:00:00'), 'none', NOW), null);
+  // With the day kept to, a successor on the 28th goes back to the 31st, even after two short months.
+  assert.equal(
+    iso(nextTodoDue(at('2027-02-28T00:30:00'), 'monthly', at('2027-02-27T00:00:00'), 31)),
+    '2027-03-31T00:30',
+  );
+  assert.equal(
+    iso(nextTodoDue(at('2027-04-30T00:30:00'), 'monthly', at('2027-04-29T00:00:00'), 31)),
+    '2027-05-31T00:30',
+  );
+});
+
+test('a monthly to-do from the 31st keeps to the 31st through its successors', async () => {
+  const { db } = await firm();
+  const member = await getMember(db, people.associate.email);
+  const ctxAt = (now) =>
+    memberContext({ db, env: {}, fetch: () => Promise.reject(new Error('offline')), now }, member);
+  const { createTodo, completeTodo, successorOf, updateTodo } =
+    await import('../modules/assistant/server/records.ts');
+  const first = await createTodo(ctxAt(ist('2027-01-20T10:00:00')), {
+    title: 'GST return',
+    details: '',
+    priority: 'normal',
+    dueAt: ist('2027-01-31T18:00:00'),
+    repeat: 'monthly',
+  });
+  const dues = [];
+  let todo = first;
+  for (const when of ['2027-01-30', '2027-02-27', '2027-03-30', '2027-04-29']) {
+    const ctx = ctxAt(ist(`${when}T10:00:00`));
+    await completeTodo(ctx, todo.id);
+    todo = await successorOf(ctx, todo.id);
+    dues.push(iso(todo.dueAt));
+  }
+  assert.deepEqual(dues, ['2027-02-28T18:00', '2027-03-31T18:00', '2027-04-30T18:00', '2027-05-31T18:00']);
+  // A new due date sets the day again.
+  const ctx = ctxAt(ist('2027-05-01T10:00:00'));
+  const moved = await updateTodo(ctx, todo.id, { ...todo, dueAt: ist('2027-05-15T18:00:00') }, todo.revision);
+  await completeTodo(ctx, moved.id);
+  assert.equal(iso((await successorOf(ctx, moved.id)).dueAt), '2027-06-15T18:00');
 });
 
 test('addTodoFrom adds each source item once; deleting it dismisses it for good', async () => {

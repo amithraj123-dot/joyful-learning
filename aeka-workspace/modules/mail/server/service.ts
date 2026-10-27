@@ -18,7 +18,7 @@ import { createDraft } from './drafts.ts';
 import { GraphSession, ReauthError } from './graph.ts';
 import { confirmedLink } from './rules.ts';
 import { listFollowUps } from './followups.ts';
-import { itemsWith, listItems, loadAccount, queueCounts } from './store.ts';
+import { itemsWith, listItems, listRules, loadAccount, matchRules, queueCounts } from './store.ts';
 
 const memberEmail = (ctx: ModuleContext) => ctx.member?.email ?? '';
 const bound = (n: number, max: number) =>
@@ -133,4 +133,20 @@ export async function mailWith(ctx: ModuleContext, addresses: string[], limit = 
   if (!email || !Array.isArray(addresses)) return [];
   const list = addresses.filter((a): a is string => typeof a === 'string' && a.length <= 254);
   return itemsWith(ctx.db, email, list, bound(limit, 30));
+}
+
+// The ids of these emails that the member's "Never send to AI" rules keep from AI (by sender, any
+// recipient or subject). Another module must leave them out of anything it sends to AI.
+export async function keptFromAi(ctx: ModuleContext, items: MailItem[]): Promise<Set<string>> {
+  const email = memberEmail(ctx);
+  const kept = new Set<string>();
+  if (!email || !items.length) return kept;
+  const rules = await listRules(ctx.db, email, 'active');
+  for (const m of items)
+    if (
+      [m.from, ...m.to, ...m.cc].some((a) => matchRules(rules, a.address, m.subject)?.effect.neverAi) ||
+      matchRules(rules, '', m.subject)?.effect.neverAi
+    )
+      kept.add(m.id);
+  return kept;
 }

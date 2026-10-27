@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getMember } from '../core/server/members.ts';
-import { followUps, mailWith } from '../modules/mail/server/service.ts';
+import { followUps, keptFromAi, mailWith } from '../modules/mail/server/service.ts';
 import { habitOf, materialEdit } from '../modules/mail/server/style.ts';
 import { people } from './fixtures/workflow-firm.mjs';
 import { mailFirm } from './fixtures/mail-world.mjs';
@@ -192,6 +192,32 @@ test('snooze, done and reopen; done holds only until the thread moves again', as
   assert.deepEqual(await followUps(await ctxOf(f, 'partner')), []);
 });
 
+test('a thread marked done that moves on again can be snoozed and comes back when the snooze ends', async () => {
+  const f = await followUpFirm();
+  const ids = async (p = {}) => (await f.ok('admin', 'followups.list', p)).map((x) => x.conversationId);
+  await f.ok('admin', 'followups.update', { conversationId: 'c-w1', kind: 'waiting', op: 'done' });
+  assert.ok(!(await ids()).includes('c-w1'));
+  // Marked done four days ago; I wrote again in the thread two days ago, so it is waiting once more.
+  f.db.sql
+    .prepare('UPDATE mail_threads SET waiting_done = ? WHERE conversation_id = ?')
+    .run(Date.now() - 4 * DAY, 'c-w1');
+  f.w
+    .box(people.admin.email)
+    .sentChanges.push(msg('g-s-w1b', 'c-w1', AMITH, [RAHUL], 50, { subject: 'RE: Falcon SPA schedules' }));
+  await f.ok('admin', 'sync');
+  assert.ok((await ids()).includes('c-w1'));
+  // Snoozing it must not bring back the earlier "done".
+  await f.ok('admin', 'followups.update', { conversationId: 'c-w1', kind: 'waiting', op: 'snooze', days: 1 });
+  const closed = (await f.ok('admin', 'followups.list', { includeClosed: true })).find(
+    (x) => x.conversationId === 'c-w1',
+  );
+  assert.equal(closed.done, false);
+  f.db.sql
+    .prepare('UPDATE mail_threads SET waiting_snoozed_until = ? WHERE conversation_id = ?')
+    .run(Date.now() - 1000, 'c-w1');
+  assert.ok((await ids()).includes('c-w1'));
+});
+
 test('mailWith returns my mail from or to the addresses, newest first, and only mine', async () => {
   const f = await followUpFirm();
   const ctx = await ctxOf(f, 'admin');
@@ -204,6 +230,24 @@ test('mailWith returns my mail from or to the addresses, newest first, and only 
   assert.equal((await mailWith(ctx, ['rahul@falcon-industries.example'], 2)).length, 2);
   assert.deepEqual(await mailWith(ctx, []), []);
   assert.deepEqual(await mailWith(await ctxOf(f, 'partner'), ['rahul@falcon-industries.example']), []);
+});
+
+test('keptFromAi names the emails my "Never send to AI" rules cover, by sender, recipient or subject', async () => {
+  const f = await followUpFirm();
+  const ctx = await ctxOf(f, 'admin');
+  const items = await mailWith(ctx, ['rahul@falcon-industries.example']);
+  assert.equal((await keptFromAi(ctx, items)).size, 0);
+  await f.ok('admin', 'rules.save', {
+    rule: {
+      kind: 'domain',
+      pattern: 'falcon-industries.example',
+      effect: { neverAi: true },
+      status: 'active',
+    },
+  });
+  // Mail from Rahul and my sent mail to him alike.
+  assert.equal((await keptFromAi(ctx, items)).size, items.length);
+  assert.equal((await keptFromAi(await ctxOf(f, 'partner'), items)).size, 0);
 });
 
 test('a follow-up draft replies to all on my last sent email and is reviewed and sent like a reply', async () => {
@@ -330,8 +374,12 @@ test('writing style: learned once from safe sent mail, accepted, then used with 
     replyAll: false,
   });
   await f.ok('admin', 'draft.send', { draftId: d.id, confirm: true, baseRevision: edited.revision });
+  // A draft to someone else (another party) never sees that client's wording.
   const tp = await f.item('g-tp');
   await f.ok('admin', 'draft.create', { id: tp.id });
+  assert.deepEqual(dataOf(f.w.ai[f.w.ai.length - 1]).editExamples, []);
+  // A later draft to the same person does.
+  await f.ok('admin', 'draft.create', { id: kestrel.id });
   const next = dataOf(f.w.ai[f.w.ai.length - 1]);
   assert.equal(next.editExamples.length, 1);
   assert.match(next.editExamples[0].before, /INPUT REQUIRED/);

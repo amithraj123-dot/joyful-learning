@@ -145,6 +145,13 @@ test('archive moves only my own inbox mail to Archive, only on confirmation from
   assert.equal(refused.status, 502);
   assert.equal((await f.item('g-docusign')).id, docusign.id);
   assert.equal(f.rows('SELECT removed_at FROM mail_messages WHERE id = ?', docusign.id)[0].removed_at, null);
+  // The throttle pauses every later Outlook call for this member, not only the sync.
+  assert.ok(
+    f.rows('SELECT until FROM core_leases WHERE name = ?', `mail-busy:${people.admin.email}`)[0].until >
+      Date.now(),
+  );
+  // Emails archived by hand count in the stats.
+  assert.equal((await f.ok('admin', 'stats')).archived30d, 2);
   // The allow-list permits no other destination and no message outside the stored inbox.
   const session = new GraphSession(
     { db: f.db, env: f.options.env, fetch: f.w.fetcher, now: Date.now() },

@@ -150,7 +150,7 @@ async function compose(
   } catch {
     style = [];
   }
-  const learned = await styleForDraft(ctx.db, member);
+  const learned = await styleForDraft(ctx.db, member, counterpart || '');
   const habit = counterpart ? await recipientHabit(ctx.db, member, counterpart) : null;
   const writer = ctx.member!;
   const message = {
@@ -468,7 +468,14 @@ export async function sendDraft(ctx: ModuleContext, draftId: unknown, confirm: u
     .bind(ctx.now, ctx.now, d.id, member)
     .run();
   // Learning from edits never affects the send; its failure is ignored.
-  await learnFromSend(ctx.db, member, d.id, current.body, ctx.now).catch(() => false);
+  await learnFromSend(
+    ctx.db,
+    member,
+    d.id,
+    current.body,
+    ctx.now,
+    addresses(current.to_json)[0]?.address || '',
+  ).catch(() => false);
   await ctx.log('draft.sent', d.id, 'Sent a reply');
   return toDraft((await loadDraft(ctx.db, member, d.id))!);
 }

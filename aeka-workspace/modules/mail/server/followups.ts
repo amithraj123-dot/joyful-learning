@@ -119,7 +119,8 @@ export async function computeFollowUps(
       let count = 0;
       for (let i = entries.length - 1; i >= 0 && entries[i].mine; i--) count++;
       const latestSent = sent.length ? sent.reduce((a, b) => (b.received_at > a.received_at ? b : a)) : null;
-      const done = !!state?.waiting_done && state.updated_at >= last.at;
+      // Done holds when it was marked (ms): it lapses once the thread moves on after that.
+      const done = !!state?.waiting_done && state.waiting_done >= last.at;
       out.push({
         conversationId,
         kind: 'waiting',
@@ -145,7 +146,7 @@ export async function computeFollowUps(
     const sender = latest.row.from_address;
     const fromSender = theirs.filter((e) => e.row!.from_address === sender);
     if (fromSender.length < 2) continue;
-    const done = !!state?.chasing_done && state.updated_at >= latest.at;
+    const done = !!state?.chasing_done && state.chasing_done >= latest.at;
     out.push({
       conversationId,
       kind: 'chasing',
@@ -286,8 +287,10 @@ export const followUpActions: Record<string, ModuleAction> = {
           throw new CloudError('Snooze for 1 to 30 days.');
         set = 'waiting_snoozed_until = ?';
         values.push(ctx.now + days * DAY);
-      } else if (action === 'done') set = `${col} = 1`;
-      else if (action === 'reopen') set = `${col} = 0, waiting_snoozed_until = NULL`;
+      } else if (action === 'done') {
+        set = `${col} = ?`;
+        values.push(ctx.now);
+      } else if (action === 'reopen') set = `${col} = 0, waiting_snoozed_until = NULL`;
       else throw new CloudError('Choose snooze, done or reopen.');
       await ctx.db
         .prepare(

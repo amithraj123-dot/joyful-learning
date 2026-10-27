@@ -184,7 +184,7 @@ const accountActions: Record<string, ModuleAction> = {
       const archived = await ctx.db
         .prepare(
           `SELECT coalesce(sum(CAST(target AS INTEGER)), 0) AS n FROM org_activity WHERE actor = ? AND module = 'mail'
-           AND action = 'message.autoArchived' AND at >= ?`,
+           AND action IN ('message.archived','message.autoArchived') AND at >= ?`,
         )
         .bind(member, since)
         .first<{ n: number }>();
@@ -194,7 +194,7 @@ const accountActions: Record<string, ModuleAction> = {
         correctionsByField: Object.fromEntries(byField.results.map((r) => [r.field, r.n])),
         aiCallsToday: await usedToday(ctx.db, member, ctx.now),
         aiLimit: aiLimit(ctx),
-        // Additive: emails archived automatically in 30 days (each pass records its count).
+        // Emails moved to Archive in 30 days, by the member or automatically (each records its count).
         archived30d: Number(archived?.n ?? 0),
       };
     },
