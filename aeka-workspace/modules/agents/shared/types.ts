@@ -60,6 +60,8 @@ export interface Agent {
   nextRunAt: number | null; // schedules only
   lastRunAt: number | null;
   stats: { runs: number; good: number; bad: number; approved: number; rejected: number };
+  monthlyLimit: number; // AI calls a month (0: no limit); runs stop when reached, until the 1st
+  usedThisMonth: number; // AI calls this month (India time), its runs and what it learnt from them
   createdAt: number;
   updatedAt: number;
   revision: number;
@@ -90,7 +92,7 @@ export interface Run {
 }
 
 // What waits for the member's one-tap approval.
-export const APPROVAL_ACTIONS = ['send_email', 'create_task'] as const;
+export const APPROVAL_ACTIONS = ['send_email', 'create_task', 'update_task'] as const;
 export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'failed' | 'expired';
 export interface Approval {

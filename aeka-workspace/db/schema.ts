@@ -789,6 +789,7 @@ export const agAgents = sqliteTable(
     eventCursor: integer('event_cursor').notNull().default(0), // events: notices up to this time are handled
     lastRunAt: integer('last_run_at'),
     statsJson: text('stats_json').notNull().default('{}'),
+    limitCalls: integer('limit_calls').notNull().default(300), // AI calls a month; 0: no limit
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
     revision: integer('revision').notNull().default(1),
@@ -810,6 +811,7 @@ export const agRuns = sqliteTable(
     error: text('error').notNull().default(''),
     rating: integer('rating').notNull().default(0),
     feedback: text('feedback').notNull().default(''),
+    aiCalls: integer('ai_calls').notNull().default(0), // model calls made by this run, with learning
     startedAt: integer('started_at').notNull(),
     finishedAt: integer('finished_at'),
   },

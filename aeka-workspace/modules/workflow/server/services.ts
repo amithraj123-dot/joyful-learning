@@ -7,6 +7,9 @@ import { loadPeople } from './people.ts';
 import { me, visibleMatter, visibleMatters } from './permissions.ts';
 import { newTask, notifyAssignee } from './tasks.ts';
 
+// For agents' approvals: a task summary, and a change made with task.update's rules.
+export { changeTask, taskSummary } from './tasks.ts';
+
 // Live mandates the caller can see, with client names, sorted by client then title.
 export async function matterTargets(ctx: ModuleContext): Promise<MeetingTarget[]> {
   const names = new Map((await all(ctx.db, clients, 'deleted_at IS NULL')).map((c) => [c.id, c.name]));

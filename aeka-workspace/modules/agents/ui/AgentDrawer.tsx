@@ -29,6 +29,7 @@ const asInput = (a: Agent): AgentInput => ({
   instruction: a.instruction,
   trigger: a.trigger,
   status: a.status,
+  monthlyLimit: a.monthlyLimit,
 });
 
 export function AgentDrawer({
@@ -114,12 +115,16 @@ export function AgentDrawer({
     form.name !== agent.name ||
     form.instruction !== agent.instruction ||
     form.status !== agent.status ||
+    form.monthlyLimit !== agent.monthlyLimit ||
     !sameTrigger(form.trigger, agent.trigger);
+  const limit = form.monthlyLimit ?? 300;
   const problem = !form.name.trim()
     ? 'Give the agent a name.'
-    : !form.instruction.trim()
-      ? 'Say what the agent should do.'
-      : triggerProblem(form.trigger);
+    : !Number.isInteger(limit) || limit < 0 || limit > 5000
+      ? 'Set a monthly limit from 0 (no limit) to 5,000 AI calls.'
+      : !form.instruction.trim()
+        ? 'Say what the agent should do.'
+        : triggerProblem(form.trigger);
 
   const save = () =>
     act('save', async () => {
@@ -226,7 +231,8 @@ export function AgentDrawer({
             onChange={(e) => setForm({ ...form, instruction: e.target.value })}
           />
           <small>
-            It prepares work freely. Sending an email or creating a Workflow task waits for your approval.
+            It prepares work freely, including email and chat reply drafts. Sending an email, or creating or
+            changing a Workflow task, waits for your approval.
           </small>
         </div>
         <TriggerEditor
@@ -234,6 +240,29 @@ export function AgentDrawer({
           value={form.trigger}
           onChange={(trigger) => setForm({ ...form, trigger })}
         />
+        <div className="wf-field">
+          <label htmlFor={id + '-limit'}>AI calls a month (0 for no limit)</label>
+          <input
+            id={id + '-limit'}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={5000}
+            step={10}
+            value={Number.isFinite(limit) ? limit : ''}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                monthlyLimit: e.target.value === '' ? 0 : Math.round(Number(e.target.value)),
+              })
+            }
+          />
+          <small>
+            Used this month: {agent.usedThisMonth}
+            {agent.monthlyLimit ? ` of ${agent.monthlyLimit}` : ''}. A run is about 2 to 6 calls. When the
+            limit is reached it stops until the 1st, and tells you.
+          </small>
+        </div>
         {problem && dirty && <p className="ag-problem">{problem}</p>}
         {dirty && <p className="ag-note">Save your changes before you run it.</p>}
 

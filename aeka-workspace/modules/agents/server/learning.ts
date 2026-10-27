@@ -114,7 +114,7 @@ const SIGNAL_TEXT = (s: Signal) =>
 export async function reflect(
   sys: Sys,
   member: string,
-  run: Pick<Run, 'agentId' | 'command' | 'summary' | 'steps'>,
+  run: Pick<Run, 'id' | 'agentId' | 'command' | 'summary' | 'steps'>,
   signal: Signal,
 ): Promise<Lesson[]> {
   if (signal.kind === 'rating' && signal.rating === 1 && !signal.comment) return [];
@@ -122,6 +122,11 @@ export async function reflect(
   const known = (await listLessons(sys.db, member, run.agentId)).map((l) => l.text);
   let res;
   try {
+    // The call counts towards the agent's monthly AI limit, on the run it learns from.
+    await sys.db
+      .prepare('UPDATE ag_runs SET ai_calls = ai_calls + 1 WHERE member = ? AND id = ?')
+      .bind(member, run.id)
+      .run();
     res = await chat(sys, {
       purpose: 'other',
       module: 'agents',

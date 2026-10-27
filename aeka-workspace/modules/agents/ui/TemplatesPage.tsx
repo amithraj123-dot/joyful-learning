@@ -83,8 +83,8 @@ export function TemplatesPage({
   return (
     <div className="ag-page">
       <p className="ag-note">
-        Partners publish their agents here from the agent&apos;s panel. A copy starts paused and keeps its own
-        notes and lessons.
+        Aeka&apos;s starter agents are here, with those partners publish from an agent&apos;s panel. A copy
+        starts paused and keeps its own notes and lessons.
       </p>
       {phase === 'loading' && <p className="ag-note">Loading templates…</p>}
       {phase === 'error' && (

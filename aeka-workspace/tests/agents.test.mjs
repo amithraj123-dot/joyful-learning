@@ -35,6 +35,8 @@ async function world() {
     if (system.startsWith('You turn a command')) {
       ai.plans.push(body);
       message = { role: 'assistant', content: JSON.stringify(ai.plan) };
+    } else if (system.startsWith('You write a reply')) {
+      message = { role: 'assistant', content: 'Thank you, I will send it by 6 pm today.' };
     } else if (system.startsWith('You help an automated agent')) {
       ai.reflections.push(body);
       message = { role: 'assistant', content: JSON.stringify({ lessons: ai.lessons }) };
@@ -457,4 +459,232 @@ test('templates: partners publish, anyone copies as a paused agent; agents stay 
   );
   await w.action('agent.delete', { id: mine.id });
   assert.deepEqual((await w.action('agents.list', {})).agents, []);
+});
+
+test('starter templates from Aeka are there to copy', async () => {
+  const w = await world();
+  const list = await w.action('templates.list', {});
+  assert.deepEqual(
+    list.map((t) => t.authorName),
+    ['Aeka', 'Aeka', 'Aeka', 'Aeka', 'Aeka'],
+  );
+  assert.deepEqual(list.map((t) => t.name).sort(), [
+    'Chats waiting digest',
+    'Evening overdue sweep',
+    'Friday follow-up sweep',
+    'Morning deadline check',
+    'Urgent email handler',
+  ]);
+  const sweep = list.find((t) => t.name === 'Evening overdue sweep');
+  const copy = await w.action('template.copy', { id: sweep.id }, T0, 'associate');
+  assert.equal(copy.status, 'paused');
+  assert.deepEqual(copy.trigger, { type: 'schedule', repeat: 'weekdays', at: ist('2026-10-26T18:00:00') });
+  // Its next run is the next weekday evening, not the past anchor.
+  assert.equal(copy.nextRunAt, ist('2026-10-27T18:00:00'));
+  // Only an administrator can remove a starter template.
+  await assert.rejects(w.action('template.delete', { id: sweep.id }, T0, 'associate'), /Only its author/);
+});
+
+test('a monthly AI limit stops an agent until the 1st, with one notice', async () => {
+  const w = await world();
+  w.ai.script = steps({ content: 'Done.' });
+  const a = await w.action('agent.save', {
+    agent: {
+      name: 'Small',
+      instruction: 'Check.',
+      trigger: { type: 'schedule', repeat: 'daily', at: T0 + HOUR },
+      status: 'active',
+      monthlyLimit: 2,
+    },
+  });
+  assert.equal(a.monthlyLimit, 2);
+  await w.action('agent.run', { id: a.id });
+  await w.action('agent.run', { id: a.id }, T0 + MIN);
+  assert.equal((await w.action('agent.get', { id: a.id }, T0 + 2 * MIN)).agent.usedThisMonth, 2);
+  await assert.rejects(w.action('agent.run', { id: a.id }, T0 + 2 * MIN), /used its AI calls for this month/);
+  const admin = await getMember(w.f.db, people.admin.email);
+  assert.equal(await agentsPass(w.sys(T0 + 61 * MIN), admin), 0);
+  assert.equal(await agentsPass(w.sys(T0 + 25 * HOUR), admin), 0);
+  const notes = w.rows(
+    "SELECT title FROM org_notifications WHERE kind = 'agent.report' AND title != 'Your agents last week'",
+  );
+  assert.deepEqual(
+    notes.map((n) => n.title),
+    ['Small: monthly AI limit reached'],
+  );
+  // A new month starts afresh; a higher limit lets it run again now.
+  assert.equal(await agentsPass(w.sys(ist('2026-11-01T12:00:00')), admin), 1);
+  const raised = await w.action(
+    'agent.save',
+    {
+      id: a.id,
+      agent: { name: 'Small', instruction: 'Check.', trigger: a.trigger, status: 'active', monthlyLimit: 0 },
+      baseRevision: (await w.action('agent.get', { id: a.id }, ist('2026-11-01T12:01:00'))).agent.revision,
+    },
+    ist('2026-11-01T12:01:00'),
+  );
+  assert.equal(raised.monthlyLimit, 0);
+  await assert.rejects(
+    w.action('agent.save', {
+      id: a.id,
+      agent: { ...raised, monthlyLimit: 9000 },
+      baseRevision: raised.revision,
+    }),
+    /from 0 \(no limit\) to 5,000/,
+  );
+});
+
+test('every Monday from 9 am the member gets a weekly report on their agents, once', async () => {
+  const w = await world();
+  w.ai.script = steps({ content: 'Done.' });
+  const a = await w.action('agent.save', {
+    agent: { name: 'Digest', instruction: 'Summarise.', trigger: { type: 'manual' }, status: 'active' },
+  });
+  const run = await w.action('agent.run', { id: a.id });
+  w.ai.lessons = [{ text: 'Lead with overdue items.', scope: 'this_agent' }];
+  await w.action('run.feedback', { id: run.id, rating: -1, comment: 'Overdue first' });
+  const { weeklyReport } = await import('../modules/agents/server/index.ts');
+  // Monday 2 Nov 2026, 8:59 am: too early; 9:05 am: sent; again: not repeated.
+  assert.equal(await weeklyReport(w.sys(ist('2026-11-02T08:59:00')), people.admin.email), false);
+  assert.equal(await weeklyReport(w.sys(ist('2026-11-02T09:05:00')), people.admin.email), true);
+  assert.equal(await weeklyReport(w.sys(ist('2026-11-02T10:00:00')), people.admin.email), false);
+  const [r] = w.rows(
+    "SELECT title, body FROM org_notifications WHERE kind = 'agent.report' AND title = 'Your agents last week'",
+  );
+  assert.match(
+    r.body,
+    /^Digest: 1 run, rated 0 good, 1 poor, 1 lessons learnt, \d+ of 300 AI calls this month\.\nLearnt this week: "Lead with overdue items\."\.$/,
+  );
+  // Nobody without agents gets one.
+  assert.equal(await weeklyReport(w.sys(ist('2026-11-02T09:05:00')), people.partner.email), false);
+});
+
+test('agents can ask to update a Workflow task, and prepare chat replies that are never sent', async () => {
+  const w = await world();
+  const task = await w.f.ok('admin', 'task.create', {
+    task: {
+      matterId: w.f.open.id,
+      title: 'Draft SPA comments',
+      status: 'Preparing',
+      assignee: people.admin.email,
+      preparedBy: null,
+      reviewedBy: null,
+      dueDate: '2026-10-30',
+      priority: false,
+      notes: '',
+      steps: [],
+    },
+  });
+  // A phone chat to reply to.
+  const { ingest } = await import('../modules/chats/server/device.ts');
+  const { DEFAULT_SETTINGS } = await import('../modules/chats/shared/types.ts');
+  await ingest(
+    w.sys(),
+    people.admin.email,
+    DEFAULT_SETTINGS,
+    [
+      {
+        type: 'message',
+        id: 'b'.repeat(32),
+        app: 'whatsapp',
+        chat: 'whatsapp:9198',
+        title: 'Rahul Mehta',
+        group: false,
+        sender: 'Rahul Mehta',
+        fromMe: false,
+        text: 'Can you send the note today?',
+        at: T0 - MIN,
+        address: '9198',
+      },
+    ],
+    [],
+  );
+  const thread = w.rows('SELECT id FROM ch_threads')[0];
+  w.f.db.sql.exec("UPDATE ch_threads SET triage_status = 'done', reply_needed = 'yes', tier = 2");
+  w.ai.script = (body) => {
+    const results = lastToolResults(body);
+    if (!results.length)
+      return {
+        calls: [
+          call('my_work', {}),
+          call('phone_chats', {}),
+          call('create_agent', { command: 'every day do something' }),
+        ],
+      };
+    if (results.length === 3) {
+      const t = results[0].result.tasks.find((x) => x.title === 'Draft SPA comments');
+      return {
+        calls: [
+          call('request_task_update', {
+            taskId: t.id,
+            status: 'In Review',
+            dueDate: '2026-10-31',
+            reason: 'The draft is ready.',
+          }),
+          call('request_task_update', { taskId: t.id, status: 'Preparing', reason: 'Nothing changes.' }),
+          call('draft_chat_reply', { chatId: results[1].result.chats[0].id, instructions: 'Say by 6 pm.' }),
+        ],
+      };
+    }
+    return { content: 'Asked to move the task to review and prepared a reply to Rahul.' };
+  };
+  const run = await w.action('command.run', { command: 'Move my SPA task to review and answer Rahul' });
+  assert.deepEqual(
+    run.steps.map((s) => [s.tool, s.ok]),
+    [
+      ['my_work', true],
+      ['phone_chats', true],
+      ['create_agent', false],
+      ['request_task_update', true],
+      ['request_task_update', false],
+      ['draft_chat_reply', true],
+    ],
+  );
+  assert.match(run.steps[2].summary, /do not create other agents/);
+  assert.match(run.steps[4].summary, /Nothing would change/);
+  // The chat reply is a draft in Chats, not sent.
+  const drafts = w.rows('SELECT text, status FROM ch_drafts WHERE thread_id = ?', thread.id);
+  assert.deepEqual(
+    drafts.map((d) => [d.text, d.status]),
+    [['Thank you, I will send it by 6 pm today.', 'draft']],
+  );
+  const [approval] = await w.action('approvals.list', { status: 'pending' });
+  assert.equal(approval.action, 'update_task');
+  assert.equal(
+    approval.detail,
+    'Change the status from Preparing to In Review; due date from 2026-10-30 to 2026-10-31.',
+  );
+  const done = await w.action('approval.decide', { id: approval.id, approve: true }, T0 + MIN);
+  assert.equal(done.approval.result, 'Task updated: Draft SPA comments (In Review, due 2026-10-31).');
+  const t = w.rows('SELECT status, due_date FROM wf_tasks WHERE id = ?', task.id)[0];
+  assert.deepEqual([t.status, t.due_date], ['In Review', '2026-10-31']);
+});
+
+test('Ask Aeka creates and lists agents from plain words', async () => {
+  const w = await world();
+  w.ai.plan = {
+    name: 'Friday timesheet nudge',
+    instruction: 'Remind me to fill in my timesheet.',
+    trigger: { type: 'schedule', repeat: 'weekly', firstRun: '2026-10-30T16:00+05:30' },
+    explanation: 'Every Friday at 4 pm.',
+  };
+  const { runTool } = await import('../modules/assistant/server/tools.ts');
+  const ctx = await w.ctx();
+  const made = await runTool(
+    { ctx, channel: 'whatsapp' },
+    'create_agent',
+    JSON.stringify({ command: 'Every Friday at 4 pm remind me to fill my timesheet' }),
+  );
+  assert.equal(made.note.ok, true);
+  assert.match(
+    made.note.summary,
+    /^Created the agent "Friday timesheet nudge" \(Every week, from Friday, 30 Oct 2026, 4:00 pm\)$/,
+  );
+  const { agents } = await w.action('agents.list', {});
+  assert.deepEqual(
+    agents.map((a) => [a.name, a.status, a.nextRunAt]),
+    [['Friday timesheet nudge', 'active', ist('2026-10-30T16:00:00')]],
+  );
+  const listed = await runTool({ ctx, channel: 'web' }, 'list_agents', '{}');
+  assert.equal(JSON.parse(listed.content).result[0].name, 'Friday timesheet nudge');
 });

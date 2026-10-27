@@ -5,7 +5,8 @@ import { CloudError } from '../../../lib/cloud-store.ts';
 import type { ModuleContext } from '../../../core/server/module.ts';
 import { notify } from '../../../core/server/notifications.ts';
 import { draftForApproval, sendApprovedDraft } from '../../mail/server/service.ts';
-import { createTaskFor, matterTargets } from '../../workflow/server/services.ts';
+import { changeTask, createTaskFor, matterTargets, taskSummary } from '../../workflow/server/services.ts';
+import { TASK_STATUSES } from '../../workflow/shared/types.ts';
 import type { Approval, ApprovalAction, Lesson } from '../shared/types.ts';
 import { reflect } from './learning.ts';
 import {
@@ -36,9 +37,16 @@ export interface CreateTask {
   notes: string;
 }
 
+export interface UpdateTask {
+  taskId: string;
+  status?: (typeof TASK_STATUSES)[number];
+  dueDate?: string;
+  assignee?: string | null;
+}
+
 export interface Proposal {
   action: ApprovalAction;
-  payload: SendEmail | CreateTask;
+  payload: SendEmail | CreateTask | UpdateTask;
   title: string;
   detail: string;
   link: string;
@@ -67,6 +75,52 @@ export async function describe(ctx: ModuleContext, action: ApprovalAction, p: Ro
         ),
       detail: d.body.slice(0, 4000),
       link: 'mail/drafts',
+    };
+  }
+  if (action === 'update_task') {
+    const taskId = typeof p.taskId === 'string' ? p.taskId : '';
+    let t;
+    try {
+      t = await taskSummary(ctx, taskId);
+    } catch {
+      throw new CloudError(
+        'There is no such Workflow task that the member can see. Use my_work for task ids.',
+      );
+    }
+    const change: UpdateTask = { taskId: t.id };
+    const what: string[] = [];
+    if (p.status != null) {
+      if (!(TASK_STATUSES as readonly unknown[]).includes(p.status))
+        throw new CloudError(`The status must be one of: ${TASK_STATUSES.join(', ')}.`);
+      if (p.status !== t.status) {
+        change.status = p.status as UpdateTask['status'];
+        what.push(`status from ${t.status} to ${p.status as string}`);
+      }
+    }
+    if (p.dueDate != null) {
+      if (typeof p.dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(p.dueDate))
+        throw new CloudError('Give the due date as YYYY-MM-DD.');
+      if (p.dueDate !== t.dueDate) {
+        change.dueDate = p.dueDate;
+        what.push(`due date from ${t.dueDate ?? 'none'} to ${p.dueDate}`);
+      }
+    }
+    if (p.assignee != null) {
+      const to = typeof p.assignee === 'string' && p.assignee.trim() ? p.assignee.trim().toLowerCase() : null;
+      if (to !== t.assignee) {
+        change.assignee = to;
+        what.push(to ? `assign it to ${to}` : 'unassign it');
+      }
+    }
+    if (!what.length) throw new CloudError('Nothing would change on this task.');
+    return {
+      action,
+      payload: change,
+      title: `Update the task "${t.title}" on ${t.matterTitle}`.slice(0, 300),
+      detail: `Change the ${what.join('; ')}.`
+        .replace('Change the assign', 'Assign')
+        .replace('Change the unassign', 'Unassign'),
+      link: `workflow/matters#${t.matterId}`,
     };
   }
   const matterId = typeof p.mandateId === 'string' ? p.mandateId : '';
@@ -209,6 +263,11 @@ export async function decide(
       if (row.action === 'send_email') {
         await sendApprovedDraft(ctx, payload.draftId as string);
         result = 'Sent from your mailbox.';
+      } else if (row.action === 'update_task') {
+        const p = payload as unknown as UpdateTask;
+        const { taskId, ...changes } = p;
+        const task = await changeTask(ctx, taskId, changes);
+        result = `Task updated: ${task.title} (${task.status}${task.dueDate ? `, due ${task.dueDate}` : ''}).`;
       } else {
         const p = payload as unknown as CreateTask;
         const task = await createTaskFor(

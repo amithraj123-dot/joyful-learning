@@ -212,3 +212,32 @@ export const taskActions: Record<string, ModuleAction> = {
     },
   },
 };
+
+// For approvals (module agents): one task the caller can see, as a short summary.
+export async function taskSummary(ctx: ModuleContext, id: unknown) {
+  const { task, matter } = await findTask(ctx, id);
+  return {
+    id: task.id,
+    title: task.title,
+    matterId: matter.id,
+    matterTitle: matter.title,
+    status: task.status,
+    dueDate: task.dueDate,
+    assignee: task.assignee,
+  };
+}
+
+// Changes a task's status, due date or assignee as the caller, with every rule of task.update
+// (who may edit, sign-off, ethical walls). Used when a member approves an agent's proposal.
+export async function changeTask(
+  ctx: ModuleContext,
+  id: unknown,
+  changes: { status?: Task['status']; dueDate?: string | null; assignee?: string | null },
+) {
+  const { task } = await findTask(ctx, id);
+  return (await taskActions['task.update'].handler(ctx, {
+    id: task.id,
+    task: { ...task, ...changes },
+    baseRevision: task.revision,
+  })) as Task;
+}

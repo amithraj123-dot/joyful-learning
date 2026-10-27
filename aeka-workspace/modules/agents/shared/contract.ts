@@ -27,6 +27,8 @@ export interface AgentInput {
   instruction: string;
   trigger: Trigger;
   status: AgentStatus;
+  // AI calls a month, 0 to 5,000 (0: no limit). Left out: 300 for a new agent, unchanged on an update.
+  monthlyLimit?: number;
 }
 
 export interface AgentsActions {

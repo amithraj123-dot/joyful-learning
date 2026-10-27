@@ -30,7 +30,7 @@ export const agentsModule: ClientModule = {
       label: 'Templates',
       icon: LayoutTemplate,
       title: 'Firm Templates',
-      subtitle: 'Agents published by partners for the whole firm',
+      subtitle: 'Starter agents by Aeka, and agents partners publish for the firm',
     },
   ],
 };

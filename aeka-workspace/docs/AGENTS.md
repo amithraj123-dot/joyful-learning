@@ -30,13 +30,34 @@ and deadlines. Agent tools add:
 - **update_notes**: what the agent keeps between runs (2,000 characters);
 - **save_lesson**: a lasting lesson about how the member wants the work done;
 - **list_mandates**;
-- **request_send_email** and **request_task**: proposals that wait for approval.
+- **draft_chat_reply**: a reply to a phone chat, prepared for the member to review and send from Chats
+  on the phone (never for chats kept from AI);
+- **request_send_email**, **request_task** and **request_task_update** (status, due date or
+  assignee): proposals that wait for approval.
 
-Agents never send anything themselves. Sending an email draft or creating a Workflow task waits in
+Agents do not create other agents. Calendar changes are not available: the Outlook calendar is read
+only by the firm's choice.
+
+Agents never send anything themselves. Sending an email draft, or creating or changing a Workflow task, waits in
 "Waiting for your approval" (also in the brief and on the phone); approving carries it out as the
 member with every check of Mail's Send and Workflow's task rules and ethical walls. Approvals expire
 after 7 days. Content from mail, chats and notices is passed to the model as data, never as
 instructions; chat notices are passed by their title only.
+
+## Creating agents from Ask Aeka and WhatsApp
+
+Asked for something recurring or automatic in Ask Aeka or on WhatsApp ("every Friday at 4 pm, remind me
+to fill in my timesheet"), the assistant creates the agent (switched on) and says how it read the
+command and when it first runs. "What agents do I have?" lists them.
+
+## Limits and the weekly report
+
+- Each agent has a monthly limit of AI calls (300 unless changed; 0 for no limit). A run makes about 2
+  to 6 calls, and learning from it one more. When the limit is reached the agent stops until the 1st
+  (India time) and the member is told once; Run now says so too. The agent's page shows the calls used
+  this month.
+- Every Monday from 9 am, members with agents get "Your agents last week": runs (and failures),
+  ratings, approvals, lessons learnt and AI calls used, for each agent, without AI.
 
 ## Memory and learning
 
@@ -49,6 +70,10 @@ instructions; chat notices are passed by their title only.
 - Each agent shows its runs, ratings and approval decisions, so its improvement can be seen.
 
 ## Templates
+
+Five starter templates by Aeka come with the workspace: Evening overdue sweep (weekdays 6 pm), Morning
+deadline check (weekdays 9 am), Urgent email handler (an urgent email arrives), Chats waiting digest
+(weekdays 1 pm) and Friday follow-up sweep (Fridays 4 pm). Only an administrator can remove them.
 
 Partners and administrators publish an agent as a firm template (its name, instruction and trigger,
 without its notes or lessons). Any member copies a template as their own agent, paused until they

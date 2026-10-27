@@ -2,6 +2,7 @@
 // assistant's chat). Only the caller's own chats; nothing when the member has no phone connected.
 import type { ModuleContext } from '../../../core/server/module.ts';
 import { APP_LABELS, type ChatThread } from '../shared/types.ts';
+import { createDraft } from './drafts.ts';
 import { listThreads, loadSettings, queueCounts, waitLabel } from './store.ts';
 
 export interface ChatNeedingMe {
@@ -42,4 +43,11 @@ export async function chatsNeedingMe(ctx: ModuleContext, limit = 10) {
   const counts = await queueCounts(ctx.db, email, ctx.now);
   const { ai } = await loadSettings(ctx.db, email);
   return { total: counts.needs, chats: threads.map((t) => brief(t, ctx.now, t.neverAi || !ai)) };
+}
+
+// Prepares a reply to one of my chats (module agents), with every rule of Chats: never for a chat kept
+// from AI or with AI off for chats. It is sent only from the phone, after I review it in Chats.
+export async function draftChatReply(ctx: ModuleContext, threadId: string, instructions?: string) {
+  const d = await createDraft(ctx, threadId, instructions);
+  return { draftId: d.id, threadId: d.threadId, link: `chats/inbox#${d.threadId}` };
 }

@@ -128,6 +128,8 @@ export const agentFrom = (r: Row): Agent => ({
   nextRunAt: (r.next_run_at as number | null) ?? null,
   lastRunAt: (r.last_run_at as number | null) ?? null,
   stats: { ...ZERO, ...json<Partial<Stats>>(r.stats_json, {}) },
+  monthlyLimit: Number(r.limit_calls ?? 300),
+  usedThisMonth: 0, // filled in by the caller (usageThisMonth)
   createdAt: r.created_at as number,
   updatedAt: r.updated_at as number,
   revision: r.revision as number,
@@ -234,4 +236,42 @@ export async function bumpStats(
     .prepare('UPDATE ag_agents SET stats_json = ? WHERE member = ? AND id = ?')
     .bind(JSON.stringify(s), member, agentId)
     .run();
+}
+
+// ---------- Monthly AI limit ----------
+
+// The start of this calendar month in India time.
+export const monthStartIST = (now: number) => {
+  const d = new Date(now + 330 * MINUTE);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) - 330 * MINUTE;
+};
+
+// AI calls made this month by each of the member's agents (runs and what they learnt from).
+export async function usageThisMonth(db: D1Database, member: string, now: number) {
+  const r = await db
+    .prepare(
+      'SELECT agent_id, sum(ai_calls) AS n FROM ag_runs WHERE member = ? AND agent_id IS NOT NULL AND started_at >= ? GROUP BY agent_id',
+    )
+    .bind(member, monthStartIST(now))
+    .all<{ agent_id: string; n: number }>();
+  return new Map(r.results.map((x) => [x.agent_id, Number(x.n ?? 0)]));
+}
+
+export class LimitReached extends CloudError {
+  constructor(name: string) {
+    super(
+      `"${name}" has used its AI calls for this month. Raise its monthly limit to run it again before the 1st.`,
+      429,
+    );
+  }
+}
+
+export async function assertUnderLimit(db: D1Database, member: string, agentId: string, now: number) {
+  const a = await db
+    .prepare('SELECT name, limit_calls FROM ag_agents WHERE member = ? AND id = ?')
+    .bind(member, agentId)
+    .first<{ name: string; limit_calls: number }>();
+  if (!a || !a.limit_calls) return;
+  const used = (await usageThisMonth(db, member, now)).get(agentId) ?? 0;
+  if (used >= a.limit_calls) throw new LimitReached(a.name);
 }

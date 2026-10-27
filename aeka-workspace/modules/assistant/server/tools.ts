@@ -184,6 +184,7 @@ export const TOOLS: Record<string, Tool> = {
             from: t.sourceLabel ? `${t.source}: ${clip(t.sourceLabel, 120)}` : null,
           })),
           tasks: tasks.slice(0, 30).map((t) => ({
+            id: t.id,
             title: t.title,
             mandate: t.matterLabel,
             status: t.status,
@@ -573,6 +574,7 @@ export const TOOLS: Record<string, Tool> = {
           note: UNTRUSTED,
           total,
           chats: chats.map((c) => ({
+            id: c.id,
             chat: c.title,
             app: c.app,
             tier: c.tier,
@@ -584,6 +586,48 @@ export const TOOLS: Record<string, Tool> = {
         },
         summary: `Checked chats from the phone: ${total} waiting for a reply`,
         ref: 'chats/inbox',
+      };
+    },
+  },
+  create_agent: {
+    description:
+      'Create an automated agent from a plain-text command, when the member asks for something recurring or automatic ("every Friday at 4 pm, ...", "whenever an urgent email arrives, ..."). It is switched on at once; the member can change or pause it in Agents. Not for one-off actions: do those now with the other tools.',
+    fields: {
+      command: {
+        type: 'string',
+        description: "The member's command, with its timing, in their words",
+        max: 4000,
+        required: true,
+      },
+    },
+    run: async ({ ctx }, a) => {
+      const { createAgentFromCommand } = await import('../../agents/server/service.ts');
+      const r = await createAgentFromCommand(ctx, String(a.command));
+      return {
+        result: {
+          ...r,
+          nextRun: r.nextRunAt ? whenLabel(r.nextRunAt) : null,
+          note: 'Switched on. Change or pause it in Agents.',
+        },
+        summary: `Created the agent "${r.name}" (${r.when})`,
+        ref: 'agents/home',
+      };
+    },
+  },
+  list_agents: {
+    description: "The member's automated agents: name, whether on or paused, when each runs and last ran.",
+    fields: {},
+    run: async ({ ctx }) => {
+      const { agentsInBrief } = await import('../../agents/server/service.ts');
+      const list = await agentsInBrief(ctx);
+      return {
+        result: list.map((x) => ({
+          ...x,
+          nextRunAt: x.nextRunAt ? whenLabel(x.nextRunAt) : null,
+          lastRunAt: x.lastRunAt ? whenLabel(x.lastRunAt) : null,
+        })),
+        summary: `Checked your agents: ${list.length}`,
+        ref: 'agents/home',
       };
     },
   },

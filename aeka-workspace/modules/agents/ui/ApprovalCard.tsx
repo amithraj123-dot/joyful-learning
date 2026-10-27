@@ -2,7 +2,7 @@
 // One thing an agent wants to do that leaves the workspace or changes shared records: approve it,
 // review it first where it lives, or reject it (with an optional reason, which teaches the agent).
 import { useId, useState } from 'react';
-import { Check, ExternalLink, Mail, ListPlus, X } from 'lucide-react';
+import { Check, ExternalLink, ListChecks, ListPlus, Mail, X } from 'lucide-react';
 import { StatusPill } from '../../workflow/ui/components/Bits';
 import { agents } from '../shared/client';
 import type { Approval, ApprovalStatus } from '../shared/types';
@@ -34,7 +34,7 @@ export function ApprovalCard({
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const Icon = a.action === 'send_email' ? Mail : ListPlus;
+  const Icon = a.action === 'send_email' ? Mail : a.action === 'update_task' ? ListChecks : ListPlus;
 
   const decide = async (approve: boolean) => {
     setBusy(true);

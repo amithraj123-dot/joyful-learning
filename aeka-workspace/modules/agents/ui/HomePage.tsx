@@ -329,6 +329,9 @@ function AgentRow({ agent: a, onOpen }: { agent: Agent; onOpen: () => void }) {
     plural(s.runs, 'run'),
     s.good || s.bad ? `${s.good} good, ${s.bad} poor` : '',
     asked ? `${s.approved} of ${plural(asked, 'request')} approved` : '',
+    a.monthlyLimit
+      ? `${a.usedThisMonth} of ${a.monthlyLimit} AI calls this month`
+      : `${a.usedThisMonth} AI calls this month`,
   ].filter(Boolean);
   return (
     <button type="button" className={'ag-row' + (on ? '' : ' paused')} onClick={onOpen}>

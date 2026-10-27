@@ -118,5 +118,5 @@ triage off. Messages are deleted from the workspace after 30 days.
 
 ## 7. Deploying
 
-Apply migrations `0006` to `0012` to the hosted database before deploying this version. Agents need
+Apply migrations `0006` to `0013` to the hosted database before deploying this version. Agents need
 no new secret: they use the firm AI service and the background scheduler (see `docs/AGENTS.md`).
