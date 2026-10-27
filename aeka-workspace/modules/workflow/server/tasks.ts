@@ -2,6 +2,7 @@
 import { CloudError } from '../../../lib/cloud-store.ts';
 import type { Member } from '../../../core/server/members.ts';
 import type { ModuleAction, ModuleContext } from '../../../core/server/module.ts';
+import { notify } from '../../../core/server/notifications.ts';
 import { SIGN_OFF_STATUSES, type Matter, type Milestone, type Task } from '../shared/types.ts';
 import { conflict, insert, milestones, remove, saveRevision, tasks, write } from './db.ts';
 import { loadPeople, type People } from './people.ts';
@@ -68,6 +69,31 @@ async function milestoneInput(ctx: ModuleContext, value: unknown, current?: Mile
   return { matter, input: { ...milestoneFields(m), matterId: matter.id, owner } };
 }
 
+// Tells a colleague that a task was assigned to them (not when they assign it to themselves). The notice
+// reaches their phone too. Only the assignee, who is inside any ethical wall, receives it.
+export async function notifyAssignee(
+  ctx: ModuleContext,
+  task: Task,
+  matter: Matter,
+  previous: string | null = null,
+) {
+  const to = task.assignee;
+  if (!to || to === previous || to === ctx.member?.email || task.deletedAt) return;
+  await notify(
+    ctx.db,
+    {
+      recipient: to,
+      module: 'workflow',
+      kind: 'task.assigned',
+      title: `New task: ${task.title}`.slice(0, 200),
+      body: `${ctx.member?.name ?? 'A colleague'} assigned it to you on ${matter.title}${task.dueDate ? `, due ${task.dueDate}` : ''}.`,
+      link: `workflow/matters#${matter.id}`,
+      dedupeKey: `task.assigned:${task.id}:${to}:${task.revision}`,
+    },
+    ctx.now,
+  );
+}
+
 // A new task, validated with the task rules, and the statement that inserts it. Callers run the
 // statement with write() (alone or with others) and record the activity.
 export async function newTask(ctx: ModuleContext, people: People, value: unknown, id = crypto.randomUUID()) {
@@ -90,6 +116,7 @@ export const taskActions: Record<string, ModuleAction> = {
       const { task, matter, statement } = await newTask(ctx, await loadPeople(ctx.db), p.task);
       await write(ctx.db, ctx.now, [statement]);
       await ctx.log('task.created', task.id, `Created task "${task.title}" on ${matter.title}`);
+      await notifyAssignee(ctx, task, matter);
       return task;
     },
   },
@@ -110,6 +137,7 @@ export const taskActions: Record<string, ModuleAction> = {
             ? `Marked task "${task.title}" on ${matter.title} as ${task.status}`
             : `Updated task "${task.title}" on ${matter.title}`;
       await ctx.log('task.updated', task.id, summary);
+      await notifyAssignee(ctx, task, matter, current.assignee);
       return task;
     },
   },

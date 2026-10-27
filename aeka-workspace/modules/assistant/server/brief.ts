@@ -174,7 +174,7 @@ export async function buildBrief(ctx: ModuleContext, fresh = false): Promise<Bri
       title: 'Chats waiting for your reply',
       lines: [
         ...chats.chats.slice(0, chats.total > MAX_LINES ? MAX_LINES - 1 : MAX_LINES).map((c) => ({
-          text: `${c.title} (${c.app}${c.waitingFor ? `, ${c.waitingFor}` : ''}): ${c.summary}`,
+          text: `${c.title} (${c.app}${c.waitingFor ? `, ${c.waitingFor}` : ''})${c.summary ? `: ${c.summary}` : ''}`,
           link: c.link,
         })),
         ...(chats.total > MAX_LINES

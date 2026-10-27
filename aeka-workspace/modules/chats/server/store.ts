@@ -4,6 +4,7 @@ import { CloudError } from '../../../lib/cloud-store.ts';
 import type { ServerEnv } from '../../../core/server/env.ts';
 import type { ModuleContext } from '../../../core/server/module.ts';
 import {
+  ALERTS,
   APPS,
   CATEGORIES,
   DEFAULT_SETTINGS,
@@ -73,9 +74,12 @@ export function settingsFrom(json: string | null | undefined): ChatSettings {
   const apps = { ...DEFAULT_SETTINGS.apps };
   const given = raw.apps && typeof raw.apps === 'object' ? (raw.apps as Record<string, unknown>) : {};
   for (const a of APPS) if (typeof given[a] === 'boolean') apps[a] = given[a] as boolean;
+  const alerts = { ...DEFAULT_SETTINGS.alerts };
+  const shown = raw.alerts && typeof raw.alerts === 'object' ? (raw.alerts as Record<string, unknown>) : {};
+  for (const a of ALERTS) if (typeof shown[a] === 'boolean') alerts[a] = shown[a] as boolean;
   const flag = (k: 'nudges' | 'quietHours' | 'ai') =>
     typeof raw[k] === 'boolean' ? (raw[k] as boolean) : DEFAULT_SETTINGS[k];
-  return { apps, nudges: flag('nudges'), quietHours: flag('quietHours'), ai: flag('ai') };
+  return { apps, alerts, nudges: flag('nudges'), quietHours: flag('quietHours'), ai: flag('ai') };
 }
 
 export async function loadSettings(db: D1Database, member: string) {

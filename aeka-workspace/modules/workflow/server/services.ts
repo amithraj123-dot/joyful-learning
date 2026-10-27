@@ -5,7 +5,7 @@ import type { MeetingTarget, Milestone, PersonKey, Task } from '../shared/types.
 import { all, clients, milestones, tasks, write } from './db.ts';
 import { loadPeople } from './people.ts';
 import { me, visibleMatter, visibleMatters } from './permissions.ts';
-import { newTask } from './tasks.ts';
+import { newTask, notifyAssignee } from './tasks.ts';
 
 // Live mandates the caller can see, with client names, sorted by client then title.
 export async function matterTargets(ctx: ModuleContext): Promise<MeetingTarget[]> {
@@ -83,5 +83,6 @@ export async function createTaskFor(
   });
   await write(ctx.db, ctx.now, [statement]);
   await ctx.log('task.created', task.id, `Created task "${task.title}" on ${matter.title} ${origin}`);
+  await notifyAssignee(ctx, task, matter);
   return task;
 }

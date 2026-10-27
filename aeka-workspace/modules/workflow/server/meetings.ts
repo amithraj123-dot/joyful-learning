@@ -22,7 +22,7 @@ import {
 import { loadPeople } from './people.ts';
 import { forbidden, isManager, me, visibleChild, visibleMatter, visibleMatters } from './permissions.ts';
 import { matterTargets } from './services.ts';
-import { newTask } from './tasks.ts';
+import { newTask, notifyAssignee } from './tasks.ts';
 import { baseRevision, bool, obj, optionalDate, text } from './validate.ts';
 
 const MAX_TASKS_AT_ONCE = 50;
@@ -211,12 +211,14 @@ export const meetingActions: Record<string, ModuleAction> = {
         ...created.map((t) => recordedTask(ctx, link.id, t)),
       ]);
       if (!changed) throw conflict('meeting note');
-      for (const t of created)
+      for (const t of created) {
         await ctx.log(
           'task.created',
           t.id,
           `Created task "${t.title}" on ${matter.title} from a meeting note`,
         );
+        await notifyAssignee(ctx, t, matter);
+      }
       return { link: shown(saved), tasks: created };
     },
   },

@@ -5,6 +5,7 @@
 import { aiStatus, chat, parseJsonObject } from '../../../core/server/ai.ts';
 import type { Member } from '../../../core/server/members.ts';
 import { notify } from '../../../core/server/notifications.ts';
+import { quietNow } from './nudges.ts';
 import {
   APP_LABELS,
   CATEGORIES,
@@ -166,12 +167,13 @@ function validItem(v: Row | undefined, model: string): Verdict | null {
 // pending so they are triaged too.
 async function save(db: D1Database, member: string, row: Row, v: Verdict, now: number) {
   const upto = Number(row.last_in_at ?? 0);
-  await db
+  // An AI verdict never lands on a chat that was kept from AI meanwhile.
+  const r = await db
     .prepare(
       `UPDATE ch_threads SET triage_status = CASE WHEN coalesce(last_in_at, 0) <= ? THEN 'done' ELSE 'pending' END,
          triage_source = ?, tier = ?, category = ?, reply_needed = ?, summary = ?, why = ?, reply_by = ?, model = ?,
          triaged_upto = ?, attempts = 0, next_attempt_at = 0, updated_at = ?, revision = revision + 1
-       WHERE member = ? AND id = ?`,
+       WHERE member = ? AND id = ? AND (? = 'rules' OR never_ai = 0)`,
     )
     .bind(
       upto,
@@ -187,8 +189,10 @@ async function save(db: D1Database, member: string, row: Row, v: Verdict, now: n
       now,
       member,
       row.id,
+      v.source,
     )
     .run();
+  return r.meta.changes > 0;
 }
 
 async function recentMessages(db: D1Database, member: string, threadId: string) {
@@ -208,28 +212,36 @@ async function recentMessages(db: D1Database, member: string, threadId: string) 
     .reverse();
 }
 
-// An urgent chat alerts at once, even in quiet hours, once per wait.
-async function alertIfUrgent(sys: Sys, member: string, row: Row, v: Verdict) {
+// A chat that newly needs my reply alerts at once, once per wait: urgent ones always (even in quiet
+// hours), important ones outside quiet hours. Snoozed chats do not alert. The phone shows these under
+// "New action needed".
+async function alertNew(sys: Sys, member: string, row: Row, v: Verdict, settings: ChatSettings) {
   const waiting = row.waiting_since as number | null;
-  if (v.tier !== 1 || v.replyNeeded !== 'yes' || waiting == null) return;
+  if (v.replyNeeded !== 'yes' || v.tier > 2 || waiting == null) return;
   const answered = row.last_out_at != null && (row.last_out_at as number) >= Number(row.last_in_at ?? 0);
-  if (answered || Number(row.urgent_alerted ?? 0) === waiting) return;
+  const snoozed = row.snoozed_until != null && (row.snoozed_until as number) > sys.now;
+  if (answered || snoozed || Number(row.urgent_alerted ?? 0) === waiting) return;
+  const urgent = v.tier === 1;
+  if (!urgent && settings.quietHours && quietNow(sys.now)) return;
+  const app = APP_LABELS[row.app as AppId] ?? 'Chat';
+  // A chat kept from AI has no summary; its own text is shown only on my devices, never sent to AI.
+  const what = v.summary || String(row.last_in_text ?? '');
   await notify(
     sys.db,
     {
       recipient: member,
       module: 'chats',
-      kind: 'chats.urgent',
-      title: `Urgent: ${row.title as string} (${APP_LABELS[row.app as AppId] ?? 'Chat'})`,
-      body: v.summary || String(row.last_in_text ?? ''),
+      kind: urgent ? 'chats.urgent' : 'chats.action',
+      title: `${urgent ? 'Urgent' : 'Needs your reply'}: ${row.title as string} (${app})`,
+      body: what,
       link: `chats/inbox#${row.id as string}`,
-      dedupeKey: `chats.urgent:${row.id as string}:${waiting}`,
+      dedupeKey: `chats.new:${row.id as string}:${waiting}`,
     },
     sys.now,
   );
   await sys.db
     .prepare(
-      'UPDATE ch_threads SET urgent_alerted = ?, nudge_level = max(nudge_level, 1) WHERE member = ? AND id = ?',
+      `UPDATE ch_threads SET urgent_alerted = ?, nudge_level = ${urgent ? 'max(nudge_level, 1)' : 'nudge_level'} WHERE member = ? AND id = ?`,
     )
     .bind(waiting, member, row.id)
     .run();
@@ -274,8 +286,7 @@ export async function runChatTriage(
             ? byRules(row, `Not triaged by AI: ${ai.reason}`)
             : null);
     if (v) {
-      await save(db, email, row, v, sys.now);
-      await alertIfUrgent(sys, email, row, v);
+      if (await save(db, email, row, v, sys.now)) await alertNew(sys, email, row, v, s);
       result.triaged++;
     } else forAi.push({ row, messages });
   }
@@ -341,8 +352,7 @@ export async function runChatTriage(
     for (const [n, p] of batch.entries()) {
       const v = validItem(byId.get(`c${n + 1}`), reply.model);
       if (v) {
-        await save(db, email, p.row, v, sys.now);
-        await alertIfUrgent(sys, email, p.row, v);
+        if (await save(db, email, p.row, v, sys.now)) await alertNew(sys, email, p.row, v, s);
         result.triaged++;
         result.aiTriaged++;
         continue;

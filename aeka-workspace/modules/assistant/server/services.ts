@@ -64,3 +64,51 @@ export async function addTodoFrom(
     one(input.sourceLabel, LIMITS.title),
   );
 }
+
+// The notice for a to-do falling due. The same key is used by the background work and by the phone's
+// own alarm (module chats), so the phone shows it once.
+export const todoDueNotice = (t: { id: string; title: string; due_at: number }) => ({
+  key: `todo.due:${t.id}:${t.due_at}`,
+  title: `Due now: ${t.title}`.slice(0, 200),
+  body: 'Complete it, or give it a new date, in Aeka.',
+  link: `assistant/todos#${t.id}`,
+});
+
+// Open to-dos and active reminders of one member due after `from` and up to `until`, earliest first,
+// as phone alerts (key, time, title, body, link). Keys match the notices raised when they fall due.
+export async function dueSoon(
+  db: D1Database,
+  member: string,
+  from: number,
+  until: number,
+  o: { todos: boolean; reminders: boolean },
+) {
+  const out: { key: string; at: number; title: string; body: string; link: string }[] = [];
+  if (o.todos) {
+    const todos = await db
+      .prepare(
+        `SELECT id, title, due_at FROM as_todos WHERE member = ? AND status IN ('open','doing') AND due_at > ? AND due_at <= ?
+         AND (task_id IS NULL OR task_id NOT LIKE 'dismissed:%') ORDER BY due_at LIMIT 40`,
+      )
+      .bind(member, from, until)
+      .all<{ id: string; title: string; due_at: number }>();
+    for (const t of todos.results) out.push({ ...todoDueNotice(t), at: t.due_at });
+  }
+  if (o.reminders) {
+    const reminders = await db
+      .prepare(
+        "SELECT id, title, due_at FROM as_reminders WHERE member = ? AND status = 'active' AND due_at > ? AND due_at <= ? ORDER BY due_at LIMIT 40",
+      )
+      .bind(member, from, until)
+      .all<{ id: string; title: string; due_at: number }>();
+    for (const r of reminders.results)
+      out.push({
+        key: `reminder:${r.id}:${r.due_at}`,
+        at: r.due_at,
+        title: r.title,
+        body: 'Reminder from Aeka.',
+        link: `assistant/todos#${r.id}`,
+      });
+  }
+  return out.sort((a, b) => a.at - b.at).slice(0, 50);
+}

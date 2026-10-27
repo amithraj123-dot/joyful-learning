@@ -65,6 +65,19 @@
                 android:value="conversations|alerting|silent" />
         </service>
 
+        <!-- To-do and reminder alerts at their time, and setting them again after a restart or update. -->
+        <receiver
+            android:name=".AlarmReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".SyncJobService"
             android:exported="false"

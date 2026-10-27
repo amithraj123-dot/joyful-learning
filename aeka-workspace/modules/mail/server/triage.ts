@@ -329,8 +329,12 @@ export async function runTriage(
     if (!(await saveVerdict(db, email, m.id, v, now))) return;
     result.triaged++;
     if (settings.autoTodos && v.status !== 'skipped') await askTodo(ctx, m, v);
+    // Urgent mail, and important mail that needs my reply, alert at once (on the phone too).
+    const urgent = v.tier === 1;
+    const action = v.tier === 2 && v.replyNeeded === 'yes';
     if (
-      v.tier === 1 &&
+      (urgent || action) &&
+      v.status !== 'skipped' &&
       settings.alertUrgent &&
       !v.safetyFlag &&
       !m.replied &&
@@ -341,11 +345,11 @@ export async function runTriage(
         {
           recipient: email,
           module: 'mail',
-          kind: 'mail.urgent',
-          title: `Urgent email from ${(m.from_name || m.from_address).slice(0, 80)}`,
+          kind: urgent ? 'mail.urgent' : 'mail.action',
+          title: `${urgent ? 'Urgent email' : 'Email needing your reply'} from ${(m.from_name || m.from_address).slice(0, 80)}`,
           body: [m.subject.slice(0, 160), v.why].filter(Boolean).join('\n'),
-          link: 'mail/inbox',
-          dedupeKey: `mail.urgent:${m.id}`,
+          link: `mail/inbox#${m.id}`,
+          dedupeKey: `${urgent ? 'mail.urgent' : 'mail.action'}:${m.id}`,
         },
         now,
       );

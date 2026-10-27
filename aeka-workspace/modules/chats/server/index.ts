@@ -7,7 +7,15 @@ import type { Member } from '../../../core/server/members.ts';
 import type { ModuleAction, ModuleContext, ServerModule } from '../../../core/server/module.ts';
 import { releaseLease, takeLease } from '../../../core/server/notifications.ts';
 import { addTodoFrom } from '../../assistant/server/services.ts';
-import { APP_LABELS, APPS, VIEWS, type ChatSettings, type ChatView } from '../shared/types.ts';
+import {
+  ALERT_LABELS,
+  ALERTS,
+  APP_LABELS,
+  APPS,
+  VIEWS,
+  type ChatSettings,
+  type ChatView,
+} from '../shared/types.ts';
 import { newPairingCode } from './device.ts';
 import { createDraft, discardDraft, markSent, prepareSend, updateDraft } from './drafts.ts';
 import { runNudges } from './nudges.ts';
@@ -179,9 +187,14 @@ const threadActions: Record<string, ModuleAction> = {
       const { thread } = await getThread(ctx, p.id);
       if (!thread.lastIn) throw new CloudError('There is nothing in this chat to follow up yet.', 409);
       const app = APP_LABELS[thread.app];
-      const what = thread.triage?.summary || thread.lastIn.text;
+      // To-dos can reach the assistant's model, so a chat kept from AI gives its name only.
+      const kept = thread.neverAi || !(await loadSettings(ctx.db, memberOf(ctx))).ai;
+      const what = kept ? '' : thread.triage?.summary || thread.lastIn.text;
       const todo = await addTodoFrom(ctx, {
-        title: `Reply to ${thread.title}: ${what}`.slice(0, 200),
+        title: (what ? `Reply to ${thread.title}: ${what}` : `Reply to ${thread.title} (${app})`).slice(
+          0,
+          200,
+        ),
         details: `${app} chat, last message ${new Date(thread.lastIn.at).toISOString().slice(0, 10)}.`,
         dueAt: thread.triage?.replyBy ? Date.parse(`${thread.triage.replyBy}T18:00:00+05:30`) : null,
         priority: thread.triage?.tier === 1 ? 'high' : 'normal',
@@ -223,8 +236,17 @@ const settingsActions: Record<string, ModuleAction> = {
         if (typeof v !== 'boolean') throw bad(`Choose yes or no for ${label}.`);
         return v;
       };
+      // Kinds added later keep their current value when an older page leaves them out.
+      const current = await loadSettings(ctx.db, member);
+      const given = s.alerts && typeof s.alerts === 'object' ? (s.alerts as Row) : {};
       const settings: ChatSettings = {
         apps: Object.fromEntries(APPS.map((a) => [a, flag(apps[a], APP_LABELS[a])])) as ChatSettings['apps'],
+        alerts: Object.fromEntries(
+          ALERTS.map((a) => [
+            a,
+            given[a] === undefined ? current.alerts[a] : flag(given[a], ALERT_LABELS[a]),
+          ]),
+        ) as ChatSettings['alerts'],
         nudges: flag(s.nudges, 'nudges'),
         quietHours: flag(s.quietHours, 'quiet hours'),
         ai: flag(s.ai, 'AI triage'),

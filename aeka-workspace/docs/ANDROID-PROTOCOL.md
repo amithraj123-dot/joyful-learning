@@ -145,9 +145,20 @@ Reply:
     "notices": [
       {
         "id": "...",
+        "key": "chats.nudge:<thread id>:1793080000000:1",
+        "kind": "chats.nudge",
         "title": "Reply to Rahul Mehta",
         "body": "Asked for the revised valuation note today. Waiting 2 hours.",
         "link": "chats/inbox#<thread id>"
+      }
+    ],
+    "upcoming": [
+      {
+        "key": "todo.due:<to-do id>:1793088000000",
+        "at": 1793088000000,
+        "title": "Due now: File the TDS return",
+        "body": "Complete it, or give it a new date, in Aeka.",
+        "link": "assistant/todos#<to-do id>"
       }
     ],
     "syncSeconds": 900
@@ -155,9 +166,29 @@ Reply:
 }
 ```
 
-`notices` are the person's workspace notifications not yet shown on this phone (chat nudges, urgent
-mail, reminders, meetings); each is returned once. The phone shows each as an Android notification
-in the channel "Aeka nudges"; tapping it opens the app at `link`.
+`notices` are the person's workspace notifications not yet given to this phone (each phone gets its
+own copy, once), of the kinds the person switched on in Chats, Phone app, Phone notifications:
+
+| Switch             | Notice kinds                                                             |
+| ------------------ | ------------------------------------------------------------------------ |
+| New action needed  | `mail.urgent`, `mail.action`, `chats.urgent`, `chats.action`, `followup` |
+| Reminders to reply | `chats.nudge`                                                            |
+| To-dos             | `todo.due`, `todo.critical`                                              |
+| Reminders          | `reminder`                                                               |
+| Workflow tasks     | `task.assigned`                                                          |
+| Meetings           | `meeting`                                                                |
+| Morning brief      | `brief`                                                                  |
+| (always)           | anything else, for example `mail.reauth` (sign in to Outlook again)      |
+
+The phone shows each as an Android notification in the channel "Aeka nudges"; tapping it opens the
+app at `link`. `key` is the notice's dedupe key; the phone shows a key once only.
+
+`upcoming` lists the to-dos and reminders due in the next 24 hours (when those switches are on). The
+phone replaces its alarms with this list and shows each at its time (`AlarmManager`,
+`setAndAllowWhileIdle`, so a few minutes late at most in deep sleep), even without a connection then.
+The workspace raises a notice with the same key when the time comes; whichever reaches the phone
+first is shown, the other is skipped. Alarms are set again after a restart or an app update, and an
+alert missed by up to an hour while the phone was off is shown then.
 
 ## JavaScript bridge (`window.AekaAndroid`)
 

@@ -68,7 +68,10 @@ own.
 1. Open Aeka and sign in to the workspace.
 2. In the workspace, Chats, Phone app: "Connect this phone". The app pairs itself.
 3. Allow notification access for "Aeka message reader".
-4. Allow notifications (for nudges) and set battery use to "Unrestricted".
+4. Allow notifications (for nudges, to-dos and reminders) and set battery use to "Unrestricted".
+   Which kinds of notification the phone shows is chosen in the workspace: Chats, Phone app, Phone
+   notifications (new actions needed, reminders to reply, to-dos, reminders, Workflow tasks, meetings,
+   the morning brief). To-dos and reminders are alerted at their time by the phone's own alarms.
 5. In WhatsApp, keep notification previews on: Settings, Notifications, "Show preview". Without
    previews there is nothing to read, and the workspace says so.
 

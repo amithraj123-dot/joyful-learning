@@ -8,6 +8,7 @@ import type { Repeat } from '../shared/types.ts';
 import { attempt, buildBrief, briefSummary } from './brief.ts';
 import { meetingAlerts } from './calendar.ts';
 import { memberContext } from './context.ts';
+import { dueSoon } from './services.ts';
 import { CRITICAL_AFTER } from './records.ts';
 import { MINUTE, advance, dayLabel, istDate, istDayStart, whenLabel } from './recurrence.ts';
 import { ensureSettingsRow, readSettings, whatsappReady } from './settings.ts';
@@ -163,10 +164,38 @@ export async function followUpAlerts(sys: SystemContext, member: Member) {
   return sent;
 }
 
+// A notice when an open to-do falls due (once per due time), on the workspace and the phone. Due times
+// up to 6 hours past are caught up after downtime; older ones are left to the overdue alert.
+export async function todoDueAlerts(sys: SystemContext, member: Member) {
+  const due = await dueSoon(sys.db, member.email, sys.now - 6 * 60 * MINUTE, sys.now, {
+    todos: true,
+    reminders: false,
+  });
+  let sent = 0;
+  for (const t of due) {
+    const id = await notify(
+      sys.db,
+      {
+        recipient: member.email,
+        module: 'assistant',
+        kind: 'todo.due',
+        title: t.title,
+        body: t.body,
+        link: t.link,
+        dedupeKey: t.key,
+      },
+      sys.now,
+    );
+    if (id) sent++;
+  }
+  return sent;
+}
+
 export async function assistantTick(sys: SystemContext, scope: { member?: Member }) {
   const member = scope.member;
   if (!member?.active) return;
   await fireReminders(sys, member);
+  await todoDueAlerts(sys, member);
   await meetingAlerts(sys, member);
   await morningBrief(sys, member);
   await followUpAlerts(sys, member);

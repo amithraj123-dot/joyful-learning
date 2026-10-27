@@ -4,7 +4,8 @@
 import { CloudError, clientError, declaredTooLarge } from '../../../lib/cloud-store.ts';
 import { getMember, type Member } from '../../../core/server/members.ts';
 import type { SystemContext } from '../../../core/server/env.ts';
-import { APPS, type AppId, type ChatSettings } from '../shared/types.ts';
+import { dueSoon } from '../../assistant/server/services.ts';
+import { APPS, type AlertKind, type AppId, type ChatSettings } from '../shared/types.ts';
 import { isApp, loadSettings, MINUTE, sha256, type Row, type Sys } from './store.ts';
 
 export const PAIR_CODE_MS = 10 * MINUTE;
@@ -66,11 +67,7 @@ async function pair(sys: Sys, body: Row) {
     .first<{ member: string }>();
   if (!row)
     throw new CloudError('This code is not valid or has expired. Ask the workspace for a new one.', 401);
-  const used = await sys.db
-    .prepare('UPDATE ch_pairings SET used_at = ? WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?')
-    .bind(sys.now, hash, sys.now)
-    .run();
-  if (!used.meta.changes) throw new CloudError('This code has already been used. Ask for a new one.', 401);
+  // Checked before the code is used up, so a refusal leaves it valid.
   const member = await getMember(sys.db, row.member);
   if (!member?.active) throw new CloudError('Your account is not an active member of this workspace.', 403);
   const count = await sys.db
@@ -79,6 +76,11 @@ async function pair(sys: Sys, body: Row) {
     .first<{ n: number }>();
   if ((count?.n ?? 0) >= MAX_DEVICES)
     throw new CloudError(`At most ${MAX_DEVICES} phones can be connected. Disconnect one first.`, 409);
+  const used = await sys.db
+    .prepare('UPDATE ch_pairings SET used_at = ? WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?')
+    .bind(sys.now, hash, sys.now)
+    .run();
+  if (!used.meta.changes) throw new CloudError('This code has already been used. Ask for a new one.', 401);
   const id = crypto.randomUUID().replace(/-/g, '');
   const secret = randomSecret();
   const android = Number(body.android);
@@ -153,9 +155,11 @@ export interface ClearedEvent {
 }
 
 const HASH = /^[a-f0-9]{16,64}$/;
+// A phone clock a little ahead is tolerated, but times are never later than the workspace's now, so a
+// skewed clock cannot make a reply look later than the messages after it.
 const validTime = (v: unknown, now: number) =>
   typeof v === 'number' && Number.isFinite(v) && v > now - 60 * 86400000 && v < now + 10 * MINUTE
-    ? Math.round(v)
+    ? Math.min(Math.round(v), now)
     : null;
 
 // Events that fail validation are dropped one by one, never the whole batch: one odd notification must
@@ -262,14 +266,16 @@ export async function ingest(
           sys.now,
         ),
     );
-    const next = replyState(thread, list, sys.now);
-    statements.push(
-      db
+    // The chat's state is written only if nothing changed it since it was read (a reply sent or marked
+    // meanwhile); otherwise it is read again and recomputed.
+    const update = (t: ThreadState) => {
+      const next = replyState(t, list, sys.now);
+      return db
         .prepare(
           `UPDATE ch_threads SET title = ?, is_group = ?, address = CASE WHEN ? != '' THEN ? ELSE address END,
              last_in_at = ?, last_in_sender = ?, last_in_text = ?, last_out_at = ?, waiting_since = ?, unanswered = ?,
              nudge_level = ?, triage_status = ?, next_attempt_at = ?, attempts = ?, updated_at = ?, revision = revision + 1
-           WHERE member = ? AND id = ?`,
+           WHERE member = ? AND id = ? AND revision = ?`,
         )
         .bind(
           latest.title,
@@ -288,10 +294,17 @@ export async function ingest(
           next.attempts,
           sys.now,
           member,
-          thread.id,
-        ),
-    );
-    await db.batch(statements);
+          t.id,
+          t.revision,
+        );
+    };
+    statements.push(update(thread));
+    const done = await db.batch(statements);
+    let written = done[done.length - 1].meta.changes > 0;
+    for (let i = 0; !written && i < 3; i++)
+      written = (await update(await ensureThread(db, member, latest, sys.now)).run()).meta.changes > 0;
+    if (!written)
+      console.error('Chats: a chat changed repeatedly during sync; its reply state was not updated');
     result.accepted += list.length;
     result.inbound += list.filter((m) => !m.fromMe).length;
   }
@@ -332,6 +345,7 @@ async function ensureThread(db: D1Database, member: string, m: MessageEvent, now
   if (!r) throw new CloudError('The chat could not be stored. Try again.', 503);
   return {
     id: r.id as string,
+    revision: Number(r.revision ?? 1),
     title: r.title as string,
     group: !!r.is_group,
     muted: !!r.muted,
@@ -402,25 +416,69 @@ export function replyState(t: ThreadState, list: MessageEvent[], now: number) {
   };
 }
 
-// The member's notices not yet shown on a phone (created since this phone was connected, at most a day
-// old, unread), each returned once.
-export async function phoneNotices(sys: Sys, member: string, since: number) {
+// Which phone setting covers each kind of workspace notice. Kinds not listed (for example "sign in to
+// Outlook again") are always shown.
+export const ALERT_OF: Record<string, AlertKind> = {
+  'mail.urgent': 'actions',
+  'mail.action': 'actions',
+  'chats.urgent': 'actions',
+  'chats.action': 'actions',
+  followup: 'actions',
+  'chats.nudge': 'chats',
+  'todo.due': 'todos',
+  'todo.critical': 'todos',
+  reminder: 'reminders',
+  'task.assigned': 'tasks',
+  meeting: 'meetings',
+  brief: 'brief',
+};
+export const shownOnPhone = (kind: string, settings: ChatSettings) => {
+  const a = ALERT_OF[kind];
+  return a ? settings.alerts[a] : true;
+};
+
+// The member's notices not yet given to this phone (created since it was connected, at most a day old,
+// unread), each once per phone. Notices of kinds the member switched off are passed over for good.
+// `key` is the notice's dedupe key: the phone uses it to show a to-do or reminder once, whether its own
+// alarm or this list gets there first.
+export async function phoneNotices(
+  sys: Sys,
+  member: string,
+  deviceId: string,
+  since: number,
+  settings: ChatSettings,
+) {
+  const tag = `phone:${deviceId}`;
   const r = await sys.db
     .prepare(
-      `SELECT id, title, body, link FROM org_notifications WHERE recipient = ? AND created_at >= ? AND read_at IS NULL
-       AND (',' || delivered || ',') NOT LIKE '%,phone,%' ORDER BY created_at LIMIT 20`,
+      `SELECT id, kind, title, body, link, dedupe_key FROM org_notifications WHERE recipient = ? AND created_at >= ?
+       AND read_at IS NULL AND (',' || delivered || ',') NOT LIKE ? ORDER BY created_at LIMIT 30`,
     )
-    .bind(member, Math.max(since, sys.now - 86400000))
-    .all<{ id: string; title: string; body: string; link: string }>();
+    .bind(member, Math.max(since, sys.now - 86400000), `%,${tag},%`)
+    .all<{ id: string; kind: string; title: string; body: string; link: string; dedupe_key: string }>();
   for (const n of r.results)
     await sys.db
       .prepare(
-        "UPDATE org_notifications SET delivered = CASE WHEN delivered = '' THEN 'phone' ELSE delivered || ',phone' END WHERE id = ? AND recipient = ?",
+        "UPDATE org_notifications SET delivered = CASE WHEN delivered = '' THEN ? ELSE delivered || ',' || ? END WHERE id = ? AND recipient = ?",
       )
-      .bind(n.id, member)
+      .bind(tag, tag, n.id, member)
       .run();
-  return r.results;
+  return r.results
+    .filter((n) => shownOnPhone(n.kind, settings))
+    .slice(0, 20)
+    .map((n) => ({ id: n.id, key: n.dedupe_key, kind: n.kind, title: n.title, body: n.body, link: n.link }));
 }
+
+const UPCOMING_MS = 24 * 3600000;
+
+// To-dos and reminders due in the next 24 hours, for the phone to alert at the exact time with its own
+// alarms (the workspace's background work runs every few minutes, the phone's sync every 15). Keys match
+// the notices the workspace raises at the same time, so the phone shows each once.
+export const upcomingAlerts = (sys: Sys, member: string, settings: ChatSettings) =>
+  dueSoon(sys.db, member, sys.now, sys.now + UPCOMING_MS, {
+    todos: settings.alerts.todos,
+    reminders: settings.alerts.reminders,
+  });
 
 async function sync(sys: Sys, device: Row, member: Member, body: Row) {
   const settings = await loadSettings(sys.db, member.email);
@@ -434,14 +492,15 @@ async function sync(sys: Sys, device: Row, member: Member, body: Row) {
             .filter((c): c is string => typeof c === 'string')
             .map((c) => c.slice(0, 200)),
         ),
-      ].slice(0, 90)
+      ].slice(0, 500)
     : [];
+  // One JSON parameter, whatever the number of chats (D1 allows at most 100 bound parameters).
   await sys.db
     .prepare(
-      `UPDATE ch_threads SET live = CASE WHEN chat_key IN (${live.map(() => '?').join(',') || "''"}) THEN 1 ELSE 0 END
-       WHERE member = ? AND (live = 1 OR chat_key IN (${live.map(() => '?').join(',') || "''"}))`,
+      `UPDATE ch_threads SET live = CASE WHEN chat_key IN (SELECT value FROM json_each(?1)) THEN 1 ELSE 0 END
+       WHERE member = ?2 AND (live = 1 OR chat_key IN (SELECT value FROM json_each(?1)))`,
     )
-    .bind(...live, member.email, ...live)
+    .bind(JSON.stringify(live), member.email)
     .run();
   // Permissions as the phone reports them; a sync without them keeps the last known ones.
   const access = body.access && typeof body.access === 'object' ? (body.access as Row) : null;
@@ -464,7 +523,14 @@ async function sync(sys: Sys, device: Row, member: Member, body: Row) {
       device.id,
     )
     .run();
-  const notices = await phoneNotices(sys, member.email, device.created_at as number);
+  const notices = await phoneNotices(
+    sys,
+    member.email,
+    device.id as string,
+    device.created_at as number,
+    settings,
+  );
+  const upcoming = await upcomingAlerts(sys, member.email, settings);
   return {
     result,
     value: {
@@ -472,6 +538,7 @@ async function sync(sys: Sys, device: Row, member: Member, body: Row) {
       dropped,
       apps: Object.fromEntries(APPS.map((a) => [a, settings.apps[a]])),
       notices,
+      upcoming,
       syncSeconds: SYNC_SECONDS,
     },
   };

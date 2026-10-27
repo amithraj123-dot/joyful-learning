@@ -292,7 +292,13 @@ test('an urgent item notifies once', async () => {
   const notices = () => f.rows("SELECT * FROM org_notifications WHERE kind = 'mail.urgent'");
   assert.equal(notices().length, 2); // the closing and the tax notice
   assert.equal(notices()[0].recipient, people.admin.email);
-  assert.equal(notices()[0].link, 'mail/inbox');
+  // The link opens that email.
+  const item = f.rows('SELECT id FROM mail_messages WHERE id = ?', notices()[0].link.split('#')[1]);
+  assert.equal(item.length, 1);
+  // Important mail that needs my reply alerts too, as "needs your reply".
+  const actions = f.rows("SELECT * FROM org_notifications WHERE kind = 'mail.action'");
+  assert.ok(actions.length > 0);
+  assert.match(actions[0].title, /^Email needing your reply from /);
   // Even if the item were triaged again, the alert is not repeated.
   f.db.sql.exec("UPDATE mail_triage SET status = 'pending', next_attempt_at = 0");
   await f.tick('admin', Date.now() + 5 * MIN);

@@ -186,9 +186,12 @@ internal class Syncer private constructor(context: Context) {
                     title = n.optString("title", "").ifBlank { Texts.NUDGE_CHANNEL },
                     body = n.optString("body", ""),
                     link = n.optString("link", "").ifBlank { null },
+                    key = n.optString("key", "").ifBlank { null },
                 )
             }
         }
+        // To-dos and reminders of the next 24 hours, alerted on time by the phone's own alarms.
+        if (value.has("upcoming")) Alerts.schedule(app, Alerts.parse(value.optJSONArray("upcoming")))
         if (value.has("syncSeconds")) {
             val period = SyncPolicy.periodSeconds(value.optLong("syncSeconds", SyncPolicy.MIN_PERIOD_SECONDS))
             if (period != store.syncSeconds) {
@@ -202,6 +205,7 @@ internal class Syncer private constructor(context: Context) {
     private fun disconnect(error: String?) {
         store.clearPairing(error)
         LiveChats.clear()
+        Alerts.cancelAll(app)
         Jobs.cancelAll(app)
         notifyChanged()
     }

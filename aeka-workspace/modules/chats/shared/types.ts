@@ -114,8 +114,22 @@ export interface ChatDraft {
   revision: number;
 }
 
+// What the phone shows as notifications. Every workspace notice belongs to one of these kinds.
+export const ALERTS = ['actions', 'chats', 'todos', 'reminders', 'tasks', 'meetings', 'brief'] as const;
+export type AlertKind = (typeof ALERTS)[number];
+export const ALERT_LABELS: Record<AlertKind, string> = {
+  actions: 'New action needed: urgent or important mail and chats that need your reply',
+  chats: 'Reminders to reply to chats',
+  todos: 'To-dos when they fall due, and overdue ones',
+  reminders: 'Reminders',
+  tasks: 'Workflow tasks assigned to you',
+  meetings: 'Meetings about to start',
+  brief: 'The morning brief',
+};
+
 export interface ChatSettings {
   apps: Record<AppId, boolean>; // read on the phone
+  alerts: Record<AlertKind, boolean>; // shown on the phone
   nudges: boolean; // reminders to reply
   quietHours: boolean; // no nudges from 10 pm to 7:30 am India time (urgent ones excepted)
   ai: boolean; // AI triage; when off, rules only
@@ -129,6 +143,15 @@ export const DEFAULT_SETTINGS: ChatSettings = {
     sms: true,
     teams: true,
     slack: true,
+  },
+  alerts: {
+    actions: true,
+    chats: true,
+    todos: true,
+    reminders: true,
+    tasks: true,
+    meetings: true,
+    brief: true,
   },
   nudges: true,
   quietHours: true,

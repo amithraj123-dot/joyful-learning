@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   LayoutGrid,
   Bell,
+  BellRing,
   CheckCircle2,
   Circle,
   KeyRound,
@@ -15,7 +16,7 @@ import {
 import { ConfirmButton } from '../../workflow/ui/components/ConfirmButton';
 import { Toggle } from '../../workflow/ui/components/Bits';
 import { chats } from '../shared/client';
-import { APP_LABELS, APPS, type ChatSettings, type PhoneDevice } from '../shared/types';
+import { ALERT_LABELS, ALERTS, APP_LABELS, APPS, type ChatSettings, type PhoneDevice } from '../shared/types';
 import {
   inAndroidApp,
   onAndroidEvent,
@@ -355,9 +356,32 @@ export function PhonePage({ notify }: { notify: (m: string) => void }) {
             </div>
           </section>
 
+          <section className="ch-card ch-section" aria-labelledby="ch-alerts">
+            <h2 id="ch-alerts">
+              <BellRing size={18} aria-hidden="true" /> Phone notifications
+            </h2>
+            <p className="ch-note">
+              What the Aeka app shows as notifications on your phone. To-dos and reminders alert at their
+              exact time, even without a connection at that moment. Everything also stays under Notifications
+              in the workspace.
+            </p>
+            <div className="ch-toggles">
+              {ALERTS.map((a) => (
+                <Toggle
+                  key={a}
+                  pressed={settings.alerts[a]}
+                  disabled={!!busy}
+                  onChange={(v) => void saveSettings({ ...settings, alerts: { ...settings.alerts, [a]: v } })}
+                >
+                  {ALERT_LABELS[a]}
+                </Toggle>
+              ))}
+            </div>
+          </section>
+
           <section className="ch-card ch-section" aria-labelledby="ch-nudges">
             <h2 id="ch-nudges">
-              <Bell size={18} aria-hidden="true" /> Nudges
+              <Bell size={18} aria-hidden="true" /> Nudges to reply
             </h2>
             <div className="ch-toggles">
               <Toggle
@@ -392,7 +416,7 @@ export function PhonePage({ notify }: { notify: (m: string) => void }) {
                 disabled={!!busy}
                 onChange={(v) => void saveSettings({ ...settings, ai: v })}
               >
-                Triage with AI
+                Use AI for chats (triage and drafts)
               </Toggle>
             </div>
             {!aiReady && (
@@ -404,7 +428,9 @@ export function PhonePage({ notify }: { notify: (m: string) => void }) {
               The last 12 messages of a chat with something new are sent to the firm AI service to decide
               whether it needs your reply. Chats you mark &ldquo;Never send to AI&rdquo; (for example family)
               are triaged by rules only and never drafted by AI. Muted chats are not triaged at all. Messages
-              are deleted from the workspace after 30 days. Nobody else in the firm can see your chats.
+              are deleted from the workspace after 30 days. Nobody else in the firm can see your chats. With
+              AI off, no chat text is sent to AI at all: chats are triaged by rules, and the brief and Ask
+              Aeka list them by name only.
             </p>
             <ConfirmButton
               className="button danger small"

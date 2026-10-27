@@ -560,3 +560,182 @@ test('chats are private, feed the brief, become to-dos once, and can be deleted'
   assert.equal(w.rows('SELECT count(*) AS n FROM ch_messages')[0].n, 0);
   assert.equal(w.rows('SELECT count(*) AS n FROM ch_threads')[0].n, 0);
 });
+
+test('the phone gets each kind of notice only when its switch is on, and on time for to-dos and reminders', async () => {
+  const w = await world();
+  const token = await w.pair();
+  const ctx = await w.ctx(T0);
+  const { createTodo } = await import('../modules/assistant/server/records.ts');
+  const { notify } = await import('../core/server/notifications.ts');
+  const todo = await createTodo(ctx, {
+    title: 'File the TDS return',
+    details: '',
+    priority: 'normal',
+    dueAt: T0 + 2 * HOUR,
+  });
+  // Upcoming: the to-do due in 2 hours, keyed like the notice raised when it falls due.
+  let r = await w.device(sync([]), { token });
+  assert.deepEqual(
+    r.value.upcoming.map((u) => [u.key, u.at, u.title]),
+    [[`todo.due:${todo.id}:${T0 + 2 * HOUR}`, T0 + 2 * HOUR, 'Due now: File the TDS return']],
+  );
+  // When it falls due, the workspace raises the same key.
+  const { todoDueAlerts } = await import('../modules/assistant/server/tick.ts');
+  assert.equal(await todoDueAlerts(w.sys(T0 + 2 * HOUR + MIN), await w.member()), 1);
+  assert.equal(await todoDueAlerts(w.sys(T0 + 2 * HOUR + 2 * MIN), await w.member()), 0);
+  r = await w.device(sync([]), { token, now: T0 + 2 * HOUR + 3 * MIN });
+  assert.deepEqual(
+    r.value.notices.map((n) => [n.kind, n.key]),
+    [['todo.due', `todo.due:${todo.id}:${T0 + 2 * HOUR}`]],
+  );
+  // Switched off: the brief is not shown on the phone (and not later either), the rest still are.
+  await w.action('settings.update', {
+    settings: { ...DEFAULT_SETTINGS, alerts: { ...DEFAULT_SETTINGS.alerts, brief: false, todos: false } },
+  });
+  const at = T0 + 3 * HOUR;
+  for (const [kind, key] of [
+    ['brief', 'brief:1'],
+    ['mail.action', 'mail.action:1'],
+    ['mail.reauth', 'mail.reauth:1'],
+  ])
+    await notify(
+      w.f.db,
+      { recipient: people.admin.email, module: 'x', kind, title: kind, body: '', link: '', dedupeKey: key },
+      at,
+    );
+  r = await w.device(sync([]), { token, now: at + MIN });
+  assert.deepEqual(r.value.notices.map((n) => n.kind).sort(), ['mail.action', 'mail.reauth']);
+  assert.deepEqual(r.value.upcoming, []);
+  await w.action('settings.update', { settings: DEFAULT_SETTINGS });
+  assert.deepEqual((await w.device(sync([]), { token, now: at + 2 * MIN })).value.notices, []);
+  // Each phone gets its own copy.
+  const second = await w.pair('admin', at + 2 * MIN);
+  await notify(
+    w.f.db,
+    {
+      recipient: people.admin.email,
+      module: 'x',
+      kind: 'reminder',
+      title: 'Call bank',
+      body: '',
+      link: '',
+      dedupeKey: 'r:9',
+    },
+    at + 3 * MIN,
+  );
+  assert.equal((await w.device(sync([]), { token, now: at + 4 * MIN })).value.notices.length, 1);
+  assert.equal((await w.device(sync([]), { token: second, now: at + 4 * MIN })).value.notices.length, 1);
+});
+
+test('a chat that newly needs a reply alerts at once; a colleague is told of a task assigned to them', async () => {
+  const w = await world();
+  const token = await w.pair();
+  await w.device(
+    sync([
+      msg({
+        id: 'n1',
+        chat: 'linkedin:neha',
+        app: 'linkedin',
+        title: 'Neha Shah',
+        sender: 'Neha Shah',
+        text: 'Free for a call this week?',
+        address: '',
+      }),
+    ]),
+    { token },
+  );
+  w.ai.reply = () =>
+    JSON.stringify({
+      items: [
+        {
+          id: 'c1',
+          tier: 2,
+          category: 'business',
+          replyNeeded: 'yes',
+          summary: 'Asks for a call this week.',
+          why: 'Direct question.',
+          replyBy: null,
+        },
+      ],
+    });
+  await runChatTriage(w.sys(T0 + 2 * MIN), await w.member());
+  const action = w.rows("SELECT * FROM org_notifications WHERE kind = 'chats.action'");
+  assert.deepEqual(
+    action.map((a) => [a.title, a.body]),
+    [['Needs your reply: Neha Shah (LinkedIn)', 'Asks for a call this week.']],
+  );
+  // Workflow: the associate hears about a task the admin assigns them; nobody hears about their own.
+  const task = await w.f.ok('admin', 'task.create', {
+    task: {
+      matterId: w.f.open.id,
+      title: 'Draft SPA comments',
+      status: 'Preparing',
+      assignee: people.associate.email,
+      preparedBy: null,
+      reviewedBy: null,
+      dueDate: '2026-10-30',
+      priority: false,
+      notes: '',
+      steps: [],
+    },
+  });
+  const assigned = w.rows("SELECT * FROM org_notifications WHERE kind = 'task.assigned'");
+  assert.deepEqual(
+    assigned.map((a) => [a.recipient, a.title, a.link]),
+    [[people.associate.email, 'New task: Draft SPA comments', `workflow/matters#${w.f.open.id}`]],
+  );
+  assert.match(assigned[0].body, /^Amith Rao assigned it to you on Project Falcon, due 2026-10-30\.$/);
+  await w.f.ok('admin', 'task.update', {
+    id: task.id,
+    task: { ...task, title: 'Draft SPA comments v2' },
+    baseRevision: task.revision,
+  });
+  assert.equal(w.rows("SELECT * FROM org_notifications WHERE kind = 'task.assigned'").length, 1);
+});
+
+test('text of chats kept from AI, or with AI off, never reaches the brief, Ask Aeka, drafts or to-dos', async () => {
+  const w = await world();
+  const token = await w.pair();
+  await w.device(
+    sync([msg({ id: 'p1', chat: 'whatsapp:mum', title: 'Mum', text: 'Private family matter' })]),
+    { token },
+  );
+  const [t] = (await w.action('threads.list', { view: 'all' })).threads;
+  await w.action('thread.update', { id: t.id, op: 'neverAi' }, T0 + 2 * MIN);
+  const brief = await buildBrief(await w.ctx(T0 + 3 * MIN));
+  const text = JSON.stringify(brief);
+  assert.ok(text.includes('Mum (WhatsApp'));
+  assert.ok(!text.includes('Private family matter'));
+  const { todoId } = await w.action('thread.toTodo', { id: t.id }, T0 + 3 * MIN);
+  assert.equal(w.rows('SELECT title FROM as_todos WHERE id = ?', todoId)[0].title, 'Reply to Mum (WhatsApp)');
+  // AI off for chats: the same for every chat, and no drafts.
+  await w.action('settings.update', { settings: { ...DEFAULT_SETTINGS, ai: false } });
+  await w.device(sync([msg({ id: 'p2', text: 'Client secret figures' })]), { token });
+  await runChatTriage(w.sys(T0 + 5 * MIN), await w.member());
+  const rahul = (await w.action('threads.list', { view: 'all' }, T0 + 5 * MIN)).threads.find(
+    (x) => x.title === 'Rahul Mehta',
+  );
+  await assert.rejects(w.action('draft.create', { threadId: rahul.id }, T0 + 5 * MIN), /switched off/);
+  const tool = await runTool({ ctx: await w.ctx(T0 + 6 * MIN), channel: 'web' }, 'phone_chats', '{}');
+  assert.ok(!tool.content.includes('Client secret figures'));
+  assert.equal(w.ai.calls.length, 0);
+});
+
+test('many live chats sync in one statement; a refused pairing leaves the code usable', async () => {
+  const w = await world();
+  const token = await w.pair();
+  const chats = Array.from({ length: 120 }, (_, i) => `whatsapp:${i}`);
+  await w.device(sync(chats.slice(0, 60).map((c, i) => msg({ id: `l${i}`, chat: c, title: `Chat ${i}` }))), {
+    token,
+  });
+  const r = await w.device(sync([], { live: chats }), { token });
+  assert.equal(r.status, 200, r.error);
+  assert.equal(w.rows('SELECT count(*) AS n FROM ch_threads WHERE live = 1')[0].n, 60);
+  // Five phones are the most; the code of a refused sixth is not used up.
+  for (let i = 0; i < 4; i++) await w.pair();
+  const { code } = await w.action('phone.pairingCode', {});
+  assert.equal((await w.device({ op: 'pair', code })).status, 409);
+  const [d] = (await w.action('phone.status', {})).devices;
+  await w.action('phone.revoke', { deviceId: d.id });
+  assert.equal((await w.device({ op: 'pair', code })).status, 200);
+});

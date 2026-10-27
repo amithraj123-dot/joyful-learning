@@ -13,6 +13,7 @@ import {
   getThread,
   idOf,
   indiaTime,
+  loadSettings,
   memberOf,
   notFound,
   threadMessages,
@@ -44,6 +45,11 @@ export async function createDraft(ctx: ModuleContext, threadId: unknown, instruc
   if (thread.neverAi)
     throw new CloudError(
       'This chat is kept from AI by your choice, so Aeka cannot draft a reply. Write it yourself.',
+      409,
+    );
+  if (!(await loadSettings(ctx.db, member)).ai)
+    throw new CloudError(
+      'AI is switched off for your chats (Chats, Phone app), so Aeka cannot draft a reply.',
       409,
     );
   if (instructions != null && typeof instructions !== 'string') throw bad('Enter the instructions as text.');

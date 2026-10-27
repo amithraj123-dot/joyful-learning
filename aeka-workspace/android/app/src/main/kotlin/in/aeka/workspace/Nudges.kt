@@ -24,8 +24,14 @@ internal object Nudges {
         nm.createNotificationChannel(channel)
     }
 
-    fun show(context: Context, id: String, title: String, body: String, link: String?) {
+    /**
+     * Shows one notice. [key] (the workspace's dedupe key) shows each to-do, reminder or alert once, whether
+     * the phone's own alarm or the sync reply gets there first; without it, [id] does the same.
+     */
+    fun show(context: Context, id: String, title: String, body: String, link: String?, key: String? = null) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        val once = key ?: id
+        if (!Alerts.markShown(context, once)) return
         ensureChannel(context)
         val open = Intent(context, MainActivity::class.java)
             .setAction(MainActivity.ACTION_OPEN)
@@ -52,7 +58,7 @@ internal object Nudges {
             .setContentIntent(tap)
             .build()
         try {
-            nm.notify("notice:$id", 1, n)
+            nm.notify("notice:$once", 1, n)
         } catch (_: SecurityException) {
             // Notifications not allowed; status() reports postNotifications false.
         }
