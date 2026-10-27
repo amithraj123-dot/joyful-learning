@@ -36,7 +36,9 @@ the email body (quoted history removed), plus candidate mandate names; for a dra
 asks), the email, up to four earlier messages of the thread, the mandate's client and title and the
 member's style notes; for chat, the conversation and the results of the tools it uses (which can include meeting titles,
 times and attendee names from the calendar). Attachments are
-never sent. A member can keep a sender's mail away from AI with a "Never send to AI" rule, or switch AI
+never sent. With commitments switched on, up to 20 of the member's own sent emails a run are checked
+for promises (only those containing promise-like words go to the AI); learning the writing style sends
+up to 40 sent emails once, when the member asks. A member can keep a sender's mail away from AI with a "Never send to AI" rule, or switch AI
 triage off for their mailbox.
 
 ## 3. Outlook (Microsoft Entra app registration)
@@ -103,4 +105,4 @@ by sending the code shown there; STOP unlinks it. Only text messages are handled
 
 ## 6. Deploying
 
-Apply migrations `0006`, `0007` and `0008` to the hosted database before deploying this version.
+Apply migrations `0006` to `0009` to the hosted database before deploying this version.

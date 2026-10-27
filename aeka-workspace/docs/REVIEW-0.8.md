@@ -84,6 +84,17 @@ or declined.
 - A mailbox connected before calendar access existed keeps working; Outlook connection offers
   "Allow calendar access", and its token refreshes never ask for the new permission.
 
+## Executive assistant features (alfred_ parity)
+
+The features of alfred_ (get-alfred.ai) were reconstructed and matched or exceeded; see
+`ALFRED-PARITY.md`. In short: follow-ups (waiting on others and people chasing you), commitments from
+sent mail, to-dos created from email asks and meeting action items with source links, a learned
+writing style with per-recipient greetings and learning from edits, VIPs, archiving, natural-language
+to-dos with lists, repeats and a board, stale and critical flags, a seven-day schedule health strip,
+meeting preparation packs with an AI briefing on request, clashes on incoming invitations, and a
+Patterns section in the brief. Calendar writes (accepting invitations, creating events, focus blocks)
+were left out because calendar access is read only by choice.
+
 ## Platform additions
 
 Sealed credentials, a single metered AI client with a daily limit and a kill switch, member

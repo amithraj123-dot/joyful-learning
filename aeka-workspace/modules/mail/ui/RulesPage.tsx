@@ -344,6 +344,12 @@ function StatsView({ stats }: { stats: Stats }) {
             <span style={{ width: used + '%' }} />
           </span>
         </div>
+        {typeof stats.archived30d === 'number' && (
+          <div>
+            <strong>{stats.archived30d}</strong>
+            <span>Moved to Archive</span>
+          </div>
+        )}
       </div>
       {fields.length > 0 && (
         <>
@@ -365,7 +371,8 @@ function StatsView({ stats }: { stats: Stats }) {
         </>
       )}
       <p className="wf-caption">
-        The AI limit is per member per day, in India time. Built-in checks and your rules use no AI.
+        The AI limit is per member per day, in India time. Built-in checks and your rules use no AI. Moved to
+        Archive counts email archived by you or automatically in the last 30 days.
       </p>
     </>
   );
