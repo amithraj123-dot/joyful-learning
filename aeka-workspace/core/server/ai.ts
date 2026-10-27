@@ -56,10 +56,25 @@ const dayStartIST = (now: number) => {
 export const aiConfigured = (env: ServerEnv) =>
   configured(env.LITELLM_BASE_URL, env.LITELLM_API_KEY) && env.AEKA_AI_DISABLED !== 'true';
 
+// OpenRouter (https://openrouter.ai/api/v1) speaks the same protocol as LiteLLM; its model ids name the
+// provider ("anthropic/claude-sonnet-4.5"), so the model must be set explicitly there.
+export const isOpenRouter = (base: string | undefined) => {
+  try {
+    return !!base && new URL(base.trim()).hostname.endsWith('openrouter.ai');
+  } catch {
+    return false;
+  }
+};
+
 export function aiStatus(env: ServerEnv) {
   if (env.AEKA_AI_DISABLED === 'true') return { ready: false, reason: 'AI is switched off for the firm.' };
   if (!configured(env.LITELLM_BASE_URL, env.LITELLM_API_KEY))
-    return { ready: false, reason: 'The firm AI service (LiteLLM) is not configured.' };
+    return { ready: false, reason: 'The firm AI service (LiteLLM or OpenRouter) is not configured.' };
+  if (isOpenRouter(env.LITELLM_BASE_URL) && !(env.LITELLM_MODEL ?? '').includes('/'))
+    return {
+      ready: false,
+      reason: 'Set LITELLM_MODEL to an OpenRouter model id, for example anthropic/claude-sonnet-4.5.',
+    };
   return {
     ready: true,
     reason: '',
@@ -137,7 +152,17 @@ export async function chat(deps: AiDeps, req: AiRequest): Promise<AiResult> {
   try {
     res = await deps.fetch(endpoint(deps.env.LITELLM_BASE_URL!), {
       method: 'POST',
-      headers: { Authorization: `Bearer ${deps.env.LITELLM_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${deps.env.LITELLM_API_KEY}`,
+        'Content-Type': 'application/json',
+        // OpenRouter shows usage under this application name.
+        ...(isOpenRouter(deps.env.LITELLM_BASE_URL)
+          ? {
+              'HTTP-Referer': deps.env.AEKA_PUBLIC_ORIGIN || 'https://aeka.example',
+              'X-Title': 'Aeka Workspace',
+            }
+          : {}),
+      },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });

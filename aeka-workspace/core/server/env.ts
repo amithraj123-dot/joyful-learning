@@ -5,7 +5,9 @@ export interface ServerEnv {
   // 32 or more random bytes, base64 or hex. Seals stored credentials (mail tokens). Required before
   // any mailbox can be connected.
   AEKA_ENCRYPTION_KEY?: string;
-  // The firm's LiteLLM proxy (OpenAI-compatible). Base URL ends with /v1 or is the proxy root.
+  // The firm's AI service, OpenAI-compatible: the LiteLLM proxy, or OpenRouter (base URL
+  // https://openrouter.ai/api/v1, LITELLM_MODEL an OpenRouter id such as anthropic/claude-sonnet-4.5).
+  // Base URL ends with /v1 or is the proxy root.
   LITELLM_BASE_URL?: string;
   LITELLM_API_KEY?: string;
   LITELLM_MODEL?: string; // drafting and chat; default claude-sonnet-4.6

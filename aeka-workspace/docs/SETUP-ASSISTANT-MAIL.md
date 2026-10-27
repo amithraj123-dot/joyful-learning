@@ -16,7 +16,7 @@ only) shows which are ready.
 It seals each member's Outlook sign-in token. Keep a copy in the firm's password manager: if it is lost
 or changed, every member must connect Outlook again (their mail data is unaffected in Outlook).
 
-## 2. The firm AI service (LiteLLM proxy)
+## 2. The firm AI service (LiteLLM proxy or OpenRouter)
 
 | Secret                | Value                                                                            |
 | --------------------- | -------------------------------------------------------------------------------- |
@@ -26,6 +26,14 @@ or changed, every member must connect Outlook again (their mail data is unaffect
 | `LITELLM_FAST_MODEL`  | Optional. Triage model; default the same as `LITELLM_MODEL`                      |
 | `AEKA_AI_DAILY_LIMIT` | Optional. Model calls per member per day; default 400                            |
 | `AEKA_AI_DISABLED`    | Optional. `true` stops every AI call at once                                     |
+
+**OpenRouter instead of the proxy** (the same service the firm's deck engine uses): set
+`LITELLM_BASE_URL` to `https://openrouter.ai/api/v1`, `LITELLM_API_KEY` to an OpenRouter key made for
+Aeka Workspace, and `LITELLM_MODEL` to an OpenRouter model id with its provider, for example
+`anthropic/claude-sonnet-4.5` (optionally `LITELLM_FAST_MODEL`, for example
+`anthropic/claude-haiku-4.5`, for triage). Without a provider-prefixed model the workspace reports AI as
+not configured rather than failing call by call. Set a monthly credit limit on the key in OpenRouter.
+Keys go only into the hosting secrets, never into the repository (it is public) or a chat.
 
 Before real client mail is sent, confirm in writing the proxy's and the model provider's data retention
 and training terms (the earlier Aeka Twin review left this open). Every call, including failed ones, is
