@@ -467,8 +467,8 @@ export function SettingsPage() {
         id="as-set-brief"
       >
         <p className="wf-caption as-pad">
-          A short summary of today&apos;s meetings, urgent mail, tasks, deadlines and reminders, posted to your
-          notifications each morning. It is put together without AI.
+          A short summary of today&apos;s meetings, urgent mail, tasks, deadlines and reminders, posted to
+          your notifications each morning. It is put together without AI.
         </p>
         <div className="as-brief-settings">
           <Toggle pressed={prefs.briefEnabled} onChange={(v) => void save({ ...prefs, briefEnabled: v })}>
