@@ -9,6 +9,8 @@ export const assistantModule: ClientModule = {
   name: 'Assistant',
   surfaces: ['web'],
   View: lazy(() => import('./ui/AssistantApp')),
+  // On an open Scribe meeting note: add its action items to my to-dos.
+  slots: { 'scribe.note': lazy(() => import('./ui/NoteTodosPanel')) },
   pages: [
     {
       id: 'assistant/today',

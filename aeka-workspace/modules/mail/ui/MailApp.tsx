@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ModuleViewProps } from '../../../core/client/module';
 import { ConnectPage, takeReturnNotice, type ReturnNotice } from './ConnectPage';
 import { DraftsPage } from './DraftsPage';
+import { FollowUpsPage } from './FollowUpsPage';
 import { InboxPage } from './InboxPage';
 import { RulesPage } from './RulesPage';
 import { MailProvider } from './store';
@@ -22,6 +23,8 @@ function Body({
   switch (page) {
     case 'mail/drafts':
       return <DraftsPage />;
+    case 'mail/followups':
+      return <FollowUpsPage />;
     case 'mail/rules':
       return <RulesPage />;
     case 'mail/connect':

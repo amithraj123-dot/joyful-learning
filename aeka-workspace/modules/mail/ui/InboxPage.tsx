@@ -2,19 +2,24 @@
 // Inbox triage: what needs the partner, with "Draft a reply?" asked on each email that may need one.
 // Syncs on open and every 3 minutes while the tab is visible.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Inbox, Plug, RefreshCw, Search, TriangleAlert } from 'lucide-react';
+import { Archive, ChevronDown, ChevronUp, Inbox, Plug, RefreshCw, Search, TriangleAlert } from 'lucide-react';
 import { clear, peek } from '../../../core/client/handover';
 import { Empty } from '../../workflow/ui/components/Bits';
+import { Modal } from '../../workflow/ui/components/Modal';
 import { mail } from '../shared/client';
 import { VIEWS, VIEW_LABELS, type MailItem, type MailView, type QueueCounts } from '../shared/types';
-import { errorMessage, formatWhen, isConflict, isLow, plural } from './lib';
-import { LowRow, MailCard } from './MailCard';
+import { domainOf, errorMessage, formatWhen, isConflict, isLow, plural, senderName } from './lib';
+import { LowRow, MailCard, type CardBusy } from './MailCard';
 import { MessageDrawer } from './MessageDrawer';
 import { useMail } from './store';
+import { archiveIds, clearVip, markVip, vipRuleFor } from './actions';
 
 const SYNC_EVERY = 3 * 60 * 1000;
 const VIEW_KEY = 'aeka-mail-view';
-type Busy = '' | 'draft' | 'decide' | 'mandate' | 'retry';
+type Busy = CardBusy;
+
+// Bulk archive leaves out VIPs and mail linked to a mandate; they can still be archived one by one.
+const keepOnBulk = (i: MailItem) => i.vip || !!i.triage?.matterId;
 
 const EMPTY_TEXT: Record<MailView, { title: string; body: string }> = {
   needs_me: {
@@ -47,7 +52,7 @@ function readView(): MailView {
 }
 
 export function InboxPage() {
-  const { account, reloadAccount, navigate } = useMail();
+  const { account, reloadAccount, navigate, notify } = useMail();
   const [view, setViewState] = useState<MailView>(readView);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -66,6 +71,7 @@ export function InboxPage() {
   const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
   const [showLow, setShowLow] = useState(false);
   const [open, setOpen] = useState<{ item: MailItem; focus?: 'draft' } | null>(null);
+  const [bulk, setBulk] = useState<MailItem[] | null>(null);
   const seq = useRef(0);
 
   // Another module (for example the assistant) asked for one email to be opened.
@@ -260,6 +266,39 @@ export function InboxPage() {
       replace({ ...item, triage: t });
     });
 
+  const removeItems = useCallback((ids: string[]) => {
+    const gone = new Set(ids);
+    setItems((old) => old.filter((i) => !gone.has(i.id)));
+    setOpen((o) => (o && gone.has(o.item.id) ? null : o));
+  }, []);
+  const archive = (item: MailItem) =>
+    act(item, 'archive', async () => {
+      const n = await archiveIds([item.id]);
+      if (!n) throw new Error('Outlook did not archive this email. It may have been moved already.');
+      removeItems([item.id]);
+      notify('Moved to your Outlook Archive folder');
+      void load(true);
+    });
+  const vip = (item: MailItem, on: boolean) =>
+    act(item, 'vip', async () => {
+      const who = senderName(item.from);
+      const address = item.from.address.toLowerCase();
+      let match = (i: MailItem) => i.from.address.toLowerCase() === address;
+      if (on) {
+        await markVip('sender', address);
+        notify(`${who} is now a VIP. New email from them is at least Important and never archived.`);
+      } else {
+        const rule = await vipRuleFor(address);
+        if (rule) await clearVip(rule);
+        if (rule?.kind === 'domain') {
+          match = (i) => domainOf(i.from.address) === rule.pattern;
+          notify(`Everyone at ${rule.pattern} is no longer a VIP.`);
+        } else notify(`${who} is no longer a VIP.`);
+      }
+      setItems((old) => old.map((i) => (match(i) ? { ...i, vip: on } : i)));
+      void load(true);
+    });
+
   const shown = useMemo(() => {
     if (view !== 'needs_me') return items;
     // Urgent first in "Needs me"; otherwise newest first as the server sends them.
@@ -269,6 +308,8 @@ export function InboxPage() {
   }, [items, view]);
   const main = view === 'low' ? [] : shown.filter((i) => !isLow(i));
   const low = view === 'low' ? shown : shown.filter(isLow);
+  const lowArchivable = low.filter((i) => !keepOnBulk(i));
+  const lowKept = low.length - lowArchivable.length;
 
   if (account.phase === 'ready' && !connected)
     return (
@@ -423,6 +464,8 @@ export function InboxPage() {
                   onDecline={() => decline(item)}
                   onConfirmMandate={() => confirmMandate(item)}
                   onRetry={() => retry(item)}
+                  onArchive={() => archive(item)}
+                  onVip={(on) => vip(item, on)}
                 />
               ))}
             </ul>
@@ -447,11 +490,36 @@ export function InboxPage() {
                 </button>
               )}
               {(view === 'low' || showLow) && (
-                <ul className="mail-low-list">
-                  {low.map((item) => (
-                    <LowRow key={item.id} item={item} onOpen={() => setOpen({ item })} />
-                  ))}
-                </ul>
+                <>
+                  <div className="mail-low-bar">
+                    <span className="wf-caption">
+                      {lowKept
+                        ? `${plural(lowKept, 'email')} from VIPs or linked to a mandate ${lowKept === 1 ? 'is' : 'are'} kept out of bulk archive.`
+                        : 'Clear low-priority mail in one go, or archive one at a time.'}
+                    </span>
+                    {lowArchivable.length > 0 && (
+                      <button
+                        type="button"
+                        className="button secondary small"
+                        onClick={() => setBulk(lowArchivable)}
+                      >
+                        <Archive size={14} aria-hidden="true" /> Archive all {lowArchivable.length} shown
+                      </button>
+                    )}
+                  </div>
+                  <ul className="mail-low-list">
+                    {low.map((item) => (
+                      <LowRow
+                        key={item.id}
+                        item={item}
+                        busy={!!busy[item.id]}
+                        error={cardErrors[item.id]}
+                        onOpen={() => setOpen({ item })}
+                        onArchive={() => archive(item)}
+                      />
+                    ))}
+                  </ul>
+                </>
               )}
             </section>
           )}
@@ -473,8 +541,95 @@ export function InboxPage() {
             void load(true);
           }}
           onChange={replace}
+          onArchived={(id) => {
+            removeItems([id]);
+            void load(true);
+          }}
+        />
+      )}
+      {bulk && (
+        <BulkArchive
+          items={bulk}
+          onClose={() => setBulk(null)}
+          onDone={(archived, ids) => {
+            setBulk(null);
+            if (archived === ids.length) removeItems(ids);
+            notify(
+              archived === ids.length
+                ? `${plural(archived, 'email')} moved to your Outlook Archive folder`
+                : `${archived} of ${ids.length} emails archived. The others stay in your inbox.`,
+            );
+            void load(true);
+          }}
         />
       )}
     </div>
+  );
+}
+
+function BulkArchive({
+  items,
+  onClose,
+  onDone,
+}: {
+  items: MailItem[];
+  onClose: () => void;
+  onDone: (archived: number, ids: string[]) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const go = async () => {
+    setBusy(true);
+    setError('');
+    const ids = items.map((i) => i.id);
+    try {
+      onDone(await archiveIds(ids), ids);
+    } catch (e) {
+      setError(errorMessage(e));
+      setBusy(false);
+    }
+  };
+  const first = items.slice(0, 5);
+  return (
+    <Modal
+      title={`Archive ${plural(items.length, 'low-priority email')}?`}
+      subtitle="They move to the Archive folder in your Outlook and leave the triage views."
+      onClose={busy ? () => {} : onClose}
+      footer={
+        <div className="wf-row wf-between">
+          <button type="button" className="button ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button type="button" className="button primary" onClick={go} disabled={busy} data-autofocus>
+            <Archive size={15} aria-hidden="true" /> {busy ? 'Archiving' : `Archive ${items.length}`}
+          </button>
+        </div>
+      }
+    >
+      <ul className="mail-bulk-list">
+        {first.map((i) => (
+          <li key={i.id}>
+            <strong>{senderName(i.from)}</strong> <span>{i.subject || '(No subject)'}</span>
+          </li>
+        ))}
+        {items.length > first.length && (
+          <li className="wf-caption">and {plural(items.length - first.length, 'more email')}</li>
+        )}
+      </ul>
+      <p className="wf-caption">
+        This cannot be undone from the workspace. To bring an email back, move it out of the Archive folder in
+        Outlook. Mail from VIPs and mail linked to a mandate is not included.
+      </p>
+      {busy && (
+        <p className="wf-caption" role="status">
+          Archiving
+        </p>
+      )}
+      {error && (
+        <p className="wf-error" role="alert">
+          {error}
+        </p>
+      )}
+    </Modal>
   );
 }

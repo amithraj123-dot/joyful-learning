@@ -7,7 +7,7 @@ import { ConfirmButton } from '../../workflow/ui/components/ConfirmButton';
 import { Empty, Toggle } from '../../workflow/ui/components/Bits';
 import { mail } from '../shared/client';
 import type { AccountSettings } from '../shared/types';
-import { errorMessage, formatStamp, formatWhen } from './lib';
+import { errorMessage, formatStamp, formatWhen, settingsOf } from './lib';
 import { useMail } from './store';
 
 export interface ReturnNotice {
@@ -128,6 +128,7 @@ export function ConnectPage({ notice, onDismiss }: { notice: ReturnNotice | null
     );
 
   const { setup, account } = state;
+  const settings = settingsOf(account?.settings);
   const setupDone = setup.outlookConfigured && setup.storageReady;
 
   const updateSettings = async (settings: AccountSettings) => {
@@ -289,11 +290,12 @@ export function ConnectPage({ notice, onDismiss }: { notice: ReturnNotice | null
               </a>
             </div>
           )}
+          <h3 className="wf-h4 mail-settings-h">Triage</h3>
           <div className="wf-toggles">
             <Toggle
-              pressed={account.settings.aiTriage}
+              pressed={settings.aiTriage}
               disabled={busy}
-              onChange={(v) => updateSettings({ ...account.settings, aiTriage: v })}
+              onChange={(v) => updateSettings({ ...settings, aiTriage: v })}
             >
               Use AI to triage my mail{!setup.aiReady && ' (the firm AI service is not set up)'}
             </Toggle>
@@ -302,14 +304,50 @@ export function ConnectPage({ notice, onDismiss }: { notice: ReturnNotice | null
               AI.
             </p>
             <Toggle
-              pressed={account.settings.alertUrgent}
+              pressed={settings.alertUrgent}
               disabled={busy}
-              onChange={(v) => updateSettings({ ...account.settings, alertUrgent: v })}
+              onChange={(v) => updateSettings({ ...settings, alertUrgent: v })}
             >
               Alert me about urgent email
             </Toggle>
             <p className="wf-caption mail-toggle-help">
               A workspace notification, and WhatsApp if you have linked it in the Assistant.
+            </p>
+            <Toggle
+              pressed={settings.archiveNoise}
+              disabled={busy}
+              onChange={(v) => updateSettings({ ...settings, archiveNoise: v })}
+            >
+              Archive low-priority bulk mail
+            </Toggle>
+            <p className="wf-caption mail-toggle-help">
+              Newsletters and automated notifications move to your Outlook Archive folder after triage. Never
+              mail from your VIPs or mail linked to a mandate. Off unless you turn it on.
+            </p>
+          </div>
+          <h3 className="wf-h4 mail-settings-h">To-dos</h3>
+          <div className="wf-toggles">
+            <Toggle
+              pressed={settings.autoTodos}
+              disabled={busy}
+              onChange={(v) => updateSettings({ ...settings, autoTodos: v })}
+            >
+              Add what important email asks of me to my to-dos
+            </Toggle>
+            <p className="wf-caption mail-toggle-help">
+              Urgent and important email that needs your reply or review becomes one to-do, linked to the
+              email and due on its deadline. No extra AI is used.
+            </p>
+            <Toggle
+              pressed={settings.trackCommitments}
+              disabled={busy}
+              onChange={(v) => updateSettings({ ...settings, trackCommitments: v })}
+            >
+              Track promises I make in sent mail
+            </Toggle>
+            <p className="wf-caption mail-toggle-help">
+              When you write &ldquo;I will send the note by Friday&rdquo;, it becomes a to-do with that date.
+              Each sent email is checked once.
             </p>
           </div>
           <p className="wf-sr" aria-live="polite">
@@ -342,7 +380,15 @@ export function ConnectPage({ notice, onDismiss }: { notice: ReturnNotice | null
             For triage: the subject, sender, recipients, date and up to 2,500 characters of the body, through
             the firm&apos;s own AI service.
           </li>
-          <li>For a draft, only when you ask for one: the email thread.</li>
+          <li>For a draft or a follow-up, only when you ask for one: the email thread.</li>
+          <li>
+            To track your promises, if turned on: sent emails that contain a phrase such as &ldquo;I
+            will&rdquo; or a date, once each.
+          </li>
+          <li>
+            To learn your writing style, only when you ask: up to 40 of your recent sent emails, without the
+            quoted history.
+          </li>
           <li>Never attachments. Senders you mark as Never send to AI are sorted by rules only.</li>
           <li>Nothing is sent from your mailbox until you review a draft and press Send.</li>
         </ul>

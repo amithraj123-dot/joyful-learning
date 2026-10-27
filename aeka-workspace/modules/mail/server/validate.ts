@@ -120,6 +120,7 @@ export function ruleEffect(value: unknown): RuleEffect {
     out.matterId = e.matterId;
   }
   if (e.neverAi != null) out.neverAi = bool(e.neverAi, 'keeping this mail from AI');
+  if (e.vip != null) out.vip = bool(e.vip, 'marking as a VIP');
   if (!Object.keys(out).length) throw bad('Choose what the rule should set.');
   return out;
 }

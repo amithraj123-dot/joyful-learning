@@ -20,6 +20,7 @@ import {
   listReminders,
   listTodos,
   memoryFields,
+  quickAdd,
   reminderFields,
   saveMemory,
   snoozeReminder,
@@ -28,7 +29,9 @@ import {
   updateReminder,
   updateTodo,
 } from './records.ts';
+import { meetingPrep, prepSummary, scheduleWeek, upcomingMeetings } from './meetings.ts';
 import { getSettings, saveSettings, startLink, unlink } from './settings.ts';
+import { notesToTodos } from './sources.ts';
 import { assistantTick } from './tick.ts';
 import { revision } from './validate.ts';
 
@@ -55,6 +58,8 @@ export const assistantServer: ServerModule = {
     },
     'todo.delete': { handler: (ctx, p) => deleteTodo(ctx, p.id) },
     'todo.toTask': { handler: (ctx, p) => todoToTask(ctx, p) },
+    'todo.quickAdd': { handler: (ctx, p) => quickAdd(ctx, p.text) },
+    'notes.toTodos': { handler: (ctx, p) => notesToTodos(ctx, p.noteId) },
 
     'reminders.list': { handler: (ctx) => listReminders(ctx) },
     'reminder.create': { handler: (ctx, p) => createReminder(ctx, reminderFields(p.reminder)) },
@@ -71,6 +76,11 @@ export const assistantServer: ServerModule = {
     'memory.delete': { handler: (ctx, p) => deleteMemory(ctx, p.id) },
 
     'brief.get': { handler: (ctx) => buildBrief(ctx, true) },
+
+    'meetings.upcoming': { handler: (ctx, p) => upcomingMeetings(ctx, p.days) },
+    'meetings.prep': { handler: (ctx, p) => meetingPrep(ctx, p.eventId) },
+    'meetings.prepSummary': { handler: (ctx, p) => prepSummary(ctx, p.eventId, p.refresh) },
+    'schedule.week': { handler: (ctx) => scheduleWeek(ctx) },
 
     'settings.get': { handler: (ctx) => getSettings(ctx) },
     'settings.save': { handler: (ctx, p) => saveSettings(ctx, p.settings) },

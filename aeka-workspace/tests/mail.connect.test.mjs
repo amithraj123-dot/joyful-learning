@@ -80,7 +80,13 @@ test('callback state must exist, be fresh, belong to the same member and be used
   );
   const got = await f.ok('admin', 'account.get');
   assert.equal(got.account.address, people.admin.email);
-  assert.deepEqual(got.account.settings, { aiTriage: true, alertUrgent: true });
+  assert.deepEqual(got.account.settings, {
+    aiTriage: true,
+    alertUrgent: true,
+    archiveNoise: false,
+    autoTodos: true,
+    trackCommitments: true,
+  });
   assert.equal(got.setup.storageReady, true);
   assert.equal((await f.ok('partner', 'account.get')).account, null);
 });

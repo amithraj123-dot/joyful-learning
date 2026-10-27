@@ -33,6 +33,9 @@ const toItem = (r: DraftRow): MailItem => ({
   threadCount: 1,
   triage: null,
   draft: { id: r.id, status: r.status, placeholders: r.placeholders, updatedAt: r.updatedAt },
+  vip: false,
+  chased: 0,
+  meetingClash: null,
 });
 
 // The first lines of the reply, without the greeting.

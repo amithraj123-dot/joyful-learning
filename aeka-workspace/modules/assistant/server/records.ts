@@ -8,11 +8,15 @@ import type { MemoryInput, ReminderInput, TodoInput } from '../shared/contract.t
 import {
   MEMORY_CATEGORIES,
   REPEATS,
+  TODO_REPEATS,
   type Memory,
   type Reminder,
   type Todo,
+  type TodoRepeat,
   type TodoSource,
 } from '../shared/types.ts';
+import { QUICK_ADD_MAX, parseQuickAdd } from './quickadd.ts';
+import { DAY, nextOccurrence } from './recurrence.ts';
 import {
   LIMITS,
   bad,
@@ -34,59 +38,95 @@ const SKEW = 60000; // a reminder may be up to a minute in the past when created
 
 // ---------- To-dos ----------
 
-const todoFrom = (r: Row): Todo => ({
-  id: r.id as string,
-  title: r.title as string,
-  details: r.details as string,
-  status: r.status as Todo['status'],
-  priority: r.priority as Todo['priority'],
-  dueAt: (r.due_at as number | null) ?? null,
-  source: r.source as TodoSource,
-  sourceRef: r.source_ref as string,
-  // A to-do being moved holds a short claim ("claim:<time>:<id>"), never shown as a task.
-  taskId: typeof r.task_id === 'string' && !r.task_id.startsWith('claim:') ? r.task_id : null,
-  createdAt: r.created_at as number,
-  updatedAt: r.updated_at as number,
-  doneAt: (r.done_at as number | null) ?? null,
-  revision: r.revision as number,
-});
+// A deleted to-do that came from another module (an email, a commitment, a meeting) is kept as a hidden
+// tombstone, so that the same item is not added again. Its task_id holds this marker.
+const DISMISSED = 'dismissed:';
+// The next to-do of a repeating one carries "repeat:<previous id>" as its source_ref, so a completion
+// creates at most one successor; the API shows it as no source reference.
+const REPEAT_REF = 'repeat:';
+export const STALE_AFTER = 7 * DAY;
+export const CRITICAL_AFTER = 3 * DAY;
+const OPEN = "status IN ('open','doing')";
+const VISIBLE = `(task_id IS NULL OR task_id NOT LIKE '${DISMISSED}%')`;
+
+export const todoFrom = (r: Row, now: number): Todo => {
+  const status = r.status as Todo['status'];
+  const dueAt = (r.due_at as number | null) ?? null;
+  const sourceRef = r.source_ref as string;
+  return {
+    id: r.id as string,
+    title: r.title as string,
+    details: r.details as string,
+    status,
+    priority: r.priority as Todo['priority'],
+    dueAt,
+    source: r.source as TodoSource,
+    sourceRef: sourceRef.startsWith(REPEAT_REF) ? '' : sourceRef,
+    sourceLabel: (r.source_label as string) ?? '',
+    list: (r.list as string) ?? '',
+    repeat: TODO_REPEATS.includes(r.repeat as TodoRepeat) ? (r.repeat as TodoRepeat) : 'none',
+    stale: status !== 'done' && dueAt == null && now - (r.created_at as number) > STALE_AFTER,
+    critical: status !== 'done' && dueAt != null && now - dueAt >= CRITICAL_AFTER,
+    // A to-do being moved holds a short claim ("claim:<time>:<id>"), never shown as a task.
+    taskId:
+      typeof r.task_id === 'string' && !r.task_id.startsWith('claim:') && !r.task_id.startsWith(DISMISSED)
+        ? r.task_id
+        : null,
+    createdAt: r.created_at as number,
+    updatedAt: r.updated_at as number,
+    doneAt: (r.done_at as number | null) ?? null,
+    revision: r.revision as number,
+  };
+};
+
+// A list label: "#Falcon" and "Falcon" are the same list.
+export const listLabel = (value: unknown) =>
+  text(value, 'the list', LIMITS.list).replace(/^#+/, '').replace(/\s+/g, ' ').trim();
 
 export function todoFields(value: unknown): TodoInput {
   const t = obj(value, 'to-do');
-  return {
+  const input: TodoInput = {
     title: text(t.title, 'a title', LIMITS.title, true),
     details: text(t.details, 'the details', LIMITS.details),
     priority: t.priority == null ? 'normal' : oneOf(t.priority, ['normal', 'high'] as const, 'priority'),
     dueAt: optionalTime(t.dueAt, 'due date and time'),
-    // Absent on an update: the status stays as it is.
-    status: t.status == null ? undefined : oneOf(t.status, ['open', 'done'] as const, 'status'),
+    // Absent on an update: the status, list and repeat stay as they are.
+    status: t.status == null ? undefined : oneOf(t.status, ['open', 'doing', 'done'] as const, 'status'),
+    list: t.list == null ? undefined : listLabel(t.list),
+    repeat: t.repeat == null ? undefined : oneOf(t.repeat, TODO_REPEATS, 'repeat'),
   };
+  return input;
 }
+
+const assertRepeatable = (repeat: TodoRepeat, dueAt: number | null) => {
+  if (repeat !== 'none' && dueAt == null) throw bad('Give a repeating to-do a due date.');
+};
 
 export async function getTodo(ctx: ModuleContext, id: unknown) {
   const key = recordId(id, 'to-do');
   const r = await ctx.db
-    .prepare('SELECT * FROM as_todos WHERE id = ? AND member = ?')
+    .prepare(`SELECT * FROM as_todos WHERE id = ? AND member = ? AND ${VISIBLE}`)
     .bind(key, owner(ctx))
     .first<Row>();
   if (!r) throw notFound('to-do');
-  return todoFrom(r);
+  return todoFrom(r, ctx.now);
 }
 
+// Open and in-progress to-dos (with includeDone, done ones too), earliest due first.
 export async function listTodos(ctx: ModuleContext, includeDone = false) {
   const r = await ctx.db
     .prepare(
-      `SELECT * FROM as_todos WHERE member = ?${includeDone ? '' : " AND status = 'open'"}
+      `SELECT * FROM as_todos WHERE member = ? AND ${VISIBLE}${includeDone ? '' : ` AND ${OPEN}`}
        ORDER BY status = 'done', due_at IS NULL, due_at, created_at DESC LIMIT 1000`,
     )
     .bind(owner(ctx))
     .all<Row>();
-  return r.results.map(todoFrom);
+  return r.results.map((row) => todoFrom(row, ctx.now));
 }
 
 async function assertOpenRoom(ctx: ModuleContext) {
   const r = await ctx.db
-    .prepare("SELECT count(*) AS n FROM as_todos WHERE member = ? AND status = 'open'")
+    .prepare(`SELECT count(*) AS n FROM as_todos WHERE member = ? AND ${OPEN}`)
     .bind(owner(ctx))
     .first<{ n: number }>();
   if ((r?.n ?? 0) >= LIMITS.openTodos)
@@ -96,15 +136,40 @@ async function assertOpenRoom(ctx: ModuleContext) {
     );
 }
 
-export async function createTodo(
+const INSERT_TODO =
+  'INTO as_todos(id,member,title,details,status,priority,due_at,source,source_ref,source_label,list,repeat,task_id,created_at,updated_at,done_at,revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
+const insertTodo = (ctx: ModuleContext, t: Todo, verb = 'INSERT') =>
+  ctx.db
+    .prepare(`${verb} ${INSERT_TODO}`)
+    .bind(
+      t.id,
+      owner(ctx),
+      t.title,
+      t.details,
+      t.status,
+      t.priority,
+      t.dueAt,
+      t.source,
+      t.sourceRef,
+      t.sourceLabel,
+      t.list,
+      t.repeat,
+      null,
+      t.createdAt,
+      t.updatedAt,
+      t.doneAt,
+      1,
+    );
+
+function newTodo(
   ctx: ModuleContext,
   input: TodoInput,
-  source: TodoSource = 'manual',
-  sourceRef = '',
-) {
+  source: TodoSource,
+  sourceRef: string,
+  sourceLabel = '',
+): Todo {
   const status = input.status ?? 'open';
-  if (status === 'open') await assertOpenRoom(ctx);
-  const todo: Todo = {
+  return {
     id: crypto.randomUUID(),
     title: input.title,
     details: input.details,
@@ -113,59 +178,147 @@ export async function createTodo(
     dueAt: input.dueAt,
     source,
     sourceRef: sourceRef.slice(0, 200),
+    sourceLabel: sourceLabel.slice(0, LIMITS.title),
+    list: input.list ?? '',
+    repeat: input.repeat ?? 'none',
+    stale: false,
+    critical: status !== 'done' && input.dueAt != null && ctx.now - input.dueAt >= CRITICAL_AFTER,
     taskId: null,
     createdAt: ctx.now,
     updatedAt: ctx.now,
     doneAt: status === 'done' ? ctx.now : null,
     revision: 1,
   };
-  await ctx.db
-    .prepare(
-      'INSERT INTO as_todos(id,member,title,details,status,priority,due_at,source,source_ref,task_id,created_at,updated_at,done_at,revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-    )
-    .bind(
-      todo.id,
-      owner(ctx),
-      todo.title,
-      todo.details,
-      todo.status,
-      todo.priority,
-      todo.dueAt,
-      todo.source,
-      todo.sourceRef,
-      null,
-      todo.createdAt,
-      todo.updatedAt,
-      todo.doneAt,
-      1,
-    )
-    .run();
+}
+
+export async function createTodo(
+  ctx: ModuleContext,
+  input: TodoInput,
+  source: TodoSource = 'manual',
+  sourceRef = '',
+) {
+  const todo = newTodo(ctx, input, source, sourceRef);
+  assertRepeatable(todo.repeat, todo.dueAt);
+  if (todo.status !== 'done') await assertOpenRoom(ctx);
+  await insertTodo(ctx, todo).run();
   return todo;
+}
+
+// A to-do from another module's item, once per (source, sourceRef). Returns null when that item was
+// added before, even if the to-do was completed or deleted since.
+export async function createSourcedTodo(
+  ctx: ModuleContext,
+  input: TodoInput,
+  source: 'mail' | 'commitment' | 'meeting',
+  sourceRef: string,
+  sourceLabel: string,
+) {
+  if (!sourceRef) throw bad('A source reference is required.');
+  const existing = await ctx.db
+    .prepare('SELECT id FROM as_todos WHERE member = ? AND source = ? AND source_ref = ?')
+    .bind(owner(ctx), source, sourceRef.slice(0, 200))
+    .first<Row>();
+  if (existing) return null;
+  await assertOpenRoom(ctx);
+  const todo = newTodo(ctx, { ...input, repeat: 'none' }, source, sourceRef, sourceLabel);
+  const r = await insertTodo(ctx, todo, 'INSERT OR IGNORE').run();
+  return r.meta.changes ? todo : null;
+}
+
+// The due time of the next to-do of a repeating one: the first occurrence after now (a late
+// completion skips the occurrences missed in between), at the same time of day in India time.
+export function nextTodoDue(dueAt: number, repeat: TodoRepeat, now: number) {
+  if (repeat === 'none') return null;
+  let next = dueAt;
+  let prev: number | null = null;
+  for (let i = 0; i < 2000 && (next === dueAt || next <= now); i++) {
+    const step: number | null =
+      repeat === 'daily'
+        ? next + DAY
+        : repeat === 'weekly'
+          ? next + 7 * DAY
+          : repeat === 'fortnightly'
+            ? next + 14 * DAY
+            : nextOccurrence(next, 'monthly', prev);
+    prev = next;
+    next = step!;
+  }
+  return next;
 }
 
 export async function updateTodo(ctx: ModuleContext, id: unknown, input: TodoInput, base: number) {
   const current = await getTodo(ctx, id);
   const status = input.status ?? current.status;
-  if (status === 'open' && current.status !== 'open') await assertOpenRoom(ctx);
+  const list = input.list ?? current.list;
+  const repeat = input.repeat ?? current.repeat;
+  assertRepeatable(repeat, input.dueAt);
+  if (status !== 'done' && current.status === 'done') await assertOpenRoom(ctx);
   const doneAt = status === 'done' ? (current.doneAt ?? ctx.now) : null;
-  const r = await ctx.db
-    .prepare(
-      'UPDATE as_todos SET title = ?, details = ?, priority = ?, due_at = ?, status = ?, done_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ? AND member = ? AND revision = ?',
-    )
-    .bind(
-      input.title,
-      input.details,
-      input.priority,
-      input.dueAt,
-      status,
-      doneAt,
-      ctx.now,
-      current.id,
-      owner(ctx),
-      base,
-    )
-    .run();
-  if (!r.meta.changes) throw conflict('to-do');
+  const statements = [
+    ctx.db
+      .prepare(
+        'UPDATE as_todos SET title = ?, details = ?, priority = ?, due_at = ?, status = ?, list = ?, repeat = ?, done_at = ?, updated_at = ?, revision = revision + 1 WHERE id = ? AND member = ? AND revision = ?',
+      )
+      .bind(
+        input.title,
+        input.details,
+        input.priority,
+        input.dueAt,
+        status,
+        list,
+        repeat,
+        doneAt,
+        ctx.now,
+        current.id,
+        owner(ctx),
+        base,
+      ),
+  ];
+  // Completing a repeating to-do creates the next one in the same batch; the successor's reference is
+  // unique, so completing it twice (or reopening and completing again) never makes two.
+  if (status === 'done' && current.status !== 'done' && repeat !== 'none' && input.dueAt != null) {
+    const next = newTodo(
+      ctx,
+      {
+        title: input.title,
+        details: input.details,
+        priority: input.priority,
+        dueAt: nextTodoDue(input.dueAt, repeat, ctx.now),
+        list,
+        repeat,
+      },
+      current.source === 'manual' || current.source === 'chat' || current.source === 'whatsapp'
+        ? current.source
+        : 'manual',
+      '',
+    );
+    statements.push(
+      ctx.db
+        .prepare(
+          `INSERT OR IGNORE INTO as_todos(id,member,title,details,status,priority,due_at,source,source_ref,source_label,list,repeat,task_id,created_at,updated_at,done_at,revision)
+           SELECT ?,?,?,?,'open',?,?,?,?,'',?,?,NULL,?,?,NULL,1 WHERE EXISTS (SELECT 1 FROM as_todos WHERE id = ? AND member = ? AND status = 'done' AND revision = ?)`,
+        )
+        .bind(
+          next.id,
+          owner(ctx),
+          next.title,
+          next.details,
+          next.priority,
+          next.dueAt,
+          next.source,
+          REPEAT_REF + current.id,
+          next.list,
+          next.repeat,
+          ctx.now,
+          ctx.now,
+          current.id,
+          owner(ctx),
+          base + 1,
+        ),
+    );
+  }
+  const r = await ctx.db.batch(statements);
+  if (!r[0].meta.changes) throw conflict('to-do');
   return getTodo(ctx, current.id);
 }
 
@@ -175,13 +328,45 @@ export async function completeTodo(ctx: ModuleContext, id: unknown) {
   return updateTodo(ctx, t.id, { ...t, status: 'done' }, t.revision);
 }
 
+// todo.quickAdd: one line of plain words, read without AI (see quickadd.ts).
+export async function quickAdd(ctx: ModuleContext, value: unknown, source: TodoSource = 'manual') {
+  const line = text(value, 'the to-do', QUICK_ADD_MAX, true);
+  const q = parseQuickAdd(line, ctx.now);
+  const todo = await createTodo(
+    ctx,
+    { title: q.title, details: '', priority: q.priority, dueAt: q.dueAt, list: q.list, repeat: q.repeat },
+    source,
+  );
+  return { todo, understood: q.understood };
+}
+
+// The next to-do created when this repeating one was completed, if any.
+export async function successorOf(ctx: ModuleContext, id: string) {
+  const r = await ctx.db
+    .prepare(`SELECT * FROM as_todos WHERE member = ? AND source_ref = ? AND ${VISIBLE}`)
+    .bind(owner(ctx), REPEAT_REF + id)
+    .first<Row>();
+  return r ? todoFrom(r, ctx.now) : null;
+}
+
+// A to-do the member made is deleted. One from another module's item is dismissed instead: kept,
+// hidden and marked done, so the email, commitment or action item does not bring it back.
 export async function deleteTodo(ctx: ModuleContext, id: unknown) {
   const key = recordId(id, 'to-do');
-  const r = await ctx.db
-    .prepare('DELETE FROM as_todos WHERE id = ? AND member = ?')
-    .bind(key, owner(ctx))
-    .run();
-  if (!r.meta.changes) throw notFound('to-do');
+  const r = await ctx.db.batch([
+    ctx.db
+      .prepare(
+        `UPDATE as_todos SET status = 'done', done_at = coalesce(done_at, ?), task_id = ?, updated_at = ?, revision = revision + 1
+         WHERE id = ? AND member = ? AND source IN ('mail','commitment','meeting') AND source_ref != '' AND ${VISIBLE}`,
+      )
+      .bind(ctx.now, DISMISSED + ctx.now, ctx.now, key, owner(ctx)),
+    ctx.db
+      .prepare(
+        `DELETE FROM as_todos WHERE id = ? AND member = ? AND NOT (source IN ('mail','commitment','meeting') AND source_ref != '')`,
+      )
+      .bind(key, owner(ctx)),
+  ]);
+  if (!r[0].meta.changes && !r[1].meta.changes) throw notFound('to-do');
   return true as const;
 }
 
@@ -191,13 +376,13 @@ export async function todoToTask(ctx: ModuleContext, p: Record<string, unknown>)
   const todo = await getTodo(ctx, p.id);
   if (todo.taskId) throw new CloudError('This to-do has already been moved to a task.', 409);
   // A claim older than two minutes was left by a request that did not finish.
-  if (todo.status !== 'open') throw new CloudError('Only an open to-do can be moved to a task.', 409);
+  if (todo.status === 'done') throw new CloudError('Only an open to-do can be moved to a task.', 409);
   if (typeof p.matterId !== 'string' || !p.matterId) throw bad('Choose a mandate.');
   if (p.assignee != null && typeof p.assignee !== 'string') throw bad('Choose a valid assignee.');
   const claim = `claim:${ctx.now}:${crypto.randomUUID()}`;
   const claimed = await ctx.db
     .prepare(
-      "UPDATE as_todos SET task_id = ? WHERE id = ? AND member = ? AND status = 'open' AND (task_id IS NULL OR (task_id LIKE 'claim:%' AND task_id < ?))",
+      "UPDATE as_todos SET task_id = ? WHERE id = ? AND member = ? AND status IN ('open','doing') AND (task_id IS NULL OR (task_id LIKE 'claim:%' AND task_id < ?))",
     )
     .bind(claim, todo.id, owner(ctx), `claim:${ctx.now - 120000}`)
     .run();

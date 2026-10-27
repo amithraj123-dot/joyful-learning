@@ -29,6 +29,7 @@ const STUCK_SENDING = 5 * MINUTE;
 const KEEP_EVENTS = 30 * 24 * HOUR;
 const WRITE_TOOLS = new Set([
   'create_todo',
+  'quick_add_todo',
   'complete_todo',
   'create_reminder',
   'snooze_reminder',

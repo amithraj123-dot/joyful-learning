@@ -112,7 +112,8 @@ export interface MailActions {
   'message.archive': { payload: { ids: string[] }; result: { archived: number } };
 
   // Follow-ups (see FollowUp). Computed from stored mail; no AI.
-  'followups.list': { payload: { kind?: FollowUpKind }; result: FollowUp[] };
+  // includeClosed adds snoozed and done threads (most recent first after the open ones), to reopen them.
+  'followups.list': { payload: { kind?: FollowUpKind; includeClosed?: boolean }; result: FollowUp[] };
   // Snooze a waiting thread (days 1 to 30), mark it done, or clear both.
   'followups.update': {
     payload: {

@@ -2,7 +2,16 @@
 // Email detail: the triage and why it matters, the full text, one-tap corrections, "Make a task" and the
 // reply draft. A drawer on desktop and full screen on a phone.
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { ExternalLink, Paperclip, PencilLine, RotateCcw, ShieldAlert } from 'lucide-react';
+import {
+  Archive,
+  ExternalLink,
+  Paperclip,
+  PencilLine,
+  RotateCcw,
+  ShieldAlert,
+  Star,
+  StarOff,
+} from 'lucide-react';
 import { handOver } from '../../../core/client/handover';
 import { Toggle } from '../../workflow/ui/components/Bits';
 import { DateInput, Field } from '../../workflow/ui/components/Inputs';
@@ -17,6 +26,7 @@ import {
   TIERS,
   TIER_LABELS,
   type Draft,
+  type FollowUp,
   type MailItem,
   type MailMessage,
   type Triage,
@@ -24,6 +34,7 @@ import {
 import { DraftEditor } from './DraftEditor';
 import {
   addressLine,
+  domainOf,
   errorMessage,
   formatStamp,
   isConflict,
@@ -34,26 +45,46 @@ import {
   senderName,
 } from './lib';
 import { useMail } from './store';
-import { DeadlineBadge, DelegateChip, MandateChip, TierPill } from './MailCard';
+import {
+  ChasedBadge,
+  ClashLine,
+  DeadlineBadge,
+  DelegateChip,
+  MandateChip,
+  TierPill,
+  VipMark,
+} from './MailCard';
+import { archiveIds, clearVip, markVip, vipRuleFor } from './actions';
 
 const INSTRUCTION_CHIPS = [
   'Keep it short',
   'Ask for the share purchase agreement',
   'Say I will revert by tomorrow',
 ];
+const NUDGE_CHIPS = ['Keep it short', 'Offer a short call', 'Ask for a date'];
+
+// Follow-up drafts made in this tab, by conversation, so a second request opens the same draft.
+export const nudgeDrafts = new Map<string, string>();
 
 export function MessageDrawer({
   item,
   focus,
   onClose,
   onChange,
+  onArchived,
+  followUp,
 }: {
   item: MailItem;
   focus?: 'draft';
   onClose: () => void;
   onChange: (item: MailItem) => void; // a newer copy of the email (triage or draft changed)
+  onArchived?: (id: string) => void; // offers Archive when given
+  // Opened from Follow-ups on a thread where I am waiting: the email is my own sent message and the
+  // draft is a follow-up to it.
+  followUp?: FollowUp;
 }) {
-  const { getEdit, setEdit } = useMail();
+  const { getEdit, setEdit, notify, account } = useMail();
+  const waiting = followUp?.kind === 'waiting' ? followUp : null;
   const [message, setMessage] = useState<MailMessage | null>(null);
   const [loadError, setLoadError] = useState('');
   const [notice, setNotice] = useState('');
@@ -61,6 +92,10 @@ export function MessageDrawer({
   const [leaving, setLeaving] = useState(false);
   const draftRef = useRef<HTMLElement>(null);
   const current: MailItem = message ?? item;
+  // My own sent email (a follow-up thread, or a follow-up draft opened from Drafts): no triage, and the
+  // draft is a follow-up to it.
+  const myAddress = account.account?.address.toLowerCase() ?? '';
+  const sent = !!waiting || (!!myAddress && current.from.address.toLowerCase() === myAddress);
 
   const update = useCallback(
     (next: MailItem) => {
@@ -70,7 +105,9 @@ export function MessageDrawer({
     [onChange],
   );
 
-  const apply = (m: MailMessage) => {
+  const apply = (loaded: MailMessage) => {
+    // A follow-up draft belongs to my sent email; keep the one we opened with if the email has none.
+    const m = loaded.draft || !item.draft ? loaded : { ...loaded, draft: item.draft };
     setMessage(m);
     onChange(withoutBody(m));
   };
@@ -102,15 +139,64 @@ export function MessageDrawer({
   const close = () => (dirty || (draftId && getEdit(draftId)) ? setLeaving(true) : onClose());
   const web = safeWebLink(current.webLink);
 
+  const [acting, setActing] = useState<'' | 'archive' | 'vip'>('');
+  const [actError, setActError] = useState('');
+  const archive = async () => {
+    setActing('archive');
+    setActError('');
+    try {
+      if (!(await archiveIds([current.id])))
+        throw new Error('Outlook did not archive this email. It may have been moved already.');
+      notify('Moved to your Outlook Archive folder');
+      onArchived?.(current.id);
+    } catch (e) {
+      setActError(errorMessage(e));
+    } finally {
+      setActing('');
+    }
+  };
+  const toggleVip = async () => {
+    setActing('vip');
+    setActError('');
+    const who = senderName(current.from);
+    try {
+      if (current.vip) {
+        const rule = await vipRuleFor(current.from.address);
+        if (rule) await clearVip(rule);
+        notify(
+          rule?.kind === 'domain'
+            ? `Everyone at ${domainOf(current.from.address)} is no longer a VIP.`
+            : `${who} is no longer a VIP.`,
+        );
+      } else {
+        await markVip('sender', current.from.address);
+        notify(`${who} is now a VIP. New email from them is at least Important and never archived.`);
+      }
+      update({ ...current, vip: !current.vip });
+    } catch (e) {
+      setActError(errorMessage(e));
+    } finally {
+      setActing('');
+    }
+  };
+
   return (
     <Modal
       variant="drawer"
       title={current.subject || '(No subject)'}
       subtitle={
-        <>
-          {senderName(current.from)}
-          {current.from.name ? ` <${current.from.address}>` : ''}, {formatStamp(current.receivedAt)}
-        </>
+        waiting ? (
+          <>
+            You wrote to {senderName(waiting.counterpart)}, {formatStamp(waiting.since)}
+          </>
+        ) : sent ? (
+          <>You wrote this email, {formatStamp(current.receivedAt)}</>
+        ) : (
+          <>
+            {senderName(current.from)}
+            {current.from.name ? ` <${current.from.address}>` : ''}, {formatStamp(current.receivedAt)}
+          </>
+        )
       }
       onClose={close}
       footer={
@@ -152,17 +238,42 @@ export function MessageDrawer({
               className="button secondary small"
               onClick={() => scrollToInDialog(draftRef.current, true)}
             >
-              <PencilLine size={14} aria-hidden="true" /> Draft a reply
+              <PencilLine size={14} aria-hidden="true" /> {sent ? 'Draft a follow-up' : 'Draft a reply'}
+            </button>
+          )}
+          {!sent && (
+            <button type="button" className="button secondary small" disabled={!!acting} onClick={toggleVip}>
+              {current.vip ? <StarOff size={14} aria-hidden="true" /> : <Star size={14} aria-hidden="true" />}
+              {acting === 'vip' ? 'Saving' : current.vip ? 'Remove from VIPs' : 'Mark sender as VIP'}
+            </button>
+          )}
+          {!sent && onArchived && (
+            <button type="button" className="button secondary small" disabled={!!acting} onClick={archive}>
+              <Archive size={14} aria-hidden="true" /> {acting === 'archive' ? 'Archiving' : 'Archive'}
             </button>
           )}
         </div>
+        {actError && (
+          <p className="wf-error" role="alert">
+            {actError}
+          </p>
+        )}
+        {waiting && (
+          <p className="wf-note">
+            You are waiting on {senderName(waiting.counterpart)}:{' '}
+            {waiting.count > 1
+              ? `you have written ${waiting.count} times without an answer`
+              : 'no answer to your email'}
+            , for {plural(waiting.ageDays, 'day')}.
+          </p>
+        )}
         {notice && (
           <p className="wf-note" role="status">
             {notice}
           </p>
         )}
 
-        {(message || current.triage) && (
+        {!sent && (message || current.triage) && (
           <TriageSummary item={current} onTriage={setTriage} onConflict={onConflict} />
         )}
 
@@ -224,23 +335,32 @@ export function MessageDrawer({
           className="mail-detail-section mail-draft-area"
         >
           <h3 id="mail-draft-h" className="wf-h3">
-            Reply
+            {sent ? 'Follow-up' : 'Reply'}
           </h3>
           {draftId ? (
             <DraftEditor
               key={draftId}
               draftId={draftId}
               item={current}
+              followUp={sent}
               onDirtyChange={setDirty}
-              onChanged={(d) => update({ ...current, draft: d ? summary(d) : null })}
+              onChanged={(d) => {
+                if (!d && sent) nudgeDrafts.delete(current.conversationId);
+                update({ ...current, draft: d ? summary(d) : null });
+              }}
+            />
+          ) : sent ? (
+            <NudgeRequest
+              conversationId={waiting?.conversationId ?? current.conversationId}
+              onDraft={(d) => update({ ...current, draft: summary(d) })}
             />
           ) : (
             <DraftRequest item={current} onDraft={(d) => update({ ...current, draft: summary(d) })} />
           )}
         </section>
 
-        <Corrections item={current} onTriage={setTriage} onConflict={onConflict} />
-        <TaskForm item={current} />
+        {!sent && <Corrections item={current} onTriage={setTriage} onConflict={onConflict} />}
+        {!sent && <TaskForm item={current} />}
       </div>
     </Modal>
   );
@@ -343,8 +463,11 @@ function TriageSummary({
         <span className="wf-type">{HANDLING_LABELS[t.handling]}</span>
         <span className="wf-type">{CATEGORY_LABELS[t.category]}</span>
         {t.deadline && <DeadlineBadge deadline={t.deadline} />}
+        {item.vip && <VipMark />}
+        <ChasedBadge n={item.chased} />
       </div>
       {t.why && <p className="mail-why">{t.why}</p>}
+      <ClashLine clash={item.meetingClash} />
       {t.asks.length > 0 && (
         <ul className="mail-asks" aria-label="Asked of you">
           {t.asks.map((a, i) => (
@@ -448,6 +571,73 @@ function DraftRequest({ item, onDraft }: { item: MailItem; onDraft: (d: Draft) =
           {busy
             ? 'Drafting your reply. This can take up to a minute.'
             : 'Nothing is sent. You review the draft first.'}
+        </span>
+      </div>
+      {error && (
+        <p className="wf-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// "Draft a follow-up": a polite reminder to the people I am waiting on, made only on request.
+function NudgeRequest({ conversationId, onDraft }: { conversationId: string; onDraft: (d: Draft) => void }) {
+  const [chips, setChips] = useState<string[]>([]);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const go = async () => {
+    setBusy(true);
+    setError('');
+    const instructions = [...chips, text.trim()].filter(Boolean).join('. ');
+    try {
+      const d = await mail('followups.draftNudge', {
+        conversationId,
+        ...(instructions ? { instructions } : {}),
+      });
+      nudgeDrafts.set(conversationId, d.id);
+      onDraft(d);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mail-draft-request">
+      <div className="wf-chips" role="group" aria-label="Instructions for the follow-up">
+        {NUDGE_CHIPS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            className={'wf-chip' + (chips.includes(c) ? ' active' : '')}
+            aria-pressed={chips.includes(c)}
+            onClick={() => setChips((s) => (s.includes(c) ? s.filter((x) => x !== c) : [...s, c]))}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+      <Field label="Other instructions (optional)">
+        <textarea
+          className="wf-textarea"
+          rows={2}
+          value={text}
+          maxLength={600}
+          placeholder="For example: mention that signing is on Friday"
+          onChange={(e) => setText(e.target.value)}
+        />
+      </Field>
+      <div className="wf-row wf-wrap mail-draft-go">
+        <button type="button" className="button primary" disabled={busy || !conversationId} onClick={go}>
+          <PencilLine size={15} aria-hidden="true" /> {busy ? 'Drafting' : 'Draft a follow-up'}
+        </button>
+        <span className="wf-caption" aria-live="polite">
+          {busy
+            ? 'Drafting your follow-up. This can take up to a minute.'
+            : 'It replies to all on your last email. Nothing is sent until you review it.'}
         </span>
       </div>
       {error && (

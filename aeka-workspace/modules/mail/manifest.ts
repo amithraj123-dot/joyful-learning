@@ -1,7 +1,7 @@
 // Mail: Outlook inbox triage, drafts on request, reviewed sending and rules learned from corrections.
 // Web only; loaded lazily.
 import { lazy } from 'react';
-import { Inbox, PencilLine, Plug, SlidersHorizontal } from 'lucide-react';
+import { Hourglass, Inbox, PencilLine, Plug, SlidersHorizontal } from 'lucide-react';
 import type { ClientModule } from '../../core/client/module';
 
 export const mailModule: ClientModule = {
@@ -23,6 +23,13 @@ export const mailModule: ClientModule = {
       icon: PencilLine,
       title: 'Drafts',
       subtitle: 'Replies prepared on your request, to review, edit and send',
+    },
+    {
+      id: 'mail/followups',
+      label: 'Follow-ups',
+      icon: Hourglass,
+      title: 'Follow-ups',
+      subtitle: 'People you are waiting on, and people waiting on you',
     },
     {
       id: 'mail/rules',

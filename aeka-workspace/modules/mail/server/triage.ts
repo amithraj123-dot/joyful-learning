@@ -10,6 +10,7 @@ import type { ModuleContext } from '../../../core/server/module.ts';
 import { notify } from '../../../core/server/notifications.ts';
 import { matterTargets } from '../../workflow/server/services.ts';
 import type { MeetingTarget } from '../../workflow/shared/types.ts';
+import { addTodoFrom } from '../../assistant/server/services.ts';
 import type { MailRule, RuleEffect, Tier } from '../shared/types.ts';
 import type { GraphSession } from './graph.ts';
 import { indiaDate, indiaTime, triageSystemPrompt } from './prompts.ts';
@@ -20,7 +21,10 @@ import {
   domainOf,
   HOUR,
   isPublicDomain,
+  isVip,
   listRules,
+  CHASED,
+  meetingClash,
   REPLIED,
   saveVerdict,
   settingsOf,
@@ -60,9 +64,9 @@ export function contextFor(sys: Sys, member: Member): ModuleContext {
   };
 }
 
-type Pending = MessageRow & { attempts: number; t_updated: number; replied: number };
+type Pending = MessageRow & { attempts: number; t_updated: number; replied: number; chased: number };
 
-const NO_REPLY =
+export const NO_REPLY =
   /^(no-?reply|do-?not-?reply|donotreply|notifications?|notify|alerts?|mailer-daemon|postmaster|bounces?|auto-?confirm|automated|system|info-?noreply)([+._-].*)?$/i;
 // Government and market infrastructure senders often use no-reply addresses for statutory notices,
 // so they are never set aside without reading.
@@ -201,6 +205,44 @@ function applyEffect(v: Verdict, effect: RuleEffect | undefined): Verdict {
   return out;
 }
 
+// A VIP's mail is at least Important (tier 2) and never "no action"; VIP status alone never makes it
+// Urgent. Suspicious mail (a safety flag) is left as judged, since the sender may be spoofed.
+export function vipFloor(v: Verdict, vip: boolean): Verdict {
+  if (!vip || v.safetyFlag || v.status === 'skipped') return v;
+  if (v.tier <= 2 && v.handling !== 'none') return v;
+  return {
+    ...v,
+    tier: v.tier <= 2 ? v.tier : 2,
+    handling: v.handling === 'none' ? 'info' : v.handling,
+    why: `${v.why} Raised to Important because the sender is a VIP.`.trim(),
+  };
+}
+
+const dueAt = (date: string | null) => (date ? Date.parse(`${date}T18:00:00+05:30`) : null);
+
+// What urgent or important mail asks of me becomes a to-do linked to the email (once per email; the
+// assistant keeps a removed one from coming back). Failures never affect triage.
+async function askTodo(ctx: ModuleContext, m: MessageRow, v: Verdict) {
+  if (v.tier > 2 || (v.handling !== 'reply' && v.handling !== 'review') || !v.asks.length || v.safetyFlag)
+    return;
+  try {
+    await addTodoFrom(ctx, {
+      title: v.asks[0].slice(0, 200),
+      details: v.asks
+        .slice(1)
+        .map((a) => `Also: ${a}`)
+        .join('\n'),
+      dueAt: dueAt(v.deadline),
+      priority: v.tier === 1 ? 'high' : 'normal',
+      source: 'mail',
+      sourceRef: m.id,
+      sourceLabel: m.subject.slice(0, 200) || '(no subject)',
+    });
+  } catch {
+    console.error('Mail: a to-do could not be added for an email');
+  }
+}
+
 export interface RunResult {
   triaged: number;
   aiTriaged: number;
@@ -232,7 +274,7 @@ export async function runTriage(
   const pending = (
     await db
       .prepare(
-        `SELECT m.*, t.attempts AS attempts, t.updated_at AS t_updated, ${REPLIED} AS replied
+        `SELECT m.*, t.attempts AS attempts, t.updated_at AS t_updated, ${REPLIED} AS replied, ${CHASED} AS chased
          FROM mail_triage t JOIN mail_messages m ON m.id = t.message_id AND m.member = t.member
          WHERE t.member = ? AND t.status = 'pending' AND t.next_attempt_at <= ?${onlyClause}
          ORDER BY m.received_at DESC LIMIT 60`,
@@ -273,9 +315,20 @@ export async function runTriage(
     }
   }
 
-  const finish = async (m: Pending, v: Verdict) => {
+  const clashOf = new Map<string, string | null>();
+  const clash = async (m: Pending) => {
+    if (!(Number(m.meeting_start) > 0 && Number(m.meeting_end) > 0)) return null;
+    if (!clashOf.has(m.id))
+      clashOf.set(m.id, await meetingClash(db, email, m.meeting_start!, m.meeting_end!, m.subject));
+    return clashOf.get(m.id)!;
+  };
+  const finish = async (m: Pending, verdict: Verdict, automated = false) => {
+    let v = automated ? verdict : vipFloor(verdict, isVip(rules, m.from_address));
+    const c = await clash(m);
+    if (c && v.status !== 'skipped') v = { ...v, why: `${v.why} Clashes with ${c}.`.trim() };
     if (!(await saveVerdict(db, email, m.id, v, now))) return;
     result.triaged++;
+    if (settings.autoTodos && v.status !== 'skipped') await askTodo(ctx, m, v);
     if (
       v.tier === 1 &&
       settings.alertUrgent &&
@@ -324,7 +377,7 @@ export async function runTriage(
     }
     const built = builtIn(m);
     if (built) {
-      await finish(m, built);
+      await finish(m, built, true);
       continue;
     }
     const rule = matchRules(rules, m.from_address, m.subject);
@@ -396,6 +449,9 @@ export async function runTriage(
         readerAlreadyReplied: !!m.replied,
         threadLength: await threadLength(db, email, m.conversation_id),
         ...(known && shortOf.has(known) ? { knownMandate: shortOf.get(known) } : {}),
+        ...(isVip(rules, m.from_address) ? { vip: true } : {}),
+        ...(m.chased >= 2 ? { chased: m.chased } : {}),
+        ...((await clash(m)) ? { meetingClash: await clash(m) } : {}),
         body: m.body_text.slice(0, BODY_FOR_AI),
       });
     }

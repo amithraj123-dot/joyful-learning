@@ -1,11 +1,13 @@
 'use client';
-// Today: the morning brief, quick capture, unread notifications and a way into Ask Aeka.
+// Today: quick capture, the week at a glance, upcoming meetings with prep, the morning brief, unread
+// notifications and a way into Ask Aeka.
 import { useEffect, useState, type FormEvent } from 'react';
 import { ArrowRight, Bell, ChevronRight, RefreshCw, Sun } from 'lucide-react';
 import { assistant } from '../shared/client';
 import { askLater, useAssistant, useTickChange } from './context';
 import { Card, InlineError, LoadError, Loading } from './Bits';
 import { QuickCapture } from './QuickCapture';
+import { UpcomingMeetings, WeekStrip } from './Schedule';
 import {
   core,
   firstName,
@@ -187,6 +189,12 @@ export function TodayPage() {
       </header>
       <div className="as-today-capture card as-card tinted">
         <QuickCapture onAdded={() => setCaptureKey((k) => k + 1)} />
+      </div>
+      <div className="as-today-week">
+        <WeekStrip />
+      </div>
+      <div className="as-today-meet">
+        <UpcomingMeetings />
       </div>
       <div className="as-today-brief">
         <Brief version={captureKey} />

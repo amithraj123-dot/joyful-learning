@@ -1,6 +1,13 @@
 // Small browser helpers for the Mail pages: India-time formatting, errors, tones and safe text.
 import { ModuleError } from '../../../core/client/api';
-import { TIER_LABELS, type Address, type DraftStatus, type MailItem, type Tier } from '../shared/types';
+import {
+  TIER_LABELS,
+  type AccountSettings,
+  type Address,
+  type DraftStatus,
+  type MailItem,
+  type Tier,
+} from '../shared/types';
 
 export type Nav = (page: string) => void;
 
@@ -113,6 +120,17 @@ export const addressLine = (list: Address[]) => list.map((a) => senderName(a)).j
 
 const EMAIL = /^[^\s@<>(),;:"[\]]+@[^\s@<>(),;:"[\]]+\.[a-z]{2,}$/i;
 export const isEmail = (s: string) => EMAIL.test(s.trim());
+
+export const domainOf = (address: string) => address.toLowerCase().split('@').pop() ?? '';
+
+// Settings with the defaults for fields an older server may not send yet.
+export const settingsOf = (s: Partial<AccountSettings> | undefined): AccountSettings => ({
+  aiTriage: s?.aiTriage ?? true,
+  alertUrgent: s?.alertUrgent ?? true,
+  archiveNoise: s?.archiveNoise ?? false,
+  autoTodos: s?.autoTodos ?? true,
+  trackCommitments: s?.trackCommitments ?? true,
+});
 
 export const isLow = (item: MailItem) =>
   !!item.triage &&

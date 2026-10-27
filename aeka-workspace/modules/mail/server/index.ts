@@ -9,6 +9,7 @@ import type { ModuleAction, ModuleContext, ServerModule } from '../../../core/se
 import { sealingAvailable } from '../../../core/server/secrets.ts';
 import { createTaskFor, matterTargets } from '../../workflow/server/services.ts';
 import type { MailSetup } from '../shared/contract.ts';
+import type { AccountSettings } from '../shared/types.ts';
 import { createDraft, discardDraft, saveDraftToOutlook, sendDraft, updateDraft } from './drafts.ts';
 import { openSession } from './graph.ts';
 import { indiaTime } from './prompts.ts';
@@ -27,6 +28,7 @@ import {
   memberOf,
   notFound,
   queueCounts,
+  settingsOf,
   toAccount,
   toDraft,
   toTriage,
@@ -34,6 +36,9 @@ import {
   type DraftRow,
   type TriageRow,
 } from './store.ts';
+import { archiveActions } from './archive.ts';
+import { followUpActions } from './followups.ts';
+import { styleActions } from './style.ts';
 import { deleteMailData } from './sync.ts';
 import { runTriage } from './triage.ts';
 import {
@@ -118,9 +123,18 @@ const accountActions: Record<string, ModuleAction> = {
     handler: async (ctx, p) => {
       const member = memberOf(ctx);
       const s = obj(p.settings, 'settings');
-      const settings = {
+      const current = await loadAccount(ctx.db, member);
+      if (!current) throw new CloudError('Connect Outlook first.', 409);
+      const was = settingsOf(current);
+      // Settings added later keep their current value when an older page leaves them out.
+      const optional = (v: unknown, fallback: boolean, label: string) =>
+        v === undefined ? fallback : bool(v, label);
+      const settings: AccountSettings = {
         aiTriage: bool(s.aiTriage, 'AI triage'),
         alertUrgent: bool(s.alertUrgent, 'urgent alerts'),
+        archiveNoise: optional(s.archiveNoise, was.archiveNoise, 'archiving low-priority mail'),
+        autoTodos: optional(s.autoTodos, was.autoTodos, 'adding to-dos from mail'),
+        trackCommitments: optional(s.trackCommitments, was.trackCommitments, 'tracking commitments'),
       };
       const r = await ctx.db
         .prepare('UPDATE mail_accounts SET settings = ?, updated_at = ? WHERE member = ?')
@@ -167,12 +181,21 @@ const accountActions: Record<string, ModuleAction> = {
         )
         .bind(member, since)
         .first<{ n: number }>();
+      const archived = await ctx.db
+        .prepare(
+          `SELECT coalesce(sum(CAST(target AS INTEGER)), 0) AS n FROM org_activity WHERE actor = ? AND module = 'mail'
+           AND action = 'message.autoArchived' AND at >= ?`,
+        )
+        .bind(member, since)
+        .first<{ n: number }>();
       return {
         triaged30d: triaged?.n ?? 0,
         corrected30d: corrected?.n ?? 0,
         correctionsByField: Object.fromEntries(byField.results.map((r) => [r.field, r.n])),
         aiCallsToday: await usedToday(ctx.db, member, ctx.now),
         aiLimit: aiLimit(ctx),
+        // Additive: emails archived automatically in 30 days (each pass records its count).
+        archived30d: Number(archived?.n ?? 0),
       };
     },
   },
@@ -450,6 +473,9 @@ export const mailServer: ServerModule = {
     ...triageActions,
     ...draftActions,
     ...ruleActions,
+    ...archiveActions,
+    ...followUpActions,
+    ...styleActions,
   },
   // Sync and triage for a member with a connected account; housekeeping of expired sign-in states.
   tick: async (sys, { member }) => {

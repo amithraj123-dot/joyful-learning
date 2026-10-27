@@ -230,6 +230,13 @@ export const graphMessage = (e, folder = 'inbox', withHeaders = true) => ({
   internetMessageId: `<${e.id}@mail.example>`,
   webLink: `https://outlook.office.com/mail/${e.id}`,
   ...(folder === 'inbox' && withHeaders ? { internetMessageHeaders: e.headers || [] } : {}),
+  // A meeting invitation: { start, end } in ms (Graph reports it as an eventMessageRequest).
+  ...(e.meeting ? { '@odata.type': '#microsoft.graph.eventMessageRequest' } : {}),
+});
+// Graph's dateTimeTimeZone in India Standard Time.
+const istZoned = (ms) => ({
+  dateTime: new Date(ms + 330 * 60000).toISOString().slice(0, 19) + '.0000000',
+  timeZone: 'India Standard Time',
 });
 
 const json = (value, status = 200, headers = {}) =>
@@ -254,6 +261,18 @@ export function world() {
     expiresIn: 3600,
     tokenSeq: 0,
     drafts: new Map(), // graph draft id -> { from: message id, patch }
+    moved: [], // graph ids moved to the Archive folder
+    moveStatus: 201, // e.g. 429 or 404
+    // Answers for the AI requests beyond triage and drafting (functions of the parsed data, or values).
+    commitments: null, // (emails) => items
+    style: {
+      greeting: 'Dear {first name},',
+      signOff: 'Regards,\nAmith',
+      tone: 'Formal and brief.',
+      notes: ['Short paragraphs'],
+    },
+    nudgeBody:
+      'Dear Rahul,\n\nI am following up on my note below on the Falcon SPA schedules.\n\nRegards,\nAmith',
     scope: '', // the scope string Microsoft reports granting; '' leaves it out (older sign-ins)
     calendarStatus: 200, // e.g. 403
   };
@@ -320,7 +339,21 @@ export function world() {
     if (one && method === 'GET') {
       const e = box.inbox.find((x) => x.id === one[1]);
       if (!e) return json({ error: { code: 'ErrorItemNotFound' } }, 404);
+      if ((url.searchParams.get('$select') || '').includes('startDateTime'))
+        return e.meeting
+          ? json({ id: e.id, startDateTime: istZoned(e.meeting.start), endDateTime: istZoned(e.meeting.end) })
+          : json({ error: { code: 'RequestBroker--ParseUri' } }, 400);
       return json({ id: e.id, internetMessageHeaders: e.headers || [] });
+    }
+    const move = path.match(/^\/me\/messages\/([^/]+)\/move$/);
+    if (move && method === 'POST') {
+      if (w.moveStatus !== 201)
+        return json({ error: { code: 'Fake' } }, w.moveStatus, { 'Retry-After': '60' });
+      const i = box.inbox.findIndex((x) => x.id === move[1]);
+      if (i < 0) return json({ error: { code: 'ErrorItemNotFound' } }, 404);
+      box.inbox.splice(i, 1);
+      w.moved.push(move[1]);
+      return json({ id: move[1], parentFolderId: 'archive' }, 201);
     }
     const reply = path.match(/^\/me\/messages\/([^/]+)\/(createReply|createReplyAll)$/);
     if (reply && method === 'POST') {
@@ -359,10 +392,19 @@ export function world() {
       });
     }
     const user = body.messages[1].content;
+    const data = () => JSON.parse(user.slice(user.indexOf('\n') + 1));
     let content;
     if (user.startsWith('Draft the reply'))
       content = JSON.stringify({ body: w.draftBody, replyAll: false, placeholders: [] });
-    else {
+    else if (user.startsWith('Draft the follow-up'))
+      content = JSON.stringify({ body: w.nudgeBody, replyAll: true, placeholders: [] });
+    else if (user.startsWith('Describe the writing style')) content = JSON.stringify(w.style);
+    else if (user.startsWith('Find the commitments')) {
+      const list = data().emails;
+      content = JSON.stringify({
+        items: w.commitments ? w.commitments(list) : list.map((e) => ({ id: e.id, commitments: [] })),
+      });
+    } else {
       const data = JSON.parse(user.slice(user.indexOf('\n') + 1));
       content = JSON.stringify({
         items: data.emails.map((e) => {

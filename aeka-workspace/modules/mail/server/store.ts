@@ -6,8 +6,10 @@ import type { ModuleContext } from '../../../core/server/module.ts';
 import {
   CATEGORIES,
   HANDLING,
+  isBusy,
   type AccountSettings,
   type Address,
+  type CalendarEvent,
   type CalendarStatus,
   type Category,
   type Draft,
@@ -19,6 +21,7 @@ import {
   type MailRule,
   type MailView,
   type QueueCounts,
+  type RuleEffect,
   type Tier,
   type Triage,
 } from '../shared/types.ts';
@@ -40,7 +43,13 @@ export const notFound = (label: string) => new CloudError(`This ${label} could n
 export const conflict = (label: string) =>
   new CloudError(`This ${label} changed since you opened it. Reload and try again.`, 409);
 
-export const DEFAULT_SETTINGS: AccountSettings = { aiTriage: true, alertUrgent: true };
+export const DEFAULT_SETTINGS: AccountSettings = {
+  aiTriage: true,
+  alertUrgent: true,
+  archiveNoise: false,
+  autoTodos: true,
+  trackCommitments: true,
+};
 export const MINUTE = 60000;
 export const HOUR = 60 * MINUTE;
 export const DAY = 24 * HOUR;
@@ -276,6 +285,10 @@ export interface MessageRow {
   removed_at: number | null;
   created_at: number;
   updated_at: number;
+  commitments_at: number | null; // sent mail: when it was examined for commitments
+  // Meeting invitations: 0 when the times are not read yet, -1 when Outlook could not give them.
+  meeting_start: number | null;
+  meeting_end: number | null;
 }
 
 export const addresses = (text: string) => json<Address[]>(text, []);
@@ -294,6 +307,17 @@ export const REPLIED = `(EXISTS (SELECT 1 FROM mail_messages s WHERE s.member = 
   OR EXISTS (SELECT 1 FROM mail_drafts d WHERE d.member = m.member AND d.message_id = m.id AND d.status = 'sent'))`;
 const THREAD = `(SELECT count(*) FROM mail_messages c WHERE c.member = m.member AND m.conversation_id != ''
   AND c.conversation_id = m.conversation_id)`;
+// When I last wrote in m's conversation (sent mail, or a reply sent from the workspace); 0 if never.
+export const LAST_SENT = `max(coalesce((SELECT max(s.received_at) FROM mail_messages s WHERE s.member = m.member
+  AND s.folder = 'sent' AND m.conversation_id != '' AND s.conversation_id = m.conversation_id), 0),
+  coalesce((SELECT max(d.sent_at) FROM mail_drafts d JOIN mail_messages dm ON dm.id = d.message_id AND dm.member = d.member
+  WHERE d.member = m.member AND d.status = 'sent' AND (dm.id = m.id OR (m.conversation_id != ''
+  AND dm.conversation_id = m.conversation_id))), 0))`;
+// Inbox messages from m's sender in the conversation since I last wrote (0 when m itself is answered).
+export const CHASED = `(CASE WHEN m.folder != 'inbox' OR m.received_at <= ${LAST_SENT} THEN 0
+  WHEN m.conversation_id = '' THEN 1 ELSE (SELECT count(*) FROM mail_messages c WHERE c.member = m.member
+  AND c.folder = 'inbox' AND c.conversation_id = m.conversation_id AND c.from_address = m.from_address
+  AND c.received_at > ${LAST_SENT}) END)`;
 
 const VIEW_WHERE: Record<MailView, string> = {
   needs_me: `t.status = 'done' AND (t.handling = 'reply' OR t.tier = 1) AND NOT ${REPLIED}`,
@@ -305,7 +329,7 @@ const VIEW_WHERE: Record<MailView, string> = {
   failed: `t.status = 'failed'`,
 };
 
-type ItemRow = MessageRow & { replied: number; thread_count: number } & {
+type ItemRow = MessageRow & { replied: number; thread_count: number; chased: number } & {
   [K in keyof TriageRow as `t_${K & string}`]: TriageRow[K] | null;
 };
 const TRIAGE_COLS = [
@@ -336,12 +360,18 @@ const TRIAGE_COLS = [
   'revision',
 ] as const;
 const ITEM_SELECT = `SELECT m.*, ${TRIAGE_COLS.map((c) => `t.${c} AS t_${c}`).join(', ')},
-  ${REPLIED} AS replied, ${THREAD} AS thread_count
+  ${REPLIED} AS replied, ${THREAD} AS thread_count, ${CHASED} AS chased
   FROM mail_messages m LEFT JOIN mail_triage t ON t.message_id = m.id AND t.member = m.member`;
 
 const importanceOf = (s: string): MailItem['importance'] => (s === 'low' || s === 'high' ? s : 'normal');
 
-function toItem(r: ItemRow, draft: DraftSummary | null): MailItem {
+interface Extras {
+  draft: DraftSummary | null;
+  vip: boolean;
+  meetingClash: string | null;
+}
+
+function toItem(r: ItemRow, x: Extras): MailItem {
   const t = r.t_status
     ? toTriage(Object.fromEntries(TRIAGE_COLS.map((c) => [c, r[`t_${c}`]])) as unknown as TriageRow)
     : null;
@@ -361,8 +391,109 @@ function toItem(r: ItemRow, draft: DraftSummary | null): MailItem {
     repliedByMe: !!r.replied,
     threadCount: Math.max(1, Number(r.thread_count) || 1),
     triage: t,
-    draft,
+    draft: x.draft,
+    vip: x.vip,
+    chased: Math.max(0, Number(r.chased) || 0),
+    meetingClash: x.meetingClash,
   };
+}
+
+// The merged effect of the active rules matching a message (sender beats domain beats subject).
+export function matchRules(rules: MailRule[], from: string, subject: string) {
+  const address = from.toLowerCase();
+  const domain = domainOf(address);
+  const s = subject.toLowerCase();
+  const hits = rules.filter(
+    (r) =>
+      r.status === 'active' &&
+      ((r.kind === 'sender' && r.pattern === address) ||
+        (r.kind === 'domain' && !!domain && (domain === r.pattern || domain.endsWith('.' + r.pattern))) ||
+        (r.kind === 'subject' && s.includes(r.pattern))),
+  );
+  if (!hits.length) return null;
+  const order = { sender: 0, domain: 1, subject: 2 };
+  hits.sort((a, b) => order[a.kind] - order[b.kind]);
+  const effect: RuleEffect = {};
+  for (const r of [...hits].reverse()) Object.assign(effect, r.effect);
+  return { effect, kind: hits[0].kind };
+}
+
+// Whether the active rules mark this address (or its domain) as a VIP.
+export const isVip = (rules: MailRule[], address: string) => !!matchRules(rules, address, '')?.effect.vip;
+
+// Drafts, VIP marks and meeting clashes for a page of rows (a few queries per page, never per field).
+async function extras(db: D1Database, member: string, rows: ItemRow[]) {
+  const drafts = await latestDrafts(
+    db,
+    member,
+    rows.map((x) => x.id),
+  );
+  const rules = await listRules(db, member, 'active');
+  const out = new Map<string, Extras>();
+  for (const r of rows) {
+    const invite = Number(r.meeting_start) > 0 && Number(r.meeting_end) > 0;
+    out.set(r.id, {
+      draft: drafts.get(r.id) ?? null,
+      vip: r.folder === 'inbox' && isVip(rules, r.from_address),
+      meetingClash: invite
+        ? await meetingClash(db, member, r.meeting_start!, r.meeting_end!, r.subject)
+        : null,
+    });
+  }
+  return out;
+}
+
+const normSubject = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/^\s*((re|fw|fwd|updated|invitation|new time proposed)\s*:\s*)+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+// "h:mm am" in India time.
+export const indiaClock = (ms: number) => {
+  const d = new Date(ms + 330 * MINUTE);
+  const h = d.getUTCHours();
+  return `${h % 12 || 12}:${String(d.getUTCMinutes()).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+};
+
+// The busy meetings in my cached calendar that overlap an invitation, e.g. "Partners meeting, 11:30 am".
+// The invitation's own tentative event (same times and subject) is not a clash.
+export async function meetingClash(
+  db: D1Database,
+  member: string,
+  start: number,
+  end: number,
+  subject: string,
+): Promise<string | null> {
+  const r = await db
+    .prepare(
+      `SELECT subject, start_at, end_at, all_day, response, show_as, cancelled FROM mail_events
+       WHERE member = ? AND start_at < ? AND end_at > ? ORDER BY start_at LIMIT 20`,
+    )
+    .bind(member, end, start)
+    .all<{
+      subject: string;
+      start_at: number;
+      end_at: number;
+      all_day: number;
+      response: string;
+      show_as: string;
+      cancelled: number;
+    }>();
+  const own = normSubject(subject);
+  const hits = r.results.filter(
+    (e) =>
+      !e.all_day &&
+      isBusy({
+        cancelled: !!e.cancelled,
+        response: e.response as CalendarEvent['response'],
+        showAs: e.show_as as CalendarEvent['showAs'],
+      }) &&
+      !(e.start_at === start && e.end_at === end && normSubject(e.subject) === own),
+  );
+  if (!hits.length) return null;
+  const named = hits.slice(0, 2).map((e) => `${e.subject.slice(0, 80)}, ${indiaClock(e.start_at)}`);
+  return named.join('; ') + (hits.length > 2 ? ` and ${hits.length - 2} more` : '');
 }
 
 async function latestDrafts(db: D1Database, member: string, ids: string[]) {
@@ -430,12 +561,8 @@ export async function listItems(
     .prepare(`${ITEM_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${order}, m.id LIMIT ?`)
     .bind(...params, o.limit)
     .all<ItemRow>();
-  const drafts = await latestDrafts(
-    db,
-    member,
-    r.results.map((x) => x.id),
-  );
-  return r.results.map((x) => toItem(x, drafts.get(x.id) ?? null));
+  const x = await extras(db, member, r.results);
+  return r.results.map((row) => toItem(row, x.get(row.id)!));
 }
 
 export async function getItem(db: D1Database, member: string, id: string): Promise<MailMessage | null> {
@@ -444,8 +571,29 @@ export async function getItem(db: D1Database, member: string, id: string): Promi
     .bind(member, id)
     .first<ItemRow>();
   if (!r) return null;
-  const drafts = await latestDrafts(db, member, [id]);
-  return { ...toItem(r, drafts.get(id) ?? null), bodyText: r.body_text };
+  const x = await extras(db, member, [r]);
+  return { ...toItem(r, x.get(id)!), bodyText: r.body_text };
+}
+
+// My most recent emails from or to any of these addresses (inbox and sent, archived ones included).
+export async function itemsWith(db: D1Database, member: string, list: string[], limit: number) {
+  const wanted = [...new Set(list.map((a) => a.trim().toLowerCase()).filter((a) => a.includes('@')))].slice(
+    0,
+    30,
+  );
+  if (!wanted.length) return [];
+  const q = wanted.map(() => '?').join(',');
+  const r = await db
+    .prepare(
+      `${ITEM_SELECT} WHERE m.member = ? AND ((m.folder = 'inbox' AND m.from_address IN (${q}))
+       OR (m.folder = 'sent' AND (EXISTS (SELECT 1 FROM json_each(m.to_json) j WHERE lower(json_extract(j.value, '$.address')) IN (${q}))
+       OR EXISTS (SELECT 1 FROM json_each(m.cc_json) j WHERE lower(json_extract(j.value, '$.address')) IN (${q})))))
+       ORDER BY m.received_at DESC, m.id LIMIT ?`,
+    )
+    .bind(member, ...wanted, ...wanted, ...wanted, limit)
+    .all<ItemRow>();
+  const x = await extras(db, member, r.results);
+  return r.results.map((row) => toItem(row, x.get(row.id)!));
 }
 
 export async function queueCounts(db: D1Database, member: string): Promise<QueueCounts> {

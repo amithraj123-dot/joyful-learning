@@ -252,6 +252,7 @@ export interface FollowUp {
   mailId: string; // waiting: my last sent message; chasing: their latest message (open it in Mail)
   matterLabel: string; // a mandate linked to the counterpart, if any
   snoozedUntil: number | null;
+  done: boolean; // marked done by me (listed only with includeClosed)
 }
 
 // The member's writing style, learned from their sent mail; used for every draft once accepted.

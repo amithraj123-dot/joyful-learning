@@ -11,6 +11,7 @@ export const conflict = (label: string) =>
 
 export const LIMITS = {
   title: 240,
+  list: 40,
   details: 5000,
   memoryContent: 4000,
   chatText: 4000,

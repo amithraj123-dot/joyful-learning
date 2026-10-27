@@ -17,7 +17,8 @@ import { cachedEvents, freeSlots, istDayStart, syncCalendar } from './calendar.t
 import { createDraft } from './drafts.ts';
 import { GraphSession, ReauthError } from './graph.ts';
 import { confirmedLink } from './rules.ts';
-import { listItems, loadAccount, queueCounts } from './store.ts';
+import { listFollowUps } from './followups.ts';
+import { itemsWith, listItems, loadAccount, queueCounts } from './store.ts';
 
 const memberEmail = (ctx: ModuleContext) => ctx.member?.email ?? '';
 const bound = (n: number, max: number) =>
@@ -117,13 +118,24 @@ export async function freeTime(
 
 // My follow-ups (see FollowUp in shared/types.ts), most pressing first. Not snoozed or done ones.
 export async function followUps(
-  _ctx: ModuleContext,
-  _kind?: import('../shared/types.ts').FollowUpKind,
-  _limit = 20,
+  ctx: ModuleContext,
+  kind?: import('../shared/types.ts').FollowUpKind,
+  limit = 20,
 ): Promise<import('../shared/types.ts').FollowUp[]> {
-  throw new Error('Mail service not implemented yet.');
+  const email = memberEmail(ctx);
+  if (!email || !(await loadAccount(ctx.db, email))) return [];
+  const k = kind === 'waiting' || kind === 'chasing' ? kind : undefined;
+  const list = await listFollowUps(ctx, { kind: k, limit: bound(limit, 100) });
+  return list.map((f) => {
+    const out: Partial<typeof f> = { ...f };
+    delete out.done;
+    return out as import('../shared/types.ts').FollowUp;
+  });
 }
 // My most recent emails received from or sent to any of these addresses (lower case), newest first.
-export async function mailWith(_ctx: ModuleContext, _addresses: string[], _limit = 8): Promise<MailItem[]> {
-  throw new Error('Mail service not implemented yet.');
+export async function mailWith(ctx: ModuleContext, addresses: string[], limit = 8): Promise<MailItem[]> {
+  const email = memberEmail(ctx);
+  if (!email || !Array.isArray(addresses)) return [];
+  const list = addresses.filter((a): a is string => typeof a === 'string' && a.length <= 254);
+  return itemsWith(ctx.db, email, list, bound(limit, 30));
 }

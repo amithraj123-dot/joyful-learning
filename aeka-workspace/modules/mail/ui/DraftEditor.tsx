@@ -36,9 +36,11 @@ export function DraftEditor({
   item,
   onChanged,
   onDirtyChange,
+  followUp,
 }: {
   draftId: string;
   item?: MailItem; // the email being answered, for the subject and reply-all recipients
+  followUp?: boolean; // a follow-up to my own sent email: it already goes to everyone on it
   onChanged?: (draft: Draft | null) => void; // null once discarded
   onDirtyChange?: (dirty: boolean) => void;
 }) {
@@ -130,13 +132,14 @@ export function DraftEditor({
   };
 
   // Reply all adds the other people on the original email to Cc, and removes them again.
-  const others = item
-    ? [...item.to, ...item.cc].filter(
-        (a) =>
-          a.address.toLowerCase() !== me.toLowerCase() &&
-          a.address.toLowerCase() !== item.from.address.toLowerCase(),
-      )
-    : [];
+  const others =
+    item && !followUp
+      ? [...item.to, ...item.cc].filter(
+          (a) =>
+            a.address.toLowerCase() !== me.toLowerCase() &&
+            a.address.toLowerCase() !== item.from.address.toLowerCase(),
+        )
+      : [];
   const toggleReplyAll = (on: boolean) => {
     const known = new Set([...local.to, ...local.cc].map((a) => a.address.toLowerCase()));
     const otherSet = new Set(others.map((a) => a.address.toLowerCase()));
@@ -210,10 +213,11 @@ export function DraftEditor({
       const r = await mail('draft.send', { draftId, confirm: true, baseRevision: d.revision });
       setConfirming(false);
       accept(r);
+      const what = followUp ? 'Follow-up' : 'Reply';
       if (r.status === 'sent') {
-        setStatus('Reply sent from your mailbox.');
-        notify(`Reply sent from ${me || 'your mailbox'}`);
-      } else setStatus('The reply was not sent. Please check the draft and try again.');
+        setStatus(what + ' sent from your mailbox.');
+        notify(`${what} sent from ${me || 'your mailbox'}`);
+      } else setStatus(`The ${what.toLowerCase()} was not sent. Please check the draft and try again.`);
     });
   const discard = () =>
     run('discard', async () => {
@@ -293,7 +297,7 @@ export function DraftEditor({
       )}
 
       <div className="wf-field">
-        <label htmlFor={bodyId}>Reply</label>
+        <label htmlFor={bodyId}>{followUp ? 'Follow-up' : 'Reply'}</label>
         <textarea
           id={bodyId}
           ref={bodyRef}
@@ -390,6 +394,7 @@ export function DraftEditor({
           draft={local}
           subject={item?.subject}
           from={me}
+          followUp={followUp}
           busy={busy === 'send'}
           error={error}
           onCancel={() => setConfirming(false)}
@@ -408,10 +413,12 @@ function SendConfirm({
   error,
   onCancel,
   onSend,
+  followUp,
 }: {
   draft: DraftEdit;
   subject?: string;
   from: string;
+  followUp?: boolean;
   busy: boolean;
   error: string;
   onCancel: () => void;
@@ -425,7 +432,7 @@ function SendConfirm({
   const list = (a: Address[]) => a.map((x) => (x.name ? `${x.name} <${x.address}>` : x.address)).join(', ');
   return (
     <Modal
-      title="Send this reply?"
+      title={followUp ? 'Send this follow-up?' : 'Send this reply?'}
       subtitle="It goes out now from your own Outlook mailbox and cannot be recalled from here."
       onClose={busy ? () => {} : onCancel}
       footer={

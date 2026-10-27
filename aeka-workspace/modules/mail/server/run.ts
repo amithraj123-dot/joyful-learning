@@ -1,5 +1,6 @@
-// One mailbox pass: delta sync, then a bounded triage run, under a per-member lease so overlapping
-// ticks and actions never work on the same mailbox at once. Outlook throttling (429/503) sets a
+// One mailbox pass: delta sync, invitation times, then a bounded triage run, under a per-member lease so
+// overlapping ticks and actions never work on the same mailbox at once. Background passes then archive
+// noise (only when the member turned it on) and look for commitments in sent mail. Outlook throttling (429/503) sets a
 // "busy" lease for the Retry-After time; nothing calls Outlook again for that member until it ends.
 import { CloudError } from '../../../lib/cloud-store.ts';
 import type { Member } from '../../../core/server/members.ts';
@@ -7,8 +8,10 @@ import { releaseLease, takeLease } from '../../../core/server/notifications.ts';
 import { GraphError, GraphSession, ReauthError } from './graph.ts';
 import { loadAccount, queueCounts, setAccountError, type Sys } from './store.ts';
 import { CALENDAR_REFRESH_MS, syncCalendar } from './calendar.ts';
-import { syncMailbox } from './sync.ts';
-import { runTriage, type RunOptions } from './triage.ts';
+import { autoArchive } from './archive.ts';
+import { trackCommitments } from './commitments.ts';
+import { readMeetingTimes, syncMailbox } from './sync.ts';
+import { contextFor, runTriage, type RunOptions } from './triage.ts';
 
 const LEASE_MS = 3 * 60000;
 const TICK_INTERVAL_MS = 2 * 60000;
@@ -71,9 +74,15 @@ export async function mailboxPass(
       account.calendar_status !== 'needs_consent' &&
       (!account.calendar_synced_at || account.calendar_synced_at <= sys.now - CALENDAR_REFRESH_MS);
     if (calendarDue && !(await outlookWaiting(sys, email))) await syncCalendar(session);
+    if (!o.only && !(await outlookWaiting(sys, email))) await readMeetingTimes(session);
     const t = await runTriage(sys, member, account, session, o);
     result.triaged = t.triaged;
     if (t.aiError) problem ||= `AI triage is paused for now: ${t.aiError}`;
+    if (!o.fromAction && !o.only) {
+      const ctx = contextFor(sys, member);
+      if (!(await outlookWaiting(sys, email))) await autoArchive(session, account, ctx.log);
+      await trackCommitments(ctx, account);
+    }
   } catch (e) {
     // Reconnecting is the member's step; the background pass simply stops until then.
     if (e instanceof ReauthError && !o.fromAction) return result;

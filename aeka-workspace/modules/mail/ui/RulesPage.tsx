@@ -20,8 +20,11 @@ import {
   type RuleEffect,
   type Tier,
 } from '../shared/types';
+import { onlyVip } from './actions';
 import { errorMessage, formatWhen, isEmail, plural } from './lib';
 import { useMail } from './store';
+import { StyleCard } from './StyleCard';
+import { DOMAIN, VipCard } from './VipCard';
 
 type Stats = MailActions['stats']['result'];
 const KIND_LABELS: Record<MailRule['kind'], string> = {
@@ -54,6 +57,7 @@ function useRuleText() {
         e.handling && `handling ${HANDLING_LABELS[e.handling]}`,
         e.matterId && `mandate ${targetById.get(e.matterId)?.title ?? 'linked'}`,
         e.neverAi && 'never sent to AI',
+        e.vip && 'VIP',
       ].filter(Boolean) as string[],
   };
 }
@@ -117,7 +121,14 @@ export function RulesPage() {
   };
 
   const proposed = rules.filter((r) => r.status === 'proposed').sort((a, b) => b.evidence - a.evidence);
-  const active = rules.filter((r) => r.status === 'active').sort((a, b) => b.updatedAt - a.updatedAt);
+  // Rules that only mark a VIP are listed in the VIP card.
+  const active = rules
+    .filter((r) => r.status === 'active' && !(r.effect.vip && onlyVip(r.effect)))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const upsert = (saved: MailRule) =>
+    setRules((old) =>
+      old.some((x) => x.id === saved.id) ? old.map((x) => (x.id === saved.id ? saved : x)) : [saved, ...old],
+    );
   const rejected = rules.filter((r) => r.status === 'rejected');
 
   return (
@@ -200,6 +211,19 @@ export function RulesPage() {
             )}
           </section>
 
+          <StyleCard />
+
+          <VipCard
+            rules={rules}
+            effects={(r) => text.effects(r.effect)}
+            onSaved={upsert}
+            onRemoved={(id, rest) =>
+              setRules((old) =>
+                rest ? old.map((x) => (x.id === id ? rest : x)) : old.filter((x) => x.id !== id),
+              )
+            }
+          />
+
           <section className="card wf-section" aria-labelledby="mail-active-h">
             <div className="wf-row wf-between wf-wrap">
               <h2 id="mail-active-h">Your rules ({active.length})</h2>
@@ -272,11 +296,7 @@ export function RulesPage() {
           rule={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={(saved) => {
-            setRules((old) =>
-              old.some((x) => x.id === saved.id)
-                ? old.map((x) => (x.id === saved.id ? saved : x))
-                : [saved, ...old],
-            );
+            upsert(saved);
             setEditing(null);
             notify('Rule saved. It applies to new email.');
           }}
@@ -350,8 +370,6 @@ function StatsView({ stats }: { stats: Stats }) {
     </>
   );
 }
-
-const DOMAIN = /^(?!-)[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i;
 
 function RuleForm({
   rule,
@@ -506,6 +524,9 @@ function RuleForm({
         </div>
         <Toggle pressed={!!effect.neverAi} onChange={(v) => set({ neverAi: v })}>
           Never send to AI (for confidential senders; triaged by rules only)
+        </Toggle>
+        <Toggle pressed={!!effect.vip} onChange={(v) => set({ vip: v })}>
+          VIP (never archived, at least Important, marked with a star)
         </Toggle>
         {error && (
           <p className="wf-error" role="alert">

@@ -1,6 +1,18 @@
 'use client';
 // Triage card for one email, and the compact row used for low-priority mail.
-import { Briefcase, Check, Paperclip, PencilLine, RotateCcw, UserRound } from 'lucide-react';
+import {
+  Archive,
+  Briefcase,
+  CalendarX2,
+  Check,
+  ExternalLink,
+  Paperclip,
+  PencilLine,
+  RotateCcw,
+  Star,
+  StarOff,
+  UserRound,
+} from 'lucide-react';
 import type { MailItem, Tier, Triage } from '../shared/types';
 import {
   DRAFT_STATUS_LABELS,
@@ -8,10 +20,14 @@ import {
   formatReceived,
   formatStamp,
   plural,
+  safeWebLink,
   senderName,
   tierLabel,
 } from './lib';
+import { MoreMenu } from './Menu';
 import { useMail } from './store';
+
+export type CardBusy = '' | 'draft' | 'decide' | 'mandate' | 'retry' | 'archive' | 'vip';
 
 const TIER_TONE: Record<Tier, string> = { 1: 'urgent', 2: 'important', 3: 'routine', 4: 'low' };
 
@@ -72,6 +88,32 @@ export function MandateChip({
   );
 }
 
+// The sender (or their domain) is one of my VIPs.
+export function VipMark() {
+  return (
+    <span className="mail-vip" title="One of your VIPs">
+      <Star size={12} aria-hidden="true" /> VIP
+    </span>
+  );
+}
+
+// "Chased 3 times": the sender has written more than once since my last reply.
+export function ChasedBadge({ n }: { n: number }) {
+  if (!(n >= 2)) return null;
+  return <span className="wf-pill amber">Chased {n} times</span>;
+}
+
+// For meeting invitations: what it clashes with in my calendar.
+export function ClashLine({ clash }: { clash: string | null | undefined }) {
+  if (!clash) return null;
+  return (
+    <p className="mail-clash">
+      <CalendarX2 size={14} aria-hidden="true" />
+      <span>Clashes with {clash}</span>
+    </p>
+  );
+}
+
 export function DelegateChip({ triage }: { triage: Triage }) {
   const { memberName } = useMail();
   if (!triage.delegate) return null;
@@ -92,15 +134,19 @@ export function MailCard({
   onDecline,
   onConfirmMandate,
   onRetry,
+  onArchive,
+  onVip,
 }: {
   item: MailItem;
-  busy: '' | 'draft' | 'decide' | 'mandate' | 'retry';
+  busy: CardBusy;
   error?: string;
   onOpen: (focus?: 'draft') => void;
   onDraft: () => void;
   onDecline: () => void;
   onConfirmMandate: () => void;
   onRetry: () => void;
+  onArchive: () => void;
+  onVip: (on: boolean) => void;
 }) {
   const t = item.triage;
   const done = t?.status === 'done' || t?.status === 'skipped';
@@ -108,6 +154,7 @@ export function MailCard({
     done && t && (t.replyNeeded === 'yes' || t.replyNeeded === 'maybe') && t.draftDecision === 'undecided';
   const draft = item.draft && item.draft.status !== 'discarded' ? item.draft : null;
   const titleId = 'mail-card-' + item.id;
+  const web = safeWebLink(item.webLink);
   return (
     <li
       className={'mail-card' + (t && done ? ' tier-' + t.tier : '') + (item.isRead ? '' : ' unread')}
@@ -119,19 +166,43 @@ export function MailCard({
           {t?.status === 'failed' && <span className="wf-pill red">Could not triage</span>}
           {(!t || t.status === 'pending') && <span className="wf-pill grey">Waiting for triage</span>}
           {t?.deadline && <DeadlineBadge deadline={t.deadline} />}
+          {item.vip && <VipMark />}
+          <ChasedBadge n={item.chased} />
           {item.repliedByMe && <span className="wf-pill green">Replied</span>}
           {done && t?.draftDecision === 'declined' && !item.repliedByMe && (
             <span className="wf-pill grey">No reply needed</span>
           )}
           {item.hasAttachments && <Paperclip size={14} aria-label="Has attachments" className="mail-clip" />}
         </div>
-        <time
-          className="mail-time"
-          dateTime={new Date(item.receivedAt).toISOString()}
-          title={formatStamp(item.receivedAt)}
-        >
-          {formatReceived(item.receivedAt)}
-        </time>
+        <span className="mail-card-corner">
+          <time
+            className="mail-time"
+            dateTime={new Date(item.receivedAt).toISOString()}
+            title={formatStamp(item.receivedAt)}
+          >
+            {formatReceived(item.receivedAt)}
+          </time>
+          <MoreMenu
+            label={'More actions for ' + (item.subject || 'this email')}
+            items={[
+              {
+                label: busy === 'archive' ? 'Archiving' : 'Archive',
+                icon: Archive,
+                onSelect: onArchive,
+                disabled: !!busy,
+              },
+              item.vip
+                ? {
+                    label: 'Remove sender from VIPs',
+                    icon: StarOff,
+                    onSelect: () => onVip(false),
+                    disabled: !!busy,
+                  }
+                : { label: 'Mark sender as VIP', icon: Star, onSelect: () => onVip(true), disabled: !!busy },
+              ...(web ? [{ label: 'Open in Outlook', icon: ExternalLink, href: web }] : []),
+            ]}
+          />
+        </span>
       </div>
       <button type="button" className="mail-card-open" onClick={() => onOpen()}>
         <span id={titleId} className="mail-subject">
@@ -145,6 +216,7 @@ export function MailCard({
           <span className="mail-why muted">{item.preview}</span>
         )}
       </button>
+      <ClashLine clash={item.meetingClash} />
       {t && done && t.asks.length > 0 && (
         <ul className="mail-asks" aria-label="Asked of you">
           {t.asks.slice(0, 3).map((a, i) => (
@@ -207,6 +279,11 @@ export function MailCard({
           )}
         </div>
       )}
+      {(busy === 'archive' || busy === 'vip') && (
+        <p className="wf-caption" role="status">
+          {busy === 'archive' ? 'Archiving' : 'Updating your VIPs'}
+        </p>
+      )}
       {error && (
         <p className="wf-error" role="alert">
           {error}
@@ -216,16 +293,49 @@ export function MailCard({
   );
 }
 
-export function LowRow({ item, onOpen }: { item: MailItem; onOpen: () => void }) {
+export function LowRow({
+  item,
+  onOpen,
+  onArchive,
+  busy,
+  error,
+}: {
+  item: MailItem;
+  onOpen: () => void;
+  onArchive: () => void;
+  busy?: boolean;
+  error?: string;
+}) {
+  const subject = item.subject || '(No subject)';
   return (
     <li className={'mail-low' + (item.isRead ? '' : ' unread')}>
-      <button type="button" onClick={onOpen}>
-        <span className="mail-low-from">{senderName(item.from)}</span>
-        <span className="mail-low-subject">{item.subject || '(No subject)'}</span>
-        <time className="mail-time" dateTime={new Date(item.receivedAt).toISOString()}>
-          {formatReceived(item.receivedAt)}
-        </time>
-      </button>
+      <div className="mail-low-row">
+        <button type="button" className="mail-low-open" onClick={onOpen}>
+          <span className="mail-low-from">
+            {item.vip && <Star size={12} aria-label="VIP" className="mail-vip-star" />}
+            {senderName(item.from)}
+          </span>
+          <span className="mail-low-subject">{subject}</span>
+          <time className="mail-time" dateTime={new Date(item.receivedAt).toISOString()}>
+            {formatReceived(item.receivedAt)}
+          </time>
+        </button>
+        <button
+          type="button"
+          className="mail-low-archive"
+          disabled={busy}
+          onClick={onArchive}
+          aria-label={'Archive ' + subject}
+          title="Archive"
+        >
+          <Archive size={16} aria-hidden="true" />
+        </button>
+      </div>
+      {error && (
+        <p className="wf-error mail-low-error" role="alert">
+          {error}
+        </p>
+      )}
     </li>
   );
 }

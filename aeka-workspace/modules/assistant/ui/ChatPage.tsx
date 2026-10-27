@@ -27,6 +27,8 @@ const SUGGESTIONS = [
   'Remind me to call Rahul at 4 pm',
   'Draft a reply to the latest email from Vista Earth',
   "What did we agree in yesterday's meeting?",
+  'Who is waiting on me, and who am I waiting on?',
+  'Prepare me for my next meeting',
 ];
 const STORE_KEY = 'aeka-assistant-chat';
 const MAX_TEXT = 4000;

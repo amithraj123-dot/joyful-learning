@@ -1,6 +1,7 @@
 // The only path to Microsoft Graph. Requests are checked against a short allow-list: read messages,
-// delta and conversation queries; read the calendar view; create a reply draft; and patch, send or delete only drafts this
-// module created (recorded in mail_drafts). Tokens are refreshed before expiry and the rotated refresh
+// delta and conversation queries; read the calendar view; create a reply draft; patch, send or delete
+// only drafts this module created (recorded in mail_drafts); and move a message of the member's own
+// stored inbox to the Archive folder (nothing else can be moved, and to nowhere else). Tokens are refreshed before expiry and the rotated refresh
 // token is always stored. 429 and 503 stop the batch; 401 refreshes once.
 import { CloudError } from '../../../lib/cloud-store.ts';
 import { notify } from '../../../core/server/notifications.ts';
@@ -206,7 +207,16 @@ export class GraphSession {
     return !!r;
   }
 
-  private async allowed(method: string, url: URL) {
+  // Whether the message is in this member's stored inbox (the only messages that may be archived).
+  private async ownsInboxMessage(graphId: string) {
+    const r = await this.sys.db
+      .prepare("SELECT 1 AS ok FROM mail_messages WHERE member = ? AND graph_id = ? AND folder = 'inbox'")
+      .bind(this.account.member, graphId)
+      .first();
+    return !!r;
+  }
+
+  private async allowed(method: string, url: URL, body: unknown) {
     if (url.origin !== 'https://graph.microsoft.com' || !url.pathname.startsWith('/v1.0/')) return false;
     // Matched segment by segment, so an id can never smuggle in another path.
     let seg: string[];
@@ -228,6 +238,12 @@ export class GraphSession {
     }
     if (method === 'POST' && id && seg.length === 4 && /^createreply(all)?$/.test(lower[3])) return true;
     if (method === 'POST' && id && seg.length === 4 && lower[3] === 'send') return this.ownsDraft(id);
+    if (method === 'POST' && id && seg.length === 4 && lower[3] === 'move') {
+      const b = body as Record<string, unknown> | null;
+      const archiveOnly =
+        !!b && typeof b === 'object' && Object.keys(b).length === 1 && b.destinationId === 'archive';
+      return archiveOnly && !url.search && this.ownsInboxMessage(id);
+    }
     if ((method === 'PATCH' || method === 'DELETE') && id && seg.length === 3) return this.ownsDraft(id);
     return false;
   }
@@ -240,7 +256,7 @@ export class GraphSession {
     extraPrefer = '',
   ): Promise<{ status: number; data: Record<string, unknown> }> {
     const url = new URL(pathOrUrl.startsWith('https://') ? pathOrUrl : GRAPH + pathOrUrl);
-    if (!(await this.allowed(method, url)))
+    if (!(await this.allowed(method, url, body)))
       throw new CloudError('This Outlook operation is not permitted for the workspace.', 403);
     for (let attempt = 0; ; attempt++) {
       const token = await this.accessToken();

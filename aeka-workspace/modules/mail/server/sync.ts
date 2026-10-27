@@ -40,6 +40,8 @@ interface GraphAddress {
 interface GraphMessage {
   id?: string;
   '@removed'?: unknown;
+  '@odata.type'?: string;
+  meetingMessageType?: string;
   subject?: string;
   from?: GraphAddress;
   toRecipients?: GraphAddress[];
@@ -107,6 +109,11 @@ export function trimBody(text: string, subject: string) {
     .trim();
   return (joined || (text || '').trim()).slice(0, BODY_CAP);
 }
+
+// A meeting invitation (an eventMessage asking for a response), as opposed to a response or cancellation.
+export const isMeetingRequest = (m: { '@odata.type'?: unknown; meetingMessageType?: unknown }) =>
+  /eventMessageRequest$/i.test(String(m['@odata.type'] ?? '')) ||
+  String(m.meetingMessageType ?? '').toLowerCase() === 'meetingrequest';
 
 const time = (s: string | undefined) => {
   const t = s ? Date.parse(s) : NaN;
@@ -232,12 +239,13 @@ async function writePage(
     const from = addr(m.from);
     const importance = ['low', 'high'].includes(m.importance || '') ? m.importance! : 'normal';
     const bulk = folder === 'inbox' ? bulkFromHeaders(m.internetMessageHeaders) : 0;
+    const invite = folder === 'inbox' && isMeetingRequest(m);
     statements.push(
       db
         .prepare(
           `INSERT INTO mail_messages(id,member,graph_id,internet_message_id,conversation_id,folder,subject,from_address,
            from_name,to_json,cc_json,received_at,preview,body_text,has_attachments,importance,is_read,bulk,web_link,
-           removed_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?)
+           removed_at,created_at,updated_at,meeting_start,meeting_end) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?)
            ON CONFLICT(member, graph_id) DO UPDATE SET internet_message_id = excluded.internet_message_id,
            conversation_id = excluded.conversation_id, folder = excluded.folder, subject = excluded.subject,
            from_address = excluded.from_address, from_name = excluded.from_name, to_json = excluded.to_json,
@@ -245,7 +253,9 @@ async function writePage(
            body_text = excluded.body_text, has_attachments = excluded.has_attachments,
            importance = excluded.importance, is_read = excluded.is_read,
            bulk = CASE WHEN excluded.bulk < 0 THEN mail_messages.bulk ELSE excluded.bulk END,
-           web_link = excluded.web_link, removed_at = NULL, updated_at = excluded.updated_at`,
+           web_link = excluded.web_link, removed_at = NULL, updated_at = excluded.updated_at,
+           meeting_start = coalesce(mail_messages.meeting_start, excluded.meeting_start),
+           meeting_end = coalesce(mail_messages.meeting_end, excluded.meeting_end)`,
         )
         .bind(
           id,
@@ -269,6 +279,8 @@ async function writePage(
           (m.webLink || '').startsWith('https://') ? m.webLink!.slice(0, 2000) : '',
           now,
           now,
+          invite ? 0 : null,
+          invite ? 0 : null,
         ),
     );
     if (folder === 'inbox') {
@@ -324,10 +336,67 @@ export async function readHeaders(s: GraphSession, rows: { id: string; graph_id:
   return out;
 }
 
+// Graph's dateTimeTimeZone to ms; NaN when the zone is not one we can read reliably.
+export function zonedTime(v: unknown) {
+  const d = v as { dateTime?: unknown; timeZone?: unknown } | undefined;
+  const m =
+    typeof d?.dateTime === 'string' ? d.dateTime.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?)/) : null;
+  if (!m) return NaN;
+  const t = m[1].length === 16 ? m[1] + ':00' : m[1];
+  const zone = typeof d?.timeZone === 'string' ? d.timeZone.trim() : 'UTC';
+  if (/^(utc|gmt|etc\/utc|z)?$/i.test(zone)) return Date.parse(t + 'Z');
+  if (/^(india standard time|asia\/(kolkata|calcutta)|ist)$/i.test(zone)) return Date.parse(t + '+05:30');
+  return NaN;
+}
+
+const MAX_INVITE_READS = 15;
+const IST_PREFER = 'outlook.timezone="India Standard Time"';
+// Reads start and end times of meeting invitations not read yet (meeting_start 0). Throttling, network
+// or sign-in trouble stops the reads for this pass; an invitation Outlook cannot describe gets -1.
+export async function readMeetingTimes(s: GraphSession) {
+  const { db } = s.sys;
+  const member = s.account.member;
+  const rows = (
+    await db
+      .prepare(
+        `SELECT id, graph_id FROM mail_messages WHERE member = ? AND folder = 'inbox' AND meeting_start = 0
+         AND removed_at IS NULL ORDER BY received_at DESC LIMIT ?`,
+      )
+      .bind(member, MAX_INVITE_READS)
+      .all<{ id: string; graph_id: string }>()
+  ).results;
+  let read = 0;
+  for (const r of rows) {
+    let start = -1,
+      end = -1;
+    const path = `/me/messages/${encodeURIComponent(r.graph_id)}`;
+    const get = (query: string) => s.request('GET', path + query, undefined, IST_PREFER);
+    try {
+      // Some mailboxes refuse $select on the derived invitation type; the full item then answers.
+      const { data } = await get('?$select=startDateTime,endDateTime').catch((e) => {
+        if (e instanceof GraphError && e.status === 400) return get('');
+        throw e;
+      });
+      const a = zonedTime(data.startDateTime);
+      const b = zonedTime(data.endDateTime);
+      if (Number.isFinite(a) && Number.isFinite(b) && b >= a) [start, end] = [a, b];
+    } catch (e) {
+      if (!(e instanceof GraphError) || e.busy || e.status === 0 || e.status === 401) break;
+    }
+    await db
+      .prepare('UPDATE mail_messages SET meeting_start = ?, meeting_end = ? WHERE member = ? AND id = ?')
+      .bind(start, end, member, r.id)
+      .run();
+    read++;
+  }
+  return read;
+}
+
 // Removes the member's stored mail. With the account (disconnecting), corrections, rules, sign-in
 // states, the token and settings go too; without it (another mailbox connected), the learning stays.
 export async function deleteMailData(db: D1Database, member: string, withAccount: boolean) {
-  const tables = ['mail_drafts', 'mail_triage', 'mail_messages', 'mail_events'];
-  if (withAccount) tables.push('mail_corrections', 'mail_rules', 'mail_oauth_states', 'mail_accounts');
+  const tables = ['mail_drafts', 'mail_triage', 'mail_messages', 'mail_events', 'mail_threads'];
+  if (withAccount)
+    tables.push('mail_corrections', 'mail_rules', 'mail_style', 'mail_oauth_states', 'mail_accounts');
   await db.batch(tables.map((t) => db.prepare(`DELETE FROM ${t} WHERE member = ?`).bind(member)));
 }

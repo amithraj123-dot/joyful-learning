@@ -1,12 +1,14 @@
-// Background work for one member, bounded per run: due reminders, meeting alerts, the morning brief, WhatsApp
-// answers and deliveries. Safe to run twice at once: every step is guarded or idempotent.
+// Background work for one member, bounded per run: due reminders, meeting alerts, the morning brief,
+// follow-up and overdue alerts, WhatsApp answers and deliveries. Safe to run twice at once: every step is guarded or idempotent.
 import type { SystemContext } from '../../../core/server/env.ts';
 import type { Member } from '../../../core/server/members.ts';
-import { notify } from '../../../core/server/notifications.ts';
+import { notify, takeLease } from '../../../core/server/notifications.ts';
+import { followUps } from '../../mail/server/service.ts';
 import type { Repeat } from '../shared/types.ts';
-import { buildBrief, briefSummary } from './brief.ts';
+import { attempt, buildBrief, briefSummary } from './brief.ts';
 import { meetingAlerts } from './calendar.ts';
 import { memberContext } from './context.ts';
+import { CRITICAL_AFTER } from './records.ts';
 import { MINUTE, advance, dayLabel, istDate, istDayStart, whenLabel } from './recurrence.ts';
 import { ensureSettingsRow, readSettings, whatsappReady } from './settings.ts';
 import { processInbound, pruneEvents, queueNotices, sendOutbox } from './whatsapp.ts';
@@ -104,12 +106,70 @@ export async function morningBrief(sys: SystemContext, member: Member) {
   return r[1].meta.changes > 0;
 }
 
+const ALERT_EVERY = 30 * MINUTE;
+const ALERT_BATCH = 20;
+
+// In-app notices (not sent to WhatsApp this round): a waiting thread reaching level 3 (10 days without
+// a reply), once per conversation and level; and a to-do becoming 3 days overdue, once per to-do.
+// Checked at most every 30 minutes per member.
+export async function followUpAlerts(sys: SystemContext, member: Member) {
+  const { db, now } = sys;
+  if (!(await takeLease(db, `assistant.alerts:${member.email}`, now, ALERT_EVERY))) return 0;
+  let sent = 0;
+  const ctx = memberContext(sys, member);
+  const waiting = (await attempt(() => followUps(ctx, 'waiting', 50))) ?? [];
+  for (const f of waiting.filter((x) => x.level === 3).slice(0, ALERT_BATCH)) {
+    const id = await notify(
+      db,
+      {
+        recipient: member.email,
+        module: 'assistant',
+        kind: 'followup',
+        title: `No reply for ${f.ageDays} days: ${f.subject || '(no subject)'}`,
+        body: `You wrote to ${f.counterpart.name || f.counterpart.address} on ${dayLabel(f.since)}${
+          f.count > 1 ? ` (${f.count} emails)` : ''
+        } and have had no answer.${f.matterLabel ? ` ${f.matterLabel}.` : ''} Draft a follow-up from Follow-ups.`,
+        link: 'mail/followups',
+        dedupeKey: `followup:${f.conversationId}:${f.level}`,
+      },
+      now,
+    );
+    if (id) sent++;
+  }
+  const critical = (
+    await db
+      .prepare(
+        "SELECT id, title, due_at FROM as_todos WHERE member = ? AND status IN ('open','doing') AND due_at IS NOT NULL AND due_at <= ? AND (task_id IS NULL OR task_id NOT LIKE 'dismissed:%') ORDER BY due_at LIMIT ?",
+      )
+      .bind(member.email, now - CRITICAL_AFTER, ALERT_BATCH)
+      .all<{ id: string; title: string; due_at: number }>()
+  ).results;
+  for (const t of critical) {
+    const id = await notify(
+      db,
+      {
+        recipient: member.email,
+        module: 'assistant',
+        kind: 'todo.critical',
+        title: `Overdue since ${dayLabel(t.due_at)}: ${t.title}`,
+        body: `This to-do was due ${whenLabel(t.due_at)}. Complete it, give it a new date or delete it.`,
+        link: `assistant/todos#${t.id}`,
+        dedupeKey: `todo.critical:${t.id}`,
+      },
+      now,
+    );
+    if (id) sent++;
+  }
+  return sent;
+}
+
 export async function assistantTick(sys: SystemContext, scope: { member?: Member }) {
   const member = scope.member;
   if (!member?.active) return;
   await fireReminders(sys, member);
   await meetingAlerts(sys, member);
   await morningBrief(sys, member);
+  await followUpAlerts(sys, member);
   if (whatsappReady(sys.env)) {
     for (let i = 0; i < 2; i++) if (!(await processInbound(sys, member))) break;
     await queueNotices(sys, await readSettings(sys.db, member.email));

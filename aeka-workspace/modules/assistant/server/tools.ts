@@ -9,15 +9,24 @@ import {
   calendarStatus,
   draftReplyFor,
   eventsBetween,
+  followUps,
   freeTime,
   mailConnected,
   mailCounts,
   mailQueue,
   searchMail,
 } from '../../mail/server/service.ts';
-import { VIEWS, type MailItem, type MailView } from '../../mail/shared/types.ts';
+import { VIEWS, type FollowUpKind, type MailItem, type MailView } from '../../mail/shared/types.ts';
 import { matterTargets, myOpenTasks, upcomingDeadlines } from '../../workflow/server/services.ts';
-import { MEMORY_CATEGORIES, REPEATS, type Repeat, type ToolNote } from '../shared/types.ts';
+import {
+  MEMORY_CATEGORIES,
+  REPEATS,
+  TODO_REPEATS,
+  type Repeat,
+  type Todo,
+  type TodoRepeat,
+  type ToolNote,
+} from '../shared/types.ts';
 import { attempt, buildBrief } from './brief.ts';
 import {
   completeTodo,
@@ -27,12 +36,17 @@ import {
   getMemory,
   listMemory,
   listReminders,
+  listLabel,
   listTodos,
+  quickAdd,
   saveMemory,
   snoozeReminder,
+  successorOf,
   memoryFields,
 } from './records.ts';
 import { eventSpan } from './calendar.ts';
+import { meetingPrep, resolveMeeting } from './meetings.ts';
+import { QUICK_ADD_MAX } from './quickadd.ts';
 import { DAY, dateLabel, istDate, istDayStart, timeLabel, whenLabel } from './recurrence.ts';
 import { LIMITS, isoTime } from './validate.ts';
 
@@ -64,6 +78,24 @@ const ID_FIELD = (what: string): Field => ({
   required: true,
 });
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+const todoResult = (t: Todo) => ({
+  id: t.id,
+  title: t.title,
+  due: t.dueAt ? whenLabel(t.dueAt) : null,
+  list: t.list || null,
+  priority: t.priority,
+  repeat: t.repeat,
+});
+const todoSummary = (t: Todo) =>
+  [
+    clip(t.title, 80),
+    t.dueAt ? 'due ' + whenLabel(t.dueAt) : '',
+    t.list ? 'list ' + clip(t.list, 40) : '',
+    t.priority === 'high' ? 'high priority' : '',
+    t.repeat !== 'none' ? `repeats ${t.repeat}` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
 
 // Mail service calls, with a clear message when Mail is unavailable or not connected.
 async function mail<T>(fn: () => Promise<T>): Promise<T> {
@@ -140,8 +172,13 @@ export const TOOLS: Record<string, Tool> = {
           todos: todos.map((t) => ({
             id: t.id,
             title: t.title,
+            status: t.status,
             priority: t.priority,
             due: t.dueAt ? whenLabel(t.dueAt) : null,
+            list: t.list || null,
+            repeat: t.repeat === 'none' ? null : t.repeat,
+            flag: t.critical ? 'overdue 3 days or more' : t.stale ? 'open over a week without a date' : null,
+            from: t.sourceLabel ? `${t.source}: ${clip(t.sourceLabel, 120)}` : null,
           })),
           tasks: tasks.slice(0, 30).map((t) => ({
             title: t.title,
@@ -175,6 +212,18 @@ export const TOOLS: Record<string, Tool> = {
         max: 40,
       },
       priority: { type: 'string', description: 'normal or high', max: 10, enum: ['normal', 'high'] },
+      list: {
+        type: 'string',
+        description: 'Optional list label, e.g. a client or project name',
+        max: LIMITS.list,
+      },
+      repeat: {
+        type: 'string',
+        description:
+          'Optional; a repeating to-do needs a due date, and the next one is made when it is completed',
+        max: 12,
+        enum: TODO_REPEATS,
+      },
     },
     run: async ({ ctx, channel }, a) => {
       const todo = await createTodo(
@@ -184,12 +233,34 @@ export const TOOLS: Record<string, Tool> = {
           details: String(a.details ?? ''),
           priority: (a.priority as 'normal' | 'high') ?? 'normal',
           dueAt: a.due == null ? null : isoTime(a.due, 'the due time'),
+          list: a.list == null ? '' : listLabel(a.list),
+          repeat: (a.repeat as TodoRepeat) ?? 'none',
         },
         channel === 'whatsapp' ? 'whatsapp' : 'chat',
       );
       return {
-        result: { id: todo.id, title: todo.title, due: todo.dueAt ? whenLabel(todo.dueAt) : null },
-        summary: `Created to-do: ${clip(todo.title, 80)}${todo.dueAt ? ', due ' + whenLabel(todo.dueAt) : ''}`,
+        result: todoResult(todo),
+        summary: `Created to-do: ${todoSummary(todo)}`,
+        ref: `assistant/todos#${todo.id}`,
+      };
+    },
+  },
+  quick_add_todo: {
+    description:
+      'Create a to-do from the member\'s own words, read without AI: dates and times (tomorrow 4pm, Friday, on 3 Nov, 3/11, EOD), #List, ! for high priority and "every day|week|fortnight|month". Use it when the member dictates a to-do in one line; check the returned reading.',
+    fields: {
+      text: {
+        type: 'string',
+        description: "The member's words, as said",
+        max: QUICK_ADD_MAX,
+        required: true,
+      },
+    },
+    run: async ({ ctx, channel }, a) => {
+      const { todo, understood } = await quickAdd(ctx, a.text, channel === 'whatsapp' ? 'whatsapp' : 'chat');
+      return {
+        result: { ...todoResult(todo), understood },
+        summary: `Created to-do: ${todoSummary(todo)}`,
         ref: `assistant/todos#${todo.id}`,
       };
     },
@@ -199,9 +270,15 @@ export const TOOLS: Record<string, Tool> = {
     fields: { id: ID_FIELD('to-do') },
     run: async ({ ctx }, a) => {
       const todo = await completeTodo(ctx, a.id);
+      const next = todo.repeat === 'none' ? null : await successorOf(ctx, todo.id);
       return {
-        result: { id: todo.id, title: todo.title, status: todo.status },
-        summary: `Marked done: ${clip(todo.title, 80)}`,
+        result: {
+          id: todo.id,
+          title: todo.title,
+          status: todo.status,
+          ...(next ? { next: { id: next.id, due: next.dueAt ? whenLabel(next.dueAt) : null } } : {}),
+        },
+        summary: `Marked done: ${clip(todo.title, 80)}${next?.dueAt ? `; next due ${whenLabel(next.dueAt)}` : ''}`,
         ref: `assistant/todos#${todo.id}`,
       };
     },
@@ -448,8 +525,94 @@ export const TOOLS: Record<string, Tool> = {
       };
     },
   },
+  follow_ups: {
+    description:
+      'Email follow-ups: "waiting" (the member wrote last and has had no reply for 2 days or more) and "chasing" (someone has written 2 or more times since the member last replied). Most pressing first. Needs Outlook connected.',
+    fields: {
+      kind: {
+        type: 'string',
+        description: 'Only one kind; default both',
+        max: 10,
+        enum: ['waiting', 'chasing'],
+      },
+    },
+    run: async ({ ctx }, a) => {
+      await requireMail(ctx, 'follow-ups cannot be checked');
+      const kind = a.kind as FollowUpKind | undefined;
+      const items = await mail(() => followUps(ctx, kind, 15));
+      return {
+        result: {
+          note: UNTRUSTED,
+          items: items.map((f) => ({
+            kind: f.kind,
+            person: f.counterpart.name || f.counterpart.address,
+            subject: clip(f.subject, 200),
+            days: f.ageDays,
+            level: f.level,
+            count: f.count,
+            mailId: f.mailId,
+            mandate: f.matterLabel || null,
+          })),
+        },
+        summary: `Checked follow-ups${kind ? ` (${kind})` : ''}: ${items.length} found`,
+        ref: 'mail/followups',
+      };
+    },
+  },
+  meeting_prep: {
+    description:
+      "A preparation pack for one of the member's meetings (no AI): attendees with their last email and follow-up state, the linked mandate with the member's open tasks and deadlines, recent mail with the attendees, the member's own notes and to-dos. Also an AI briefing if one was made earlier in Today.",
+    fields: {
+      when: {
+        type: 'string',
+        description:
+          '"next" for the next meeting, an ISO 8601 date and time with offset for the meeting nearest that time, or words of the meeting subject',
+        max: 120,
+        required: true,
+      },
+    },
+    run: async ({ ctx }, a) => {
+      await calendarStart(ctx, undefined);
+      const event = await resolveMeeting(ctx, String(a.when));
+      if (!event)
+        throw new CloudError(
+          'No meeting matched in your calendar from yesterday to 14 days ahead. Nothing was prepared.',
+        );
+      const prep = await meetingPrep(ctx, event.id);
+      return {
+        result: {
+          note: UNTRUSTED,
+          meeting: {
+            subject: clip(prep.event.subject, 200),
+            when: `${dateLabel(prep.event.start)}, ${eventSpan(event)}`,
+            place: prep.event.place,
+          },
+          people: prep.people.map((p) => ({
+            name: p.name,
+            colleague: p.colleague,
+            lastEmail: p.lastMail ? `${clip(p.lastMail.subject, 160)} (${whenLabel(p.lastMail.at)})` : null,
+            waitingOnThem: p.waitingOnThem,
+            chasingMe: p.chasingMe,
+          })),
+          mandate: prep.mandate,
+          recentMail: prep.recentMail.map((m) => ({
+            subject: clip(m.subject, 160),
+            from: m.from,
+            when: whenLabel(m.at),
+            why: clip(m.why, 160),
+          })),
+          notes: prep.notes.map((n) => ({ title: n.title, snippet: clip(n.snippet, 240) })),
+          todos: prep.todos.map((t) => t.title),
+          summary: prep.summary?.text ?? null,
+        },
+        summary: `Prepared a meeting pack: ${clip(prep.event.subject, 80)}`,
+        ref: 'assistant/today',
+      };
+    },
+  },
   today_brief: {
-    description: "The member's brief for today: urgent mail, due and overdue items, deadlines and reminders.",
+    description:
+      "The member's brief for today: overdue to-dos, calendar and day health, urgent mail, follow-ups, due items, deadlines, reminders and patterns.",
     fields: {},
     run: async ({ ctx }) => {
       const brief = await buildBrief(ctx, true);

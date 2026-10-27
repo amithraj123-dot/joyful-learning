@@ -223,3 +223,57 @@ export function useClock(ms = 60_000) {
   }, [ms]);
   return now;
 }
+
+// "45 min", "2 h", "3 h 30 min".
+export function formatMinutes(min: number) {
+  const m = Math.max(0, Math.round(min));
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (!h) return `${r} min`;
+  return r ? `${h} h ${r} min` : `${h} h`;
+}
+// "0", "1.5", "4": hours with at most one decimal, for compact day cards.
+export const shortHours = (min: number) => String(Math.round((Math.max(0, min) / 60) * 10) / 10);
+
+// What to say when the Outlook calendar cannot supply meetings, or '' when it can.
+export function calendarNote(status: string) {
+  switch (status) {
+    case 'ready':
+      return '';
+    case 'not_connected':
+      return 'Connect Outlook to see your meetings and how full each day is.';
+    case 'needs_consent':
+      return 'Allow calendar access in Outlook connection to see your meetings here.';
+    case 'pending':
+      return 'Your calendar is being read for the first time. Check again in a few minutes.';
+    case 'error':
+      return 'Your calendar could not be read just now. It will be tried again shortly.';
+    default:
+      return 'Your calendar is not available just now.';
+  }
+}
+// The page that fixes a calendar problem, if any.
+export const calendarFix = (status: string) =>
+  status === 'not_connected' || status === 'needs_consent' ? 'mail/connect' : '';
+
+// A per-viewer preference kept in this browser (for example the to-do view); never required.
+export function useStored<T extends string>(key: string, fallback: T, allowed: readonly T[]) {
+  const [value, setValue] = useState<T>(fallback);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(key) as T | null;
+      if (v && allowed.includes(v)) queueMicrotask(() => setValue(v));
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  const set = useCallback(
+    (v: T) => {
+      setValue(v);
+      try {
+        localStorage.setItem(key, v);
+      } catch {}
+    },
+    [key],
+  );
+  return [value, set] as const;
+}

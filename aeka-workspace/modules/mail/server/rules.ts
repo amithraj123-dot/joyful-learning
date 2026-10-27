@@ -24,25 +24,7 @@ const PROPOSE_AT = 3;
 // Fields a rule can carry, as stored in mail_corrections.field.
 const RULE_FIELDS = ['tier', 'category', 'handling', 'matterId'] as const;
 
-// The merged effect of the active rules matching a message (sender beats domain beats subject).
-export function matchRules(rules: MailRule[], from: string, subject: string) {
-  const address = from.toLowerCase();
-  const domain = domainOf(address);
-  const s = subject.toLowerCase();
-  const hits = rules.filter(
-    (r) =>
-      r.status === 'active' &&
-      ((r.kind === 'sender' && r.pattern === address) ||
-        (r.kind === 'domain' && !!domain && (domain === r.pattern || domain.endsWith('.' + r.pattern))) ||
-        (r.kind === 'subject' && s.includes(r.pattern))),
-  );
-  if (!hits.length) return null;
-  const order = { sender: 0, domain: 1, subject: 2 };
-  hits.sort((a, b) => order[a.kind] - order[b.kind]);
-  const effect: RuleEffect = {};
-  for (const r of [...hits].reverse()) Object.assign(effect, r.effect);
-  return { effect, kind: hits[0].kind };
-}
+export { matchRules } from './store.ts';
 
 // The mandate the member last confirmed for this sender, else for the sender's domain (not public).
 // An explicit unlink for the sender stops the lookup. Only mandates in `visible` count.
