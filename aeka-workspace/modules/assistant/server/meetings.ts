@@ -9,7 +9,7 @@ import { releaseLease, takeLease } from '../../../core/server/notifications.ts';
 import { searchOwnNotes } from '../../scribe/server/notes.ts';
 import { calendarStatus, eventsBetween, followUps, mailWith } from '../../mail/server/service.ts';
 import { isBusy, type CalendarEvent, type FollowUp, type MailItem } from '../../mail/shared/types.ts';
-import { matterTargets, myOpenTasks, upcomingDeadlines } from '../../workflow/server/services.ts';
+import { matterTargets, openTasksOn, upcomingDeadlines } from '../../workflow/server/services.ts';
 import type { DayHealth, MeetingPrep, MeetingPrepPerson } from '../shared/types.ts';
 import { attempt } from './brief.ts';
 import { listTodos } from './records.ts';
@@ -222,9 +222,7 @@ export async function meetingPrep(ctx: ModuleContext, eventId: unknown): Promise
       (t) => t.matterId === event.matterId,
     );
     if (target) {
-      const tasks = ((await attempt(() => myOpenTasks(ctx))) ?? []).filter(
-        (t) => t.matterId === target.matterId,
-      );
+      const tasks = (await attempt(() => openTasksOn(ctx, target.matterId))) ?? [];
       const deadlines = (
         (await attempt(() => upcomingDeadlines(ctx, istDate(ctx.now + 30 * DAY)))) ?? []
       ).filter((d) => d.matterId === target.matterId);
@@ -346,8 +344,9 @@ function prepData(prep: MeetingPrep) {
     mandate: prep.mandate
       ? {
           name: prep.mandate.label,
-          myOpenTasks: prep.mandate.openTasks.map(
-            (t) => `${t.title}${t.dueDate ? `, due ${t.dueDate}` : ''}`,
+          openTasks: prep.mandate.openTasks.map(
+            (t) =>
+              `${t.title}${t.dueDate ? `, due ${t.dueDate}` : ''}${t.assignee ? `, with ${t.assignee}` : ''}`,
           ),
           deadlines: prep.mandate.deadlines.map((d) => `${d.title}, ${d.dueDate}`),
         }

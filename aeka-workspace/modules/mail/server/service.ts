@@ -125,12 +125,7 @@ export async function followUps(
   const email = memberEmail(ctx);
   if (!email || !(await loadAccount(ctx.db, email))) return [];
   const k = kind === 'waiting' || kind === 'chasing' ? kind : undefined;
-  const list = await listFollowUps(ctx, { kind: k, limit: bound(limit, 100) });
-  return list.map((f) => {
-    const out: Partial<typeof f> = { ...f };
-    delete out.done;
-    return out as import('../shared/types.ts').FollowUp;
-  });
+  return listFollowUps(ctx, { kind: k, limit: bound(limit, 100) });
 }
 // My most recent emails received from or sent to any of these addresses (lower case), newest first.
 export async function mailWith(ctx: ModuleContext, addresses: string[], limit = 8): Promise<MailItem[]> {

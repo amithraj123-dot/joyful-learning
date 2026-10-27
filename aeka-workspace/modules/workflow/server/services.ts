@@ -36,6 +36,14 @@ export async function myOpenTasks(ctx: ModuleContext): Promise<(Task & { matterL
     .sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'));
 }
 
+// Open tasks on one mandate the caller can see (everyone's, not only the caller's), soonest due first.
+export async function openTasksOn(ctx: ModuleContext, matterId: string): Promise<Task[]> {
+  const matter = await visibleMatter(ctx, matterId);
+  return (
+    await all(ctx.db, tasks, "deleted_at IS NULL AND matter_id = ? AND status != 'Completed'", matter.id)
+  ).sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'));
+}
+
 // Open deadlines on visible mandates due on or before `until` (YYYY-MM-DD), with the mandate label.
 export async function upcomingDeadlines(ctx: ModuleContext, until: string) {
   const targets = new Map((await matterTargets(ctx)).map((t) => [t.matterId, t]));

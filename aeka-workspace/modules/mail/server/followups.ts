@@ -4,7 +4,7 @@
 //   chasing: someone wrote 2 or more times since I last wrote (or I never wrote); level = their count,
 //     capped at 3.
 // Done hides the follow-up only for the state it was marked in: a later message brings it back. A snooze
-// hides the conversation until it ends. Replies sent from the workspace count as mine at once.
+// (waiting threads only) hides it until the snooze ends. Replies sent from the workspace count as mine at once.
 import { CloudError } from '../../../lib/cloud-store.ts';
 import type { ModuleAction, ModuleContext } from '../../../core/server/module.ts';
 import { matterTargets } from '../../workflow/server/services.ts';
@@ -48,7 +48,6 @@ interface ThreadState {
   chasing_done: number;
   updated_at: number;
 }
-export type FollowUpRow = FollowUp & { done: boolean };
 
 const automatedAddress = (a: string) => NO_REPLY.test(a.split('@')[0] || '');
 const levelForAge = (ms: number): 0 | 1 | 2 | 3 =>
@@ -63,7 +62,7 @@ export async function computeFollowUps(
   me: Set<string>,
   now: number,
   link: (address: string) => Promise<string>,
-): Promise<FollowUpRow[]> {
+): Promise<FollowUp[]> {
   const byConversation = new Map<string, Row[]>();
   for (const r of rows)
     if (r.conversation_id) {
@@ -74,7 +73,7 @@ export async function computeFollowUps(
   const draftsBy = new Map<string, SentDraft[]>();
   for (const d of drafts) draftsBy.set(d.conversation_id, [...(draftsBy.get(d.conversation_id) ?? []), d]);
 
-  const out: FollowUpRow[] = [];
+  const out: FollowUp[] = [];
   for (const [conversationId, list] of byConversation) {
     type Entry = { at: number; mine: boolean; row: Row | null; to: Address[]; cc: Address[] };
     const sent = list.filter((r) => r.folder === 'sent');
@@ -158,7 +157,7 @@ export async function computeFollowUps(
       count: fromSender.length,
       mailId: latest.row.id,
       matterLabel: await link(sender),
-      snoozedUntil: snoozed,
+      snoozedUntil: null, // only waiting threads can be snoozed
       done,
     });
   }
@@ -173,8 +172,8 @@ async function meOf(db: D1Database, member: string) {
 // The caller's follow-ups (hidden ones too when asked), most pressing first.
 export async function listFollowUps(
   ctx: ModuleContext,
-  o: { kind?: FollowUpKind; includeHidden?: boolean; conversationId?: string; limit?: number },
-): Promise<FollowUpRow[]> {
+  o: { kind?: FollowUpKind; includeClosed?: boolean; conversationId?: string; limit?: number },
+): Promise<FollowUp[]> {
   const member = memberOf(ctx);
   const since = ctx.now - WINDOW;
   const ids = o.conversationId
@@ -239,9 +238,12 @@ export async function listFollowUps(
     return seen.get(address)!;
   };
   const all = await computeFollowUps(rows, drafts, threads, await meOf(ctx.db, member), ctx.now, link);
-  return all
-    .filter((f) => (!o.kind || f.kind === o.kind) && (o.includeHidden || (!f.done && !f.snoozedUntil)))
-    .slice(0, o.limit ?? 200);
+  const mine = all.filter((f) => !o.kind || f.kind === o.kind);
+  const closed = (f: FollowUp) => f.done || !!f.snoozedUntil;
+  // Open ones, most pressing first; then (when asked) snoozed and done ones, most recent first.
+  const open = mine.filter((f) => !closed(f));
+  const rest = o.includeClosed ? mine.filter(closed).sort((a, b) => b.since - a.since) : [];
+  return [...open, ...rest].slice(0, o.limit ?? 200);
 }
 
 const KINDS = ['waiting', 'chasing'];
@@ -254,11 +256,11 @@ export const followUpActions: Record<string, ModuleAction> = {
   'followups.list': {
     handler: async (ctx, p) => {
       if (p.kind != null && !KINDS.includes(p.kind as string)) throw new CloudError('Choose a valid kind.');
-      if (p.includeHidden != null && typeof p.includeHidden !== 'boolean')
+      if (p.includeClosed != null && typeof p.includeClosed !== 'boolean')
         throw new CloudError('Choose yes or no for showing done or snoozed follow-ups.');
       return listFollowUps(ctx, {
         kind: (p.kind as FollowUpKind | undefined) ?? undefined,
-        includeHidden: p.includeHidden === true,
+        includeClosed: p.includeClosed === true,
       });
     },
   },
@@ -279,6 +281,7 @@ export const followUpActions: Record<string, ModuleAction> = {
       const values: unknown[] = [];
       if (action === 'snooze') {
         const days = p.days;
+        if (kind !== 'waiting') throw new CloudError('Only threads you are waiting on can be snoozed.');
         if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 30)
           throw new CloudError('Snooze for 1 to 30 days.');
         set = 'waiting_snoozed_until = ?';

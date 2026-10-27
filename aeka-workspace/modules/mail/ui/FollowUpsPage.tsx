@@ -23,10 +23,6 @@ const DAY = 24 * 3600 * 1000;
 const SNOOZE_DAYS = [1, 3, 7];
 const key = (f: Pick<FollowUp, 'kind' | 'conversationId'>) => f.kind + ':' + f.conversationId;
 
-// Marked done in this tab, so they can be reopened from "Show done or snoozed". The list from the
-// server leaves done threads out.
-const doneHere = new Map<string, FollowUp>();
-
 const WAITING_LEVEL: Record<FollowUp['level'], string> = { 1: '2+ days', 2: '5+ days', 3: '10+ days' };
 const LEVEL_TONE: Record<FollowUp['level'], string> = { 1: 'grey', 2: 'amber', 3: 'red' };
 
@@ -34,6 +30,8 @@ const levelText = (f: FollowUp) =>
   f.kind === 'waiting' ? 'Waiting ' + WAITING_LEVEL[f.level] : `Chased ${f.count} times`;
 const ageText = (days: number) => (days < 1 ? 'Today' : days === 1 ? '1 day' : `${days} days`);
 const snoozedNow = (f: FollowUp) => !!f.snoozedUntil && f.snoozedUntil > Date.now();
+// Done or snoozed: listed only with "Show done or snoozed", to reopen.
+const isClosed = (f: FollowUp) => f.done || snoozedNow(f);
 const shortDate = (ms: number) =>
   new Date(ms).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' });
 
@@ -68,36 +66,40 @@ export function FollowUpsPage() {
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState('');
   const [showClosed, setShowClosed] = useState(false);
+  const [withClosed, setWithClosed] = useState(false); // the list includes done and snoozed threads
   const [busy, setBusy] = useState<Record<string, Busy>>({});
   const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
-  const [, setDoneCount] = useState(doneHere.size); // re-render when the tab's done list changes
   const [open, setOpen] = useState<{ item: MailItem; followUp: FollowUp; focus?: 'draft' } | null>(null);
   const seq = useRef(0);
+  const loaded = useRef(false);
 
   const acct = account.account;
   const connected = !!acct && acct.status !== 'disconnected';
   const me: Address = { name: acct?.displayName ?? '', address: acct?.address ?? '' };
 
-  const load = useCallback(async (quiet = false) => {
-    const mine = ++seq.current;
-    if (!quiet) setPhase('loading');
-    try {
-      const r = await mail('followups.list', {});
-      if (mine !== seq.current) return;
-      // A thread that is open again on the server is no longer "done here".
-      for (const f of r) doneHere.delete(key(f));
-      setDoneCount(doneHere.size);
-      setList(r);
-      setPhase('ready');
-      setError('');
-    } catch (e) {
-      if (mine !== seq.current) return;
-      setError(errorMessage(e));
-      setPhase('error');
-    }
-  }, []);
+  const load = useCallback(
+    async (quiet = false) => {
+      const mine = ++seq.current;
+      if (!quiet) setPhase('loading');
+      try {
+        const r = await mail('followups.list', showClosed ? { includeClosed: true } : {});
+        if (mine !== seq.current) return;
+        setList(r);
+        setWithClosed(showClosed);
+        setPhase('ready');
+        setError('');
+      } catch (e) {
+        if (mine !== seq.current) return;
+        setError(errorMessage(e));
+        setPhase('error');
+      }
+    },
+    [showClosed],
+  );
   useEffect(() => {
-    if (account.phase === 'ready' && connected) void load();
+    // Turning "Show done or snoozed" on or off reloads quietly, keeping the list on screen.
+    if (account.phase === 'ready' && connected) void load(loaded.current);
+    loaded.current = true;
   }, [account.phase, connected, load]);
 
   const act = async (f: FollowUp, kind: Busy, fn: () => Promise<void>) => {
@@ -130,20 +132,13 @@ export function FollowUpsPage() {
   const done = (f: FollowUp) =>
     act(f, 'done', async () => {
       await update(f, 'done');
-      doneHere.set(key(f), f);
-      setDoneCount(doneHere.size);
-      setList((old) => old.filter((x) => key(x) !== key(f)));
+      setList((old) => old.map((x) => (key(x) === key(f) ? { ...x, done: true } : x)));
       notify('Marked done. Turn on Show done or snoozed to reopen it.');
     });
   const reopen = (f: FollowUp) =>
     act(f, 'reopen', async () => {
       await update(f, 'reopen');
-      doneHere.delete(key(f));
-      setDoneCount(doneHere.size);
-      setList((old) => {
-        const rest = old.filter((x) => key(x) !== key(f));
-        return [...rest, { ...f, snoozedUntil: null }];
-      });
+      setList((old) => old.map((x) => (key(x) === key(f) ? { ...x, done: false, snoozedUntil: null } : x)));
       notify('Reopened');
       void load(true);
     });
@@ -200,13 +195,10 @@ export function FollowUpsPage() {
       </Empty>
     );
 
-  const openNow = list.filter((f) => !snoozedNow(f));
+  const openNow = list.filter((f) => !isClosed(f));
   const waiting = openNow.filter((f) => f.kind === 'waiting');
   const chasing = openNow.filter((f) => f.kind === 'chasing');
-  const closed = [
-    ...list.filter(snoozedNow),
-    ...[...doneHere.values()].filter((d) => !list.some((f) => key(f) === key(d))),
-  ];
+  const closed = showClosed ? list.filter(isClosed) : [];
 
   const card = (f: FollowUp, closedCard = false) => (
     <FollowUpCard
@@ -215,7 +207,6 @@ export function FollowUpsPage() {
       closed={closedCard}
       busy={busy[key(f)] ?? ''}
       error={cardErrors[key(f)]}
-      isDone={doneHere.has(key(f))}
       onOpen={() =>
         setOpen({
           item: toItem(f, me, f.kind === 'waiting' ? nudgeDrafts.get(f.conversationId) : undefined),
@@ -238,7 +229,7 @@ export function FollowUpsPage() {
           {acct?.lastSyncAt ? `Mail last synced ${formatWhen(acct.lastSyncAt)}.` : ''}
         </p>
         <Toggle pressed={showClosed} onChange={setShowClosed}>
-          Show done or snoozed{closed.length ? ` (${closed.length})` : ''}
+          Show done or snoozed{showClosed && closed.length ? ` (${closed.length})` : ''}
         </Toggle>
       </div>
 
@@ -272,10 +263,14 @@ export function FollowUpsPage() {
             Done or snoozed <span className="wf-count">{closed.length}</span>
           </h2>
           <p className="wf-caption">
-            Snoozed threads come back by themselves. Threads you mark done here can be reopened while this tab
-            stays open.
+            Snoozed threads come back by themselves if there is still no answer. Done threads stay closed
+            until you reopen them.
           </p>
-          {closed.length ? (
+          {!withClosed ? (
+            <p className="wf-loading" role="status">
+              Loading done and snoozed threads
+            </p>
+          ) : closed.length ? (
             <ul className="mail-list">{closed.map((f) => card(f, true))}</ul>
           ) : (
             <p className="mail-fu-empty">Nothing is done or snoozed.</p>
@@ -307,7 +302,6 @@ function FollowUpCard({
   closed,
   busy,
   error,
-  isDone,
   onOpen,
   onReply,
   onNudge,
@@ -319,7 +313,6 @@ function FollowUpCard({
   closed: boolean;
   busy: Busy;
   error?: string;
-  isDone: boolean;
   onOpen: () => void;
   onReply: () => void;
   onNudge: () => void;
@@ -348,7 +341,7 @@ function FollowUpCard({
           )}
           {closed && (
             <span className="wf-pill tint">
-              {isDone ? 'Done' : f.snoozedUntil ? 'Snoozed until ' + shortDate(f.snoozedUntil) : 'Snoozed'}
+              {f.done ? 'Done' : f.snoozedUntil ? 'Snoozed until ' + shortDate(f.snoozedUntil) : 'Snoozed'}
             </span>
           )}
         </div>

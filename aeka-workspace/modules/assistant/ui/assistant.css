@@ -172,6 +172,9 @@
   grid-area: meet;
   min-width: 0;
 }
+.as-today-meet:empty {
+  display: none;
+}
 .as-greeting {
   grid-area: greet;
 }
