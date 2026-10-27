@@ -1,5 +1,6 @@
 // Server-side module registry. Add a module's server definition here to expose its actions on
 // POST /api/modules. (The browser-side registry is core/client/registry.ts.)
+import { agentsServer } from '../../modules/agents/server/index.ts';
 import { assistantServer } from '../../modules/assistant/server/index.ts';
 import { chatsServer } from '../../modules/chats/server/index.ts';
 import { mailServer } from '../../modules/mail/server/index.ts';
@@ -13,4 +14,5 @@ export const serverModules: ServerModule[] = [
   mailServer,
   chatsServer,
   assistantServer,
+  agentsServer,
 ];

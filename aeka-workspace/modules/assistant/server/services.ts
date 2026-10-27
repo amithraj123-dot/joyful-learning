@@ -112,3 +112,10 @@ export async function dueSoon(
   }
   return out.sort((a, b) => a.at - b.at).slice(0, 50);
 }
+
+// ---------- For agents (module agents) ----------
+// The assistant's tools (the same as Ask Aeka's, on the caller's own data; drafts are only prepared),
+// the member's memory, and India-time helpers for schedules.
+export { TOOL_SCHEMAS as assistantToolSchemas, runTool as runAssistantTool } from './tools.ts';
+export { listMemory as memberMemories } from './records.ts';
+export { advance as nextRun, isoIST, longLabel, whenLabel } from './recurrence.ts';

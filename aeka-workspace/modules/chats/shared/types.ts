@@ -115,10 +115,20 @@ export interface ChatDraft {
 }
 
 // What the phone shows as notifications. Every workspace notice belongs to one of these kinds.
-export const ALERTS = ['actions', 'chats', 'todos', 'reminders', 'tasks', 'meetings', 'brief'] as const;
+export const ALERTS = [
+  'actions',
+  'agents',
+  'chats',
+  'todos',
+  'reminders',
+  'tasks',
+  'meetings',
+  'brief',
+] as const;
 export type AlertKind = (typeof ALERTS)[number];
 export const ALERT_LABELS: Record<AlertKind, string> = {
   actions: 'New action needed: urgent or important mail and chats that need your reply',
+  agents: 'Agent reports, and actions waiting for your approval',
   chats: 'Reminders to reply to chats',
   todos: 'To-dos when they fall due, and overdue ones',
   reminders: 'Reminders',
@@ -146,6 +156,7 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   },
   alerts: {
     actions: true,
+    agents: true,
     chats: true,
     todos: true,
     reminders: true,

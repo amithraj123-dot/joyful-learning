@@ -771,3 +771,95 @@ export const chSettings = sqliteTable('ch_settings', {
   settingsJson: text('settings_json').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });
+
+// ---------- Agents: automated workflows described in plain words ----------
+
+export const agAgents = sqliteTable(
+  'ag_agents',
+  {
+    id: text('id').primaryKey(),
+    member: text('member').notNull(),
+    name: text('name').notNull(),
+    instruction: text('instruction').notNull(),
+    triggerJson: text('trigger_json').notNull(),
+    status: text('status').notNull(), // active | paused
+    notes: text('notes').notNull().default(''), // kept between runs, written by the agent
+    templateId: text('template_id'),
+    nextRunAt: integer('next_run_at'), // schedules
+    eventCursor: integer('event_cursor').notNull().default(0), // events: notices up to this time are handled
+    lastRunAt: integer('last_run_at'),
+    statsJson: text('stats_json').notNull().default('{}'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    revision: integer('revision').notNull().default(1),
+  },
+  (t) => [index('ag_agents_member').on(t.member), index('ag_agents_due').on(t.status, t.nextRunAt)],
+);
+export const agRuns = sqliteTable(
+  'ag_runs',
+  {
+    id: text('id').primaryKey(),
+    member: text('member').notNull(),
+    agentId: text('agent_id'),
+    agentName: text('agent_name').notNull(),
+    trigger: text('trigger').notNull(), // command | manual | schedule | event
+    status: text('status').notNull(), // running | done | failed
+    command: text('command').notNull(),
+    summary: text('summary').notNull().default(''),
+    stepsJson: text('steps_json').notNull().default('[]'),
+    error: text('error').notNull().default(''),
+    rating: integer('rating').notNull().default(0),
+    feedback: text('feedback').notNull().default(''),
+    startedAt: integer('started_at').notNull(),
+    finishedAt: integer('finished_at'),
+  },
+  (t) => [
+    index('ag_runs_member').on(t.member, t.startedAt),
+    index('ag_runs_agent').on(t.agentId, t.startedAt),
+  ],
+);
+export const agApprovals = sqliteTable(
+  'ag_approvals',
+  {
+    id: text('id').primaryKey(),
+    member: text('member').notNull(),
+    agentId: text('agent_id'),
+    agentName: text('agent_name').notNull(),
+    runId: text('run_id').notNull(),
+    action: text('action').notNull(), // send_email | create_task
+    payloadJson: text('payload_json').notNull(),
+    title: text('title').notNull(),
+    detail: text('detail').notNull(),
+    reason: text('reason').notNull(),
+    link: text('link').notNull(),
+    status: text('status').notNull(), // pending | approved | rejected | failed | expired
+    result: text('result').notNull().default(''),
+    createdAt: integer('created_at').notNull(),
+    decidedAt: integer('decided_at'),
+  },
+  (t) => [index('ag_approvals_member').on(t.member, t.status, t.createdAt)],
+);
+export const agLessons = sqliteTable(
+  'ag_lessons',
+  {
+    id: text('id').primaryKey(),
+    member: text('member').notNull(),
+    agentId: text('agent_id'), // null: every agent
+    text: text('text').notNull(),
+    source: text('source').notNull(), // agent | feedback | approval | review | member
+    uses: integer('uses').notNull().default(0),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('ag_lessons_member').on(t.member, t.agentId)],
+);
+export const agTemplates = sqliteTable('ag_templates', {
+  id: text('id').primaryKey(),
+  author: text('author').notNull(),
+  authorName: text('author_name').notNull(),
+  name: text('name').notNull(),
+  description: text('description').notNull(),
+  instruction: text('instruction').notNull(),
+  triggerJson: text('trigger_json').notNull(),
+  copies: integer('copies').notNull().default(0),
+  createdAt: integer('created_at').notNull(),
+});

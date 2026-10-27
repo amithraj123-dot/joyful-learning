@@ -22,6 +22,8 @@ aeka-workspace/
     workflow/ manifest.ts, shared/ (types and action contract), server/ (actions), ui/ (pages)
     mail/     Outlook triage, drafts and sending (same layout; server/service.ts for other modules)
     assistant/ chat with tools, to-dos, reminders, memory, brief, WhatsApp (same layout)
+    agents/   automated workflows in plain words: planner, runner (assistant tools plus agent tools),
+              approvals, schedules and event triggers, automatic lessons, firm templates
     chats/    phone notifications (WhatsApp, LinkedIn, SMS, Teams, Slack, Gmail): triage, nudges,
               drafts; server/device.ts is the Android app's API (POST /api/device)
   app/        the shell (app/page.tsx), API routes, styles

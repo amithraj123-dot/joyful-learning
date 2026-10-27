@@ -2,6 +2,7 @@
 // reads only stored data (no Graph call), except draftReplyFor, which drafts with the AI, and the
 // calendar functions, which may refresh the cached calendar first.
 // SIGNATURES ARE FIXED.
+import { CloudError } from '../../../lib/cloud-store.ts';
 import type { ModuleContext } from '../../../core/server/module.ts';
 import { matterTargets } from '../../workflow/server/services.ts';
 import type {
@@ -14,11 +15,21 @@ import type {
 } from '../shared/types.ts';
 import { VIEWS } from '../shared/types.ts';
 import { cachedEvents, freeSlots, istDayStart, syncCalendar } from './calendar.ts';
-import { createDraft } from './drafts.ts';
+import { createDraft, sendDraft } from './drafts.ts';
 import { GraphSession, ReauthError } from './graph.ts';
 import { confirmedLink } from './rules.ts';
 import { listFollowUps } from './followups.ts';
-import { itemsWith, listItems, listRules, loadAccount, matchRules, queueCounts } from './store.ts';
+import {
+  addresses,
+  itemsWith,
+  listItems,
+  listRules,
+  loadAccount,
+  loadDraft,
+  loadMessage,
+  matchRules,
+  queueCounts,
+} from './store.ts';
 
 const memberEmail = (ctx: ModuleContext) => ctx.member?.email ?? '';
 const bound = (n: number, max: number) =>
@@ -149,4 +160,30 @@ export async function keptFromAi(ctx: ModuleContext, items: MailItem[]): Promise
     )
       kept.add(m.id);
   return kept;
+}
+
+// One of my reply drafts, as an approval shows it (module agents): recipients, subject, the text and
+// whether it can be sent as it stands. Null when it is not mine or no longer a draft.
+export async function draftForApproval(ctx: ModuleContext, draftId: string) {
+  const email = memberEmail(ctx);
+  if (!email) return null;
+  const d = await loadDraft(ctx.db, email, draftId);
+  if (!d || (d.status !== 'draft' && d.status !== 'saved')) return null;
+  const m = await loadMessage(ctx.db, email, d.message_id);
+  return {
+    id: d.id,
+    to: addresses(d.to_json).map((a) => a.address),
+    subject: m?.subject ?? '',
+    body: d.body,
+    placeholders: d.placeholders,
+    revision: d.revision,
+  };
+}
+
+// Sends one of my reply drafts after I approved it, with every check of Send in Mail (placeholders,
+// recipients, the original email still there).
+export async function sendApprovedDraft(ctx: ModuleContext, draftId: string) {
+  const d = await draftForApproval(ctx, draftId);
+  if (!d) throw new CloudError('This email draft is no longer waiting to be sent.', 409);
+  return sendDraft(ctx, d.id, true, d.revision);
 }

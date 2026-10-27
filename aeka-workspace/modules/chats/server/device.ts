@@ -425,6 +425,8 @@ export const ALERT_OF: Record<string, AlertKind> = {
   'chats.action': 'actions',
   followup: 'actions',
   'chats.nudge': 'chats',
+  'agent.report': 'agents',
+  'agent.approval': 'agents',
   'todo.due': 'todos',
   'todo.critical': 'todos',
   reminder: 'reminders',

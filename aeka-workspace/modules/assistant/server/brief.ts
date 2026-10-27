@@ -2,6 +2,7 @@
 // reminders and deadlines, with a few counted observations (Patterns). Sections with nothing in them
 // are left out; the short sections show at most 5 lines.
 import type { ModuleContext } from '../../../core/server/module.ts';
+import { approvalsWaiting } from '../../agents/server/service.ts';
 import { chatsNeedingMe } from '../../chats/server/service.ts';
 import { followUps, mailConnected, mailCounts, mailQueue } from '../../mail/server/service.ts';
 import type { FollowUp } from '../../mail/shared/types.ts';
@@ -181,6 +182,14 @@ export async function buildBrief(ctx: ModuleContext, fresh = false): Promise<Bri
           ? [{ text: `and ${chats.total - (MAX_LINES - 1)} more`, link: 'chats/inbox' }]
           : []),
       ],
+    });
+
+  // Actions agents prepared that wait for my approval.
+  const approvals = (await attempt(() => approvalsWaiting(ctx, MAX_LINES))) ?? [];
+  if (approvals.length)
+    sections.push({
+      title: 'Waiting for your approval',
+      lines: approvals.map((a) => ({ text: `${a.title} (${a.agentName})`, link: 'agents/home' })),
     });
 
   const follow = (await attempt(() => followUps(ctx, undefined, 30))) ?? [];
