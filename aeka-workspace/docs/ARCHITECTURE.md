@@ -22,9 +22,12 @@ aeka-workspace/
     workflow/ manifest.ts, shared/ (types and action contract), server/ (actions), ui/ (pages)
     mail/     Outlook triage, drafts and sending (same layout; server/service.ts for other modules)
     assistant/ chat with tools, to-dos, reminders, memory, brief, WhatsApp (same layout)
+    chats/    phone notifications (WhatsApp, LinkedIn, SMS, Teams, Slack, Gmail): triage, nudges,
+              drafts; server/device.ts is the Android app's API (POST /api/device)
   app/        the shell (app/page.tsx), API routes, styles
   lib/        Scribe libraries (notes, transcription, AI) shared by web and desktop
   desktop/    Windows companion app (Aeka Scribe), which loads the same shell
+  android/    Android app (Aeka): notification reader and the same shell in a WebView
   db/, drizzle/  database schema and migrations (one migration per change, never edited once deployed)
 ```
 
@@ -56,8 +59,8 @@ aeka-workspace/
   than breaking the page. Slots today: `scribe.note` (under the title of an open note).
 - **Hand-over.** To open a record in another module, call `handOver(key, value)` from
   `core/client/handover.ts` and navigate; the receiving module reads it once. Keys today:
-  `workflow.matter` (a mandate and tab), `scribe.note` (one of the user's notes) and `mail.item` (one
-  of the user's emails).
+  `workflow.matter` (a mandate and tab), `scribe.note` (one of the user's notes), `mail.item` (one
+  of the user's emails) and `chats.thread` (one of the user's chats).
 - **Services.** Server code of one module may import another module's `server/` service, never its
   tables or its action handlers.
 

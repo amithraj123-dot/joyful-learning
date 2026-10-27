@@ -78,6 +78,13 @@
       "when": 1793066967453,
       "tag": "0010_todo_repeat_day",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1793068247599,
+      "tag": "0011_chats",
+      "breakpoints": true
     }
   ]
 }

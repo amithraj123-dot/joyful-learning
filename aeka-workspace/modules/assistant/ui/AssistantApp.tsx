@@ -83,6 +83,7 @@ export default function AssistantApp({ page, navigate, notify }: ModuleViewProps
     if (ref && target === 'workflow/matters') handOver('workflow.matter', { matterId: ref });
     if (ref && (target === 'notes' || target === 'meetings')) handOver('scribe.note', { noteId: ref });
     if (ref && target.startsWith('mail/')) handOver('mail.item', { itemId: ref });
+    if (ref && target.startsWith('chats/')) handOver('chats.thread', { threadId: ref });
     shell.current.navigate(target);
   }, []);
 

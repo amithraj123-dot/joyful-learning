@@ -4,6 +4,7 @@
 import { CloudError } from '../../../lib/cloud-store.ts';
 import type { ToolSchema } from '../../../core/server/ai.ts';
 import type { ModuleContext } from '../../../core/server/module.ts';
+import { chatsNeedingMe } from '../../chats/server/service.ts';
 import { searchOwnNotes } from '../../scribe/server/notes.ts';
 import {
   calendarStatus,
@@ -558,6 +559,31 @@ export const TOOLS: Record<string, Tool> = {
         },
         summary: `Checked follow-ups${kind ? ` (${kind})` : ''}: ${items.length} found`,
         ref: 'mail/followups',
+      };
+    },
+  },
+  phone_chats: {
+    description:
+      "Chats read from the member's phone (WhatsApp, WhatsApp Business, LinkedIn, Gmail, SMS, Teams, Slack) that are waiting for the member's reply, most pressing first. Replies are drafted and sent from Chats on the phone, never from here.",
+    fields: {},
+    run: async ({ ctx }) => {
+      const { total, chats } = (await attempt(() => chatsNeedingMe(ctx, 15))) ?? { total: 0, chats: [] };
+      return {
+        result: {
+          note: UNTRUSTED,
+          total,
+          chats: chats.map((c) => ({
+            chat: c.title,
+            app: c.app,
+            tier: c.tier,
+            waiting: c.waitingFor || null,
+            vip: c.vip,
+            // A chat kept from AI is listed without its content.
+            about: c.keptFromAi ? '(kept from AI)' : clip(c.summary, 200),
+          })),
+        },
+        summary: `Checked chats from the phone: ${total} waiting for a reply`,
+        ref: 'chats/inbox',
       };
     },
   },

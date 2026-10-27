@@ -5,7 +5,8 @@
 export type TodoStatus = 'open' | 'doing' | 'done';
 export type TodoPriority = 'normal' | 'high';
 // mail: an ask in an email; commitment: a promise in my sent mail; meeting: a Scribe action item.
-export type TodoSource = 'manual' | 'chat' | 'whatsapp' | 'mail' | 'commitment' | 'meeting';
+// phone: a chat read from the member's phone (module chats).
+export type TodoSource = 'manual' | 'chat' | 'whatsapp' | 'mail' | 'commitment' | 'meeting' | 'phone';
 export const TODO_REPEATS = ['none', 'daily', 'weekly', 'fortnightly', 'monthly'] as const;
 export type TodoRepeat = (typeof TODO_REPEATS)[number];
 export interface Todo {

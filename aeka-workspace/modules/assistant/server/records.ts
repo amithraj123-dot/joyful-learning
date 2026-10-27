@@ -218,7 +218,7 @@ export async function createTodo(
 export async function createSourcedTodo(
   ctx: ModuleContext,
   input: TodoInput,
-  source: 'mail' | 'commitment' | 'meeting',
+  source: 'mail' | 'commitment' | 'meeting' | 'phone',
   sourceRef: string,
   sourceLabel: string,
 ) {
@@ -355,12 +355,12 @@ export async function deleteTodo(ctx: ModuleContext, id: unknown) {
     ctx.db
       .prepare(
         `UPDATE as_todos SET status = 'done', done_at = coalesce(done_at, ?), task_id = ?, updated_at = ?, revision = revision + 1
-         WHERE id = ? AND member = ? AND source IN ('mail','commitment','meeting') AND source_ref != '' AND ${VISIBLE}`,
+         WHERE id = ? AND member = ? AND source IN ('mail','commitment','meeting','phone') AND source_ref != '' AND ${VISIBLE}`,
       )
       .bind(ctx.now, DISMISSED + ctx.now, ctx.now, key, owner(ctx)),
     ctx.db
       .prepare(
-        `DELETE FROM as_todos WHERE id = ? AND member = ? AND NOT (source IN ('mail','commitment','meeting') AND source_ref != '')`,
+        `DELETE FROM as_todos WHERE id = ? AND member = ? AND NOT (source IN ('mail','commitment','meeting','phone') AND source_ref != '')`,
       )
       .bind(key, owner(ctx)),
   ]);

@@ -652,3 +652,122 @@ export const asOutbox = sqliteTable(
   },
   (t) => [index('as_outbox_status').on(t.status, t.createdAt), index('as_outbox_provider').on(t.providerId)],
 );
+
+// ---------- Chats: messages read from the member's phone notifications (Aeka for Android) ----------
+
+// Phones connected with a pairing code. The device token is stored only as a SHA-256 hash.
+export const chDevices = sqliteTable(
+  'ch_devices',
+  {
+    id: text('id').primaryKey(),
+    member: text('member').notNull(),
+    name: text('name').notNull(),
+    model: text('model').notNull(),
+    appVersion: text('app_version').notNull(),
+    android: integer('android').notNull(),
+    secretHash: text('secret_hash').notNull(),
+    accessJson: text('access_json').notNull().default(''), // notification access, battery, as last reported
+    createdAt: integer('created_at').notNull(),
+    lastSeenAt: integer('last_seen_at'),
+    revokedAt: integer('revoked_at'),
+  },
+  (t) => [index('ch_devices_member').on(t.member)],
+);
+// One-time pairing codes (hash only), valid 10 minutes.
+export const chPairings = sqliteTable('ch_pairings', {
+  codeHash: text('code_hash').primaryKey(),
+  member: text('member').notNull(),
+  createdAt: integer('created_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+  usedAt: integer('used_at'),
+});
+// One row per chat (an app's conversation), with its triage and reply state.
+export const chThreads = sqliteTable(
+  'ch_threads',
+  {
+    id: text('id').primaryKey(),
+    member: text('member').notNull(),
+    app: text('app').notNull(),
+    chatKey: text('chat_key').notNull(),
+    title: text('title').notNull(),
+    isGroup: integer('is_group').notNull().default(0),
+    address: text('address').notNull().default(''),
+    lastInAt: integer('last_in_at'),
+    lastInSender: text('last_in_sender').notNull().default(''),
+    lastInText: text('last_in_text').notNull().default(''), // first 200 characters
+    lastOutAt: integer('last_out_at'),
+    waitingSince: integer('waiting_since'), // first message after my last reply
+    unanswered: integer('unanswered').notNull().default(0),
+    seenAt: integer('seen_at'),
+    doneAt: integer('done_at'), // done while done_at >= last_in_at
+    snoozedUntil: integer('snoozed_until'),
+    muted: integer('muted').notNull().default(0),
+    neverAi: integer('never_ai').notNull().default(0),
+    vip: integer('vip').notNull().default(0),
+    live: integer('live').notNull().default(0),
+    triageStatus: text('triage_status').notNull().default('none'), // none | pending | done | failed | skipped
+    triageSource: text('triage_source').notNull().default('rules'),
+    tier: integer('tier').notNull().default(3),
+    category: text('category').notNull().default('unknown'),
+    replyNeeded: text('reply_needed').notNull().default('no'),
+    summary: text('summary').notNull().default(''),
+    why: text('why').notNull().default(''),
+    replyBy: text('reply_by'),
+    model: text('model').notNull().default(''),
+    triagedUpto: integer('triaged_upto').notNull().default(0), // newest message time the triage saw
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: integer('next_attempt_at').notNull().default(0),
+    nudgeLevel: integer('nudge_level').notNull().default(0), // for the current wait
+    urgentAlerted: integer('urgent_alerted').notNull().default(0), // waiting_since of the last urgent alert
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    revision: integer('revision').notNull().default(1),
+  },
+  (t) => [
+    uniqueIndex('ch_threads_chat').on(t.member, t.chatKey),
+    index('ch_threads_recent').on(t.member, t.lastInAt),
+    index('ch_threads_triage').on(t.member, t.triageStatus, t.nextAttemptAt),
+  ],
+);
+// Messages, kept for 30 days. The phone's message id (a hash) makes each message stored once.
+export const chMessages = sqliteTable(
+  'ch_messages',
+  {
+    id: text('id').primaryKey(),
+    member: text('member').notNull(),
+    threadId: text('thread_id').notNull(),
+    msgHash: text('msg_hash').notNull(),
+    sender: text('sender').notNull(),
+    fromMe: integer('from_me').notNull().default(0),
+    text: text('text').notNull(),
+    at: integer('at').notNull(),
+    receivedAt: integer('received_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('ch_messages_hash').on(t.member, t.msgHash),
+    index('ch_messages_thread').on(t.threadId, t.at),
+    index('ch_messages_age').on(t.receivedAt),
+  ],
+);
+export const chDrafts = sqliteTable(
+  'ch_drafts',
+  {
+    id: text('id').primaryKey(),
+    member: text('member').notNull(),
+    threadId: text('thread_id').notNull(),
+    text: text('text').notNull(),
+    status: text('status').notNull(), // draft | sent | discarded
+    how: text('how'), // notification | manual
+    model: text('model').notNull().default(''),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    sentAt: integer('sent_at'),
+    revision: integer('revision').notNull().default(1),
+  },
+  (t) => [index('ch_drafts_thread').on(t.member, t.threadId, t.status)],
+);
+export const chSettings = sqliteTable('ch_settings', {
+  member: text('member').primaryKey(),
+  settingsJson: text('settings_json').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});

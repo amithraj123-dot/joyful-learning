@@ -10,6 +10,7 @@ steps for adding a module are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | ------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Assistant** | Web (and WhatsApp) | A personal executive assistant: Ask Aeka chat, a morning brief with calendar, follow-ups and patterns, meeting preparation, schedule health, natural-language to-dos with lists, repeats and a board, reminders, notifications, memory, and an optional WhatsApp channel |
 | **Mail**      | Web                | Outlook inbox triage by priority and handling, "Draft a reply?" on request only, reviewed sending, follow-ups and commitments, VIPs and archiving, a learned writing style, rules learned from corrections, emails turned into Workflow tasks                            |
+| **Chats**     | Web and Android    | WhatsApp, WhatsApp Business, LinkedIn, Gmail, SMS, Teams and Slack messages read from the phone's notifications by the Aeka Android app, triaged like email, with nudges to reply, quiet hours, drafts on request and Send through WhatsApp's own notification reply     |
 | **Workflow**  | Web                | Clients and mandates, tasks with maker-checker sign-off, deadlines, the deal tracker, engagements and billing, timesheets with export, team access, meeting notes linked from Scribe, and import from the earlier Google Sheet workflow app                              |
 | **Scribe**    | Web and Windows    | Dictation, meeting capture, notes, summaries, sharing and Ask your notes                                                                                                                                                                                                 |
 
@@ -24,6 +25,10 @@ The setup guide and feature status are in [`public/desktop-guide.html`](public/d
 [`desktop/admin/ADMIN-SETUP.txt`](desktop/admin/ADMIN-SETUP.txt). Reviews: [`docs/REVIEW-0.6.md`](docs/REVIEW-0.6.md)
 (Scribe), [`docs/REVIEW-0.7.md`](docs/REVIEW-0.7.md) (Workflow) and [`docs/REVIEW-0.8.md`](docs/REVIEW-0.8.md)
 (Assistant and Mail); comparison with alfred_: [`docs/ALFRED-PARITY.md`](docs/ALFRED-PARITY.md). Setting up Mail and the Assistant: [`docs/SETUP-ASSISTANT-MAIL.md`](docs/SETUP-ASSISTANT-MAIL.md).
+
+The Android app (`android/`, Kotlin) is named **Aeka**: it reads notifications from the chosen apps,
+sends them to Chats and shows the workspace. Build, install and setup: [`android/README.md`](android/README.md);
+the phone and workspace protocol: [`docs/ANDROID-PROTOCOL.md`](docs/ANDROID-PROTOCOL.md).
 
 ## Development
 

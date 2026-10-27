@@ -103,6 +103,19 @@ In the Meta dashboard set the webhook to `https://<workspace address>/api/whatsa
 token, and subscribe to `messages`. Each member links their own number under **Assistant settings**
 by sending the code shown there; STOP unlinks it. Only text messages are handled.
 
-## 6. Deploying
+## 6. Chats and the Android app
 
-Apply migrations `0006` to `0010` to the hosted database before deploying this version.
+Chats needs no new secret: it uses the firm AI service (section 2) and the background scheduler. The
+Aeka Android app is built by GitHub Actions (artifact `aeka-android-debug`) and installed on each
+phone by hand; see [`android/README.md`](../android/README.md). Each member connects their own phone
+from **Chats, Phone app**; the phone receives its own device key, stored in the workspace only as a
+hash, which the member or a new pairing can revoke at any time.
+
+What leaves the phone: the text, sender, chat name and time of each notification from the apps the
+member switched on (bank one-time passwords are dropped on the phone). What is sent to AI: the last
+12 messages of a chat with something new, unless the member keeps that chat from AI or switches AI
+triage off. Messages are deleted from the workspace after 30 days.
+
+## 7. Deploying
+
+Apply migrations `0006` to `0011` to the hosted database before deploying this version.

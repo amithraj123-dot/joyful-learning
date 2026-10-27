@@ -2,6 +2,7 @@
 // reminders and deadlines, with a few counted observations (Patterns). Sections with nothing in them
 // are left out; the short sections show at most 5 lines.
 import type { ModuleContext } from '../../../core/server/module.ts';
+import { chatsNeedingMe } from '../../chats/server/service.ts';
 import { followUps, mailConnected, mailCounts, mailQueue } from '../../mail/server/service.ts';
 import type { FollowUp } from '../../mail/shared/types.ts';
 import { myOpenTasks, upcomingDeadlines } from '../../workflow/server/services.ts';
@@ -165,6 +166,22 @@ export async function buildBrief(ctx: ModuleContext, fresh = false): Promise<Bri
 
   const mail = await mailSection(ctx);
   if (mail.length) sections.push({ title: 'Needs you in mail', lines: mail });
+
+  // Chats read from the phone (WhatsApp and others) waiting for my reply, longest wait first by tier.
+  const chats = await attempt(() => chatsNeedingMe(ctx, MAX_LINES));
+  if (chats?.total)
+    sections.push({
+      title: 'Chats waiting for your reply',
+      lines: [
+        ...chats.chats.slice(0, chats.total > MAX_LINES ? MAX_LINES - 1 : MAX_LINES).map((c) => ({
+          text: `${c.title} (${c.app}${c.waitingFor ? `, ${c.waitingFor}` : ''}): ${c.summary}`,
+          link: c.link,
+        })),
+        ...(chats.total > MAX_LINES
+          ? [{ text: `and ${chats.total - (MAX_LINES - 1)} more`, link: 'chats/inbox' }]
+          : []),
+      ],
+    });
 
   const follow = (await attempt(() => followUps(ctx, undefined, 30))) ?? [];
   const followLines = followUpLines(follow);

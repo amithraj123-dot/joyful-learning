@@ -49,6 +49,7 @@ import {
 import { useRecorder } from '../hooks/use-recorder';
 import { isDesktop, runtime } from '../lib/desktop-runtime';
 import { WorkspacePanel } from '../components/workspace-panel';
+import { handOverLink } from '../core/client/handover';
 import { findPage, modulesFor } from '../core/client/registry';
 // Page ids come from module manifests (core/client/registry.ts); Scribe ids are unprefixed.
 type Page = string;
@@ -253,15 +254,29 @@ export default function AekaScribe() {
     try {
       // A link such as /?page=mail/connect (for example after Outlook sign-in) opens that page once.
       const url = new URL(window.location.href);
-      const wanted = url.searchParams.get('page');
-      if (wanted) {
+      const linked = url.searchParams.get('page');
+      // A record id after the page (/?page=chats/inbox#<id>, from a phone nudge) opens that record.
+      const wanted = linked ? handOverLink(linked + (url.hash.length > 1 ? url.hash : '')) : null;
+      if (linked) {
         url.searchParams.delete('page');
-        window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+        window.history.replaceState(null, '', url.pathname + url.search);
       }
       const last = wanted || localStorage.getItem('aeka-workspace-page');
       const found = last && findPage(last);
       if (found && found.module.surfaces.includes('web')) setPage(last);
     } catch {}
+  }, []);
+  // Inside the Aeka Android app: a nudge the member tapped opens its page and record.
+  useEffect(() => {
+    const onAndroid = (e: Event) => {
+      const d = (e as CustomEvent).detail as { type?: string; link?: string } | undefined;
+      if (d?.type !== 'open' || typeof d.link !== 'string') return;
+      const target = handOverLink(d.link);
+      const found = findPage(target);
+      if (found && found.module.surfaces.includes('web')) choosePage(target as Page);
+    };
+    window.addEventListener('aeka-android', onAndroid);
+    return () => window.removeEventListener('aeka-android', onAndroid);
   }, []);
   const start = (style?: Style) => {
     if (meetingBusy) {

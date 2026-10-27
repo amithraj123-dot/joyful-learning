@@ -31,7 +31,7 @@ export async function addTodoFrom(
     dueAt?: number | null;
     priority?: 'normal' | 'high';
     list?: string;
-    source: 'mail' | 'commitment' | 'meeting';
+    source: 'mail' | 'commitment' | 'meeting' | 'phone';
     sourceRef: string;
     sourceLabel: string;
   },
@@ -42,7 +42,7 @@ export async function addTodoFrom(
   const title = one(input.title, LIMITS.title);
   const sourceRef = typeof input.sourceRef === 'string' ? input.sourceRef.trim().slice(0, 200) : '';
   if (!title) throw new CloudError('A to-do needs a title.');
-  if (!['mail', 'commitment', 'meeting'].includes(input.source) || !sourceRef)
+  if (!['mail', 'commitment', 'meeting', 'phone'].includes(input.source) || !sourceRef)
     throw new CloudError('A to-do from another module needs its source.');
   let dueAt: number | null = null;
   try {

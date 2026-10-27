@@ -15,6 +15,7 @@ import {
   Pencil,
   Repeat2,
   RotateCcw,
+  Smartphone,
   Star,
   Tag,
   Trash2,
@@ -114,6 +115,13 @@ function sourceOf(t: Todo) {
         text: 'From a meeting' + label,
         link: ref ? 'notes#' + ref.split(':')[0] : '',
         what: 'meeting note',
+      };
+    case 'phone':
+      return {
+        icon: Smartphone,
+        text: 'From a chat' + label,
+        link: ref ? 'chats/inbox#' + ref.split(':')[0] : '',
+        what: 'chat',
       };
     case 'chat':
       return { icon: MessageSquareText, text: 'From Ask Aeka', link: '', what: '' };
@@ -463,7 +471,11 @@ interface ItemActions {
 
 function DeleteButton({ todo, onDelete }: { todo: Todo; onDelete: ItemActions['onDelete'] }) {
   // A to-do from an email or a meeting is dismissed, so it is not added again.
-  const sourced = todo.source === 'mail' || todo.source === 'commitment' || todo.source === 'meeting';
+  const sourced =
+    todo.source === 'mail' ||
+    todo.source === 'commitment' ||
+    todo.source === 'meeting' ||
+    todo.source === 'phone';
   return (
     <ConfirmButton
       className="wf-icon-btn as-tap"
