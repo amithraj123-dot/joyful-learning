@@ -1,0 +1,9 @@
+# Build outputs and local state. The Gradle wrapper JAR and the development keystore
+# (keystore/aeka-debug.keystore) are tracked on purpose.
+.gradle/
+.kotlin/
+build/
+local.properties
+*.iml
+.idea/
+captures/

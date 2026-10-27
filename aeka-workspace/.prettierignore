@@ -12,3 +12,6 @@ public/pdf.worker.min.mjs
 vendor
 drizzle
 components/ui
+android/.gradle
+android/.kotlin
+android/**/build

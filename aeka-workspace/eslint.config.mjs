@@ -22,6 +22,10 @@ const eslintConfig = defineConfig([
     'desktop/generated/**',
     '**/pdf.worker.min.mjs',
     'vendor/**',
+    // Android app: Gradle outputs and caches (test reports contain JavaScript).
+    'android/**/build/**',
+    'android/.gradle/**',
+    'android/.kotlin/**',
   ]),
   {
     // Electron main/preload files are CommonJS by design.
