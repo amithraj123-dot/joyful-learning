@@ -112,3 +112,18 @@ export async function freeTime(
   const events = await eventsBetween(ctx, start, start + 24 * 3600000, true);
   return freeSlots(events, start, minutes, hours, ctx.now);
 }
+
+// ---- Follow-ups and correspondence (SIGNATURES FIXED; implemented by the mail server work) ----
+
+// My follow-ups (see FollowUp in shared/types.ts), most pressing first. Not snoozed or done ones.
+export async function followUps(
+  _ctx: ModuleContext,
+  _kind?: import('../shared/types.ts').FollowUpKind,
+  _limit = 20,
+): Promise<import('../shared/types.ts').FollowUp[]> {
+  throw new Error('Mail service not implemented yet.');
+}
+// My most recent emails received from or sent to any of these addresses (lower case), newest first.
+export async function mailWith(_ctx: ModuleContext, _addresses: string[], _limit = 8): Promise<MailItem[]> {
+  throw new Error('Mail service not implemented yet.');
+}

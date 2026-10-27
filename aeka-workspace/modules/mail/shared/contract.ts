@@ -22,6 +22,8 @@ import type {
   Address,
   Category,
   Draft,
+  FollowUp,
+  FollowUpKind,
   Handling,
   MailAccount,
   MailItem,
@@ -31,6 +33,7 @@ import type {
   PersonKey,
   QueueCounts,
   RuleEffect,
+  StyleProfile,
   Tier,
   Triage,
 } from './types';
@@ -104,6 +107,36 @@ export interface MailActions {
   // recipients are empty. `confirm` must be true (the browser asks first).
   'draft.send': { payload: { draftId: string; confirm: true } & Rev; result: Draft };
   'draft.discard': { payload: { draftId: string } & Rev; result: true };
+
+  // Moves my emails to Outlook's Archive folder (and out of the triage views). At most 100 at a time.
+  'message.archive': { payload: { ids: string[] }; result: { archived: number } };
+
+  // Follow-ups (see FollowUp). Computed from stored mail; no AI.
+  'followups.list': { payload: { kind?: FollowUpKind }; result: FollowUp[] };
+  // Snooze a waiting thread (days 1 to 30), mark it done, or clear both.
+  'followups.update': {
+    payload: {
+      conversationId: string;
+      kind: FollowUpKind;
+      action: 'snooze' | 'done' | 'reopen';
+      days?: number;
+    };
+    result: true;
+  };
+  // A polite follow-up draft to the people I am waiting on (AI, on request); reviewed and sent like any
+  // other draft.
+  'followups.draftNudge': { payload: { conversationId: string; instructions?: string }; result: Draft };
+
+  // Writing style: learn proposes a profile from up to 40 of my recent sent emails (one AI call).
+  'style.get': { payload: Record<string, never>; result: StyleProfile | null };
+  'style.learn': { payload: Record<string, never>; result: StyleProfile };
+  'style.save': {
+    payload: {
+      profile: Pick<StyleProfile, 'greeting' | 'signOff' | 'tone' | 'notes'>;
+      status: 'active' | 'rejected';
+    };
+    result: StyleProfile;
+  };
 
   'rules.list': { payload: Record<string, never>; result: MailRule[] };
   'rules.save': {

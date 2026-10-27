@@ -125,6 +125,10 @@ export interface MailItem {
   threadCount: number;
   triage: Triage | null;
   draft: DraftSummary | null; // the latest non-discarded draft
+  vip: boolean; // the sender (or their domain) is one of my VIPs
+  chased: number; // messages from this sender in the thread since my last reply (2+ means a chaser)
+  // For meeting invitations: the meetings it clashes with in my calendar, e.g. "Partners meeting, 11:30 am".
+  meetingClash: string | null;
 }
 export interface MailMessage extends MailItem {
   bodyText: string;
@@ -160,6 +164,13 @@ export interface QueueCounts {
 export interface AccountSettings {
   aiTriage: boolean; // false: built-in rules only, no email content sent to AI
   alertUrgent: boolean; // notify (and WhatsApp, if linked) for tier 1 mail
+  // Move low-priority bulk mail (newsletters, notifications) to Outlook's Archive folder after
+  // triage. Off by default; never applied to mail from VIPs or mail linked to a mandate.
+  archiveNoise: boolean;
+  // Add what urgent and important mail asks of me to my to-dos, linked to the email.
+  autoTodos: boolean;
+  // Find promises in my own sent mail ("I will send the note by Friday") and add them as to-dos.
+  trackCommitments: boolean;
 }
 // Calendar access for the connected account: ready; needs_consent (connected before calendar access
 // was added, or the permission was not granted: reconnect to allow it); pending (not read yet); error.
@@ -182,6 +193,9 @@ export interface RuleEffect {
   handling?: Handling;
   matterId?: string;
   neverAi?: boolean; // never send this sender's mail to AI (confidential)
+  // An important contact: their mail is never archived, is at least Important (tier 2) and is
+  // marked in the inbox. Being a VIP alone never makes an email Urgent.
+  vip?: boolean;
 }
 export interface MailRule {
   id: string;
@@ -221,3 +235,32 @@ export interface CalendarEvent {
 // Counts as busy time: not cancelled, not declined, not marked free.
 export const isBusy = (e: Pick<CalendarEvent, 'cancelled' | 'response' | 'showAs'>) =>
   !e.cancelled && e.response !== 'declined' && e.showAs !== 'free' && e.showAs !== 'workingElsewhere';
+
+// Follow-ups. waiting: I wrote last and the other side has not answered (oldest first by level);
+// chasing: someone has written more than once since my last reply.
+export type FollowUpKind = 'waiting' | 'chasing';
+export interface FollowUp {
+  conversationId: string;
+  kind: FollowUpKind;
+  subject: string;
+  counterpart: Address; // whom I am waiting on, or who is chasing me
+  since: number; // waiting: when I last wrote; chasing: their first unanswered message
+  ageDays: number; // whole days since `since`, India time
+  // Escalation. waiting: 1 after 2 days, 2 after 5, 3 after 10. chasing: unanswered messages (capped at 3).
+  level: 1 | 2 | 3;
+  count: number; // waiting: my messages without an answer; chasing: their unanswered messages
+  mailId: string; // waiting: my last sent message; chasing: their latest message (open it in Mail)
+  matterLabel: string; // a mandate linked to the counterpart, if any
+  snoozedUntil: number | null;
+}
+
+// The member's writing style, learned from their sent mail; used for every draft once accepted.
+export interface StyleProfile {
+  greeting: string; // e.g. "Dear {first name},"
+  signOff: string; // e.g. "Regards,\nAmith"
+  tone: string; // one or two sentences
+  notes: string[]; // up to 10 short observations, e.g. "Short paragraphs; numbers in lakh and crore"
+  sampleCount: number;
+  status: 'proposed' | 'active' | 'rejected';
+  updatedAt: number;
+}

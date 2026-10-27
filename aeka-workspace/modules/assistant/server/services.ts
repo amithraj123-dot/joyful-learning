@@ -13,3 +13,23 @@ export async function styleNotes(ctx: ModuleContext): Promise<string[]> {
     .all<{ title: string; content: string }>();
   return r.results.map((m) => `${m.title}: ${m.content}`.slice(0, 600));
 }
+
+// Adds a to-do for the caller from another module's item (an email ask, a commitment in sent mail, a
+// meeting action item), once per (source, sourceRef): returns null when it already exists (even if
+// done or deleted since, so a removed item is not re-created). SIGNATURE FIXED; implemented by the
+// assistant server work.
+export async function addTodoFrom(
+  _ctx: ModuleContext,
+  _input: {
+    title: string;
+    details?: string;
+    dueAt?: number | null;
+    priority?: 'normal' | 'high';
+    list?: string;
+    source: 'mail' | 'commitment' | 'meeting';
+    sourceRef: string;
+    sourceLabel: string;
+  },
+): Promise<import('../shared/types.ts').Todo | null> {
+  throw new Error('Assistant service not implemented yet.');
+}

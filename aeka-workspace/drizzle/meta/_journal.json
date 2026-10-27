@@ -64,6 +64,13 @@
       "when": 1793038184544,
       "tag": "0008_calendar",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793064414259,
+      "tag": "0009_alfred_parity",
+      "breakpoints": true
     }
   ]
 }

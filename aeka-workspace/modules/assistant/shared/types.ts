@@ -2,9 +2,12 @@
 // a morning brief and an optional WhatsApp channel). Everything is private to the member.
 // Times are milliseconds; recurrence is computed in India time (Asia/Kolkata, no daylight saving).
 
-export type TodoStatus = 'open' | 'done';
+export type TodoStatus = 'open' | 'doing' | 'done';
 export type TodoPriority = 'normal' | 'high';
-export type TodoSource = 'manual' | 'chat' | 'whatsapp' | 'mail';
+// mail: an ask in an email; commitment: a promise in my sent mail; meeting: a Scribe action item.
+export type TodoSource = 'manual' | 'chat' | 'whatsapp' | 'mail' | 'commitment' | 'meeting';
+export const TODO_REPEATS = ['none', 'daily', 'weekly', 'fortnightly', 'monthly'] as const;
+export type TodoRepeat = (typeof TODO_REPEATS)[number];
 export interface Todo {
   id: string;
   title: string;
@@ -13,7 +16,12 @@ export interface Todo {
   priority: TodoPriority;
   dueAt: number | null;
   source: TodoSource;
-  sourceRef: string; // e.g. a mail item id
+  sourceRef: string; // mail: "<mail item id>"; commitment: "<sent mail id>:<n>"; meeting: "<note id>:<action id>"
+  sourceLabel: string; // e.g. the email subject or the meeting title, for the source badge
+  list: string; // a list label, e.g. "Falcon"; '' for none
+  repeat: TodoRepeat; // completing a repeating to-do creates the next one
+  stale: boolean; // open for more than 7 days without a due date
+  critical: boolean; // 3 or more days overdue
   taskId: string | null; // set when moved to a Workflow task
   createdAt: number;
   updatedAt: number;
@@ -113,4 +121,52 @@ export interface WhatsAppStatus {
   linked: boolean;
   phoneMasked: string;
   replyWindowOpen: boolean; // free-form replies allowed (24 hours since the member last wrote)
+}
+
+// Preparation for one meeting, assembled without AI (an AI summary is made only on request).
+export interface MeetingPrepPerson {
+  name: string;
+  address: string;
+  colleague: boolean; // a member of the firm
+  lastMail: { mailId: string; subject: string; at: number } | null; // the latest email with them
+  waitingOnThem: boolean;
+  chasingMe: boolean;
+}
+export interface MeetingPrep {
+  event: {
+    id: string;
+    subject: string;
+    start: number;
+    end: number;
+    allDay: boolean;
+    place: string; // location, or "Online"
+    onlineUrl: string;
+    webLink: string;
+  };
+  people: MeetingPrepPerson[]; // other attendees, external first, at most 15
+  mandate: {
+    matterId: string;
+    label: string;
+    openTasks: { title: string; dueDate: string | null; assignee: string | null }[];
+    deadlines: { title: string; dueDate: string }[];
+  } | null;
+  recentMail: { mailId: string; subject: string; from: string; at: number; why: string }[]; // up to 8
+  notes: { noteId: string; title: string; at: number; snippet: string }[]; // my Scribe notes about it
+  todos: { id: string; title: string; dueAt: number | null }[]; // my open to-dos on the same list
+  summary: { text: string; at: number } | null; // AI briefing, if made
+}
+
+// How full a day is. score 0 to 100 (higher is healthier): 100, minus 12 per meeting hour beyond 3,
+// minus 15 per clash, minus 4 per back-to-back pair, plus up to 10 for the longest focus block (a full
+// 10 at 3 hours), clamped. label: 80+ Light, 60+ Balanced, 40+ Heavy, below 40 Overloaded.
+export interface DayHealth {
+  date: string; // YYYY-MM-DD, India time
+  meetings: number;
+  meetingMinutes: number; // busy, timed meetings within 09:30 to 19:00
+  focusMinutes: number; // free blocks of 60 minutes or more within 09:30 to 19:00
+  longestFocus: number;
+  clashes: number;
+  backToBack: number; // pairs with less than 5 minutes between them
+  score: number;
+  label: 'Light' | 'Balanced' | 'Heavy' | 'Overloaded';
 }

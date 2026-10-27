@@ -21,6 +21,8 @@
 import type {
   AssistantSettings,
   Brief,
+  DayHealth,
+  MeetingPrep,
   ChatMessage,
   Conversation,
   Memory,
@@ -33,7 +35,11 @@ import type {
 } from './types';
 
 type Rev = { baseRevision: number };
-export type TodoInput = Pick<Todo, 'title' | 'details' | 'priority' | 'dueAt'> & { status?: Todo['status'] };
+export type TodoInput = Pick<Todo, 'title' | 'details' | 'priority' | 'dueAt'> & {
+  status?: Todo['status'];
+  list?: string;
+  repeat?: Todo['repeat'];
+};
 export type ReminderInput = { title: string; dueAt: number; repeat: Repeat; status?: 'active' | 'paused' };
 export type MemoryInput = { category: MemoryCategory; title: string; content: string };
 
@@ -60,6 +66,14 @@ export interface AssistantActions {
     result: { todo: Todo; taskId: string };
   };
 
+  // Natural language: "Send Rahul the valuation note tomorrow 4pm #Falcon !" gives a to-do with a due
+  // time (India time), list "Falcon" and high priority; "every week" or "every month" sets repeat; a
+  // text that is only a time ("remind me at 6 pm to ...") still becomes a to-do with a due time.
+  // Parsed without AI; returns the to-do and how the text was read.
+  'todo.quickAdd': { payload: { text: string }; result: { todo: Todo; understood: string } };
+  // My own Scribe note's action items become to-dos (once each); the note stays private.
+  'notes.toTodos': { payload: { noteId: string }; result: { added: Todo[]; skipped: number } };
+
   // Reminders
   'reminders.list': { payload: Record<string, never>; result: Reminder[] };
   'reminder.create': { payload: { reminder: ReminderInput }; result: Reminder };
@@ -74,6 +88,34 @@ export interface AssistantActions {
 
   // Morning brief, assembled without AI from mail triage, tasks, to-dos, reminders and deadlines.
   'brief.get': { payload: Record<string, never>; result: Brief };
+
+  // Meetings and schedule (read only, from the Outlook calendar)
+  // My meetings from now to the end of the given number of days (1 to 7, default 2), not declined
+  // or cancelled, earliest first; calendar is the calendar status ('ready', 'needs_consent', ...).
+  'meetings.upcoming': {
+    payload: { days?: number };
+    result: {
+      calendar: string;
+      events: {
+        id: string;
+        subject: string;
+        start: number;
+        end: number;
+        allDay: boolean;
+        place: string;
+        matterLabel: string;
+        clash: boolean;
+      }[];
+    };
+  };
+  'meetings.prep': { payload: { eventId: string }; result: MeetingPrep };
+  // A short AI briefing from the prep pack (once per meeting occurrence; refresh replaces it).
+  'meetings.prepSummary': {
+    payload: { eventId: string; refresh?: boolean };
+    result: { text: string; at: number };
+  };
+  // Today and the next 6 days.
+  'schedule.week': { payload: Record<string, never>; result: { days: DayHealth[]; calendar: string } };
 
   // Settings and WhatsApp
   'settings.get': {

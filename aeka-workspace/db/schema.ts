@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { sqliteTable, text, integer, real, primaryKey, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 export const workspaceNotes = sqliteTable(
   'workspace_notes',
@@ -362,6 +363,27 @@ export const mailEvents = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.member, t.id] }), index('mail_events_start').on(t.member, t.startAt)],
 );
+// Mail: per-conversation follow-up state set by the member (snoozed or done).
+export const mailThreads = sqliteTable(
+  'mail_threads',
+  {
+    member: text('member').notNull(),
+    conversationId: text('conversation_id').notNull(),
+    waitingSnoozedUntil: integer('waiting_snoozed_until'),
+    waitingDone: integer('waiting_done').notNull().default(0),
+    chasingDone: integer('chasing_done').notNull().default(0),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.member, t.conversationId] })],
+);
+// Mail: the member's writing style, learned from their sent mail (proposed until they accept it).
+export const mailStyle = sqliteTable('mail_style', {
+  member: text('member').primaryKey(),
+  profile: text('profile').notNull(), // JSON StyleProfile
+  status: text('status').notNull(), // proposed | active | rejected
+  sampleCount: integer('sample_count').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
 // Mail: pending OAuth sign-ins (PKCE verifier sealed), kept for ten minutes.
 export const mailOauthStates = sqliteTable('mail_oauth_states', {
   state: text('state').primaryKey(),
@@ -390,6 +412,11 @@ export const mailMessages = sqliteTable(
     importance: text('importance').notNull(),
     isRead: integer('is_read').notNull(),
     bulk: integer('bulk').notNull(), // List-Unsubscribe / Precedence: bulk / Auto-Submitted
+    // Sent mail: when commitments were looked for (null: not yet).
+    commitmentsAt: integer('commitments_at'),
+    // Meeting invitations: the proposed meeting time, to check against the calendar.
+    meetingStart: integer('meeting_start'),
+    meetingEnd: integer('meeting_end'),
     webLink: text('web_link').notNull(),
     removedAt: integer('removed_at'),
     createdAt: integer('created_at').notNull(),
@@ -508,8 +535,30 @@ export const asTodos = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
     doneAt: integer('done_at'),
     revision: integer('revision').notNull(),
+    list: text('list').notNull().default(''), // a list label, e.g. "Falcon" from "#Falcon"
+    sourceLabel: text('source_label').notNull().default(''), // e.g. the email subject
+    repeat: text('repeat').notNull().default('none'), // none | daily | weekly | fortnightly | monthly
   },
-  (t) => [index('as_todos_member').on(t.member, t.status, t.dueAt)],
+  (t) => [
+    index('as_todos_member').on(t.member, t.status, t.dueAt),
+    // One to-do per source item (an email ask, a commitment, a meeting action item).
+    uniqueIndex('as_todos_source')
+      .on(t.member, t.source, t.sourceRef)
+      .where(sql`source_ref != ''`),
+  ],
+);
+// Meeting preparation summaries made by AI on request, kept per meeting occurrence.
+export const asMeetingPreps = sqliteTable(
+  'as_meeting_preps',
+  {
+    member: text('member').notNull(),
+    eventId: text('event_id').notNull(),
+    eventStart: integer('event_start').notNull(),
+    summary: text('summary').notNull(),
+    model: text('model').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.member, t.eventId, t.eventStart] })],
 );
 export const asReminders = sqliteTable(
   'as_reminders',
