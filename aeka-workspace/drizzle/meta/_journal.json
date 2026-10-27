@@ -1,0 +1,104 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1792377204568,
+      "tag": "0000_brown_tomorrow_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792388288075,
+      "tag": "0001_damp_yellow_claw",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792454058427,
+      "tag": "0002_lying_sauron",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792547065827,
+      "tag": "0003_colossal_pixie",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792839261516,
+      "tag": "0004_core_org",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792840174408,
+      "tag": "0005_workflow",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793017209726,
+      "tag": "0006_meeting_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793029626690,
+      "tag": "0007_assistant_mail",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793038184544,
+      "tag": "0008_calendar",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793064414259,
+      "tag": "0009_alfred_parity",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793066967453,
+      "tag": "0010_todo_repeat_day",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1793068247599,
+      "tag": "0011_chats",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793076749849,
+      "tag": "0012_agents",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1793086882153,
+      "tag": "0013_agents_limits",
+      "breakpoints": true
+    }
+  ]
+}

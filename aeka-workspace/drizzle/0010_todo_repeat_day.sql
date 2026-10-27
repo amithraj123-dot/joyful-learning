@@ -1,0 +1,1 @@
+ALTER TABLE `as_todos` ADD `repeat_day` integer DEFAULT 0 NOT NULL;

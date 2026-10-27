@@ -1,0 +1,243 @@
+// Tasks (with maker-checker sign-off) and milestones.
+import { CloudError } from '../../../lib/cloud-store.ts';
+import type { Member } from '../../../core/server/members.ts';
+import type { ModuleAction, ModuleContext } from '../../../core/server/module.ts';
+import { notify } from '../../../core/server/notifications.ts';
+import { SIGN_OFF_STATUSES, type Matter, type Milestone, type Task } from '../shared/types.ts';
+import { conflict, insert, milestones, remove, saveRevision, tasks, write } from './db.ts';
+import { loadPeople, type People } from './people.ts';
+import {
+  assertInsideWall,
+  forbidden,
+  isManager,
+  managerOnly,
+  me,
+  visibleChild,
+  visibleMatter,
+} from './permissions.ts';
+import { baseRevision, milestoneFields, obj, taskFields } from './validate.ts';
+
+const mayEdit = (m: Member, task: Task, matter: Matter) =>
+  isManager(m) || matter.team.includes(m.email) || task.assignee === m.email || task.createdBy === m.email;
+const mayDelete = (m: Member, task: Task) => isManager(m) || task.createdBy === m.email;
+
+// Validates a task and applies the sign-off rule. Assigning people never changes the matter team.
+async function taskInput(ctx: ModuleContext, people: People, value: unknown, current?: Task) {
+  const t = obj(value, 'task');
+  const matter = await visibleMatter(ctx, t.matterId);
+  const fields = taskFields(t);
+  const was = current ? [current.assignee, current.preparedBy, current.reviewedBy] : [];
+  const assignee = await people.optional(t.assignee, 'assignee', was);
+  const preparedBy = await people.optional(t.preparedBy, 'preparer', was);
+  const reviewedBy = await people.optional(t.reviewedBy, 'reviewer', was);
+  const moved = current?.matterId !== matter.id;
+  assertInsideWall(
+    people,
+    matter,
+    [assignee, preparedBy, reviewedBy].filter((k) => moved || !was.includes(k)),
+  );
+  const signOffChanged =
+    !current ||
+    current.status !== fields.status ||
+    current.preparedBy !== preparedBy ||
+    current.reviewedBy !== reviewedBy;
+  if (
+    SIGN_OFF_STATUSES.includes(fields.status) &&
+    preparedBy &&
+    signOffChanged &&
+    (!reviewedBy || reviewedBy === preparedBy)
+  )
+    throw new CloudError(
+      `Before this task is marked "${fields.status}", it must be reviewed by someone other than its preparer.`,
+    );
+  const reviewedAt = !reviewedBy ? null : reviewedBy === current?.reviewedBy ? current.reviewedAt : ctx.now;
+  return { matter, input: { ...fields, matterId: matter.id, assignee, preparedBy, reviewedBy, reviewedAt } };
+}
+
+async function findTask(ctx: ModuleContext, key: unknown, where = 'deleted_at IS NULL') {
+  const { record, matter } = await visibleChild(ctx, tasks, key, 'task', where);
+  return { task: record, matter };
+}
+
+async function milestoneInput(ctx: ModuleContext, value: unknown, current?: Milestone) {
+  const m = obj(value, 'milestone');
+  const matter = await visibleMatter(ctx, m.matterId);
+  const people = await loadPeople(ctx.db);
+  const owner = await people.optional(m.owner, 'owner', current ? [current.owner] : []);
+  const unchanged = owner === current?.owner && matter.id === current.matterId;
+  assertInsideWall(people, matter, unchanged ? [] : [owner]);
+  return { matter, input: { ...milestoneFields(m), matterId: matter.id, owner } };
+}
+
+// Tells a colleague that a task was assigned to them (not when they assign it to themselves). The notice
+// reaches their phone too. Only the assignee, who is inside any ethical wall, receives it.
+export async function notifyAssignee(
+  ctx: ModuleContext,
+  task: Task,
+  matter: Matter,
+  previous: string | null = null,
+) {
+  const to = task.assignee;
+  if (!to || to === previous || to === ctx.member?.email || task.deletedAt) return;
+  await notify(
+    ctx.db,
+    {
+      recipient: to,
+      module: 'workflow',
+      kind: 'task.assigned',
+      title: `New task: ${task.title}`.slice(0, 200),
+      body: `${ctx.member?.name ?? 'A colleague'} assigned it to you on ${matter.title}${task.dueDate ? `, due ${task.dueDate}` : ''}.`,
+      link: `workflow/matters#${matter.id}`,
+      dedupeKey: `task.assigned:${task.id}:${to}:${task.revision}`,
+    },
+    ctx.now,
+  );
+}
+
+// A new task, validated with the task rules, and the statement that inserts it. Callers run the
+// statement with write() (alone or with others) and record the activity.
+export async function newTask(ctx: ModuleContext, people: People, value: unknown, id = crypto.randomUUID()) {
+  const { matter, input } = await taskInput(ctx, people, value);
+  const task: Task = {
+    id,
+    ...input,
+    createdBy: me(ctx).email,
+    createdAt: ctx.now,
+    updatedAt: ctx.now,
+    revision: 1,
+    deletedAt: null,
+  };
+  return { task, matter, statement: insert(ctx.db, tasks, task) };
+}
+
+export const taskActions: Record<string, ModuleAction> = {
+  'task.create': {
+    handler: async (ctx, p) => {
+      const { task, matter, statement } = await newTask(ctx, await loadPeople(ctx.db), p.task);
+      await write(ctx.db, ctx.now, [statement]);
+      await ctx.log('task.created', task.id, `Created task "${task.title}" on ${matter.title}`);
+      await notifyAssignee(ctx, task, matter);
+      return task;
+    },
+  },
+  'task.update': {
+    handler: async (ctx, p) => {
+      const { task: current, matter: from } = await findTask(ctx, p.id);
+      if (!mayEdit(me(ctx), current, from))
+        throw forbidden('You may edit tasks on your matters, tasks assigned to you and tasks you created.');
+      const base = baseRevision(p);
+      if (current.revision !== base) throw conflict('task');
+      const { matter, input } = await taskInput(ctx, await loadPeople(ctx.db), p.task, current);
+      const task = { ...current, ...input, revision: base + 1, updatedAt: ctx.now };
+      await saveRevision(ctx.db, ctx.now, tasks, task, base, 'task');
+      const summary =
+        matter.id !== from.id
+          ? `Moved task "${task.title}" from ${from.title} to ${matter.title}`
+          : task.status !== current.status
+            ? `Marked task "${task.title}" on ${matter.title} as ${task.status}`
+            : `Updated task "${task.title}" on ${matter.title}`;
+      await ctx.log('task.updated', task.id, summary);
+      await notifyAssignee(ctx, task, matter, current.assignee);
+      return task;
+    },
+  },
+  'task.delete': {
+    handler: async (ctx, p) => {
+      const { task: current, matter } = await findTask(ctx, p.id);
+      if (!mayDelete(me(ctx), current))
+        throw forbidden('Only the creator of a task or a Manager and above can delete it.');
+      const base = baseRevision(p);
+      if (current.revision !== base) throw conflict('task');
+      const task = { ...current, deletedAt: ctx.now, revision: base + 1, updatedAt: ctx.now };
+      await saveRevision(ctx.db, ctx.now, tasks, task, base, 'task');
+      await ctx.log('task.deleted', task.id, `Deleted task "${task.title}" on ${matter.title}`);
+      return true;
+    },
+  },
+  'task.restore': {
+    handler: async (ctx, p) => {
+      const { task: current, matter } = await findTask(ctx, p.id, 'deleted_at IS NOT NULL');
+      if (!mayDelete(me(ctx), current))
+        throw forbidden('Only the creator of a task or a Manager and above can restore it.');
+      const task = { ...current, deletedAt: null, revision: current.revision + 1, updatedAt: ctx.now };
+      await saveRevision(ctx.db, ctx.now, tasks, task, current.revision, 'task');
+      await ctx.log('task.restored', task.id, `Restored task "${task.title}" on ${matter.title}`);
+      return task;
+    },
+  },
+  'milestone.create': {
+    permission: managerOnly,
+    handler: async (ctx, p) => {
+      const { matter, input } = await milestoneInput(ctx, p.milestone);
+      const milestone: Milestone = {
+        id: crypto.randomUUID(),
+        ...input,
+        createdAt: ctx.now,
+        updatedAt: ctx.now,
+        revision: 1,
+      };
+      await write(ctx.db, ctx.now, [insert(ctx.db, milestones, milestone)]);
+      await ctx.log(
+        'milestone.created',
+        milestone.id,
+        `Added milestone "${milestone.title}" on ${matter.title}, due ${milestone.dueDate}`,
+      );
+      return milestone;
+    },
+  },
+  'milestone.update': {
+    permission: managerOnly,
+    handler: async (ctx, p) => {
+      const { record: current } = await visibleChild(ctx, milestones, p.id, 'milestone');
+      const base = baseRevision(p);
+      if (current.revision !== base) throw conflict('milestone');
+      const { matter, input } = await milestoneInput(ctx, p.milestone, current);
+      const milestone = { ...current, ...input, revision: base + 1, updatedAt: ctx.now };
+      await saveRevision(ctx.db, ctx.now, milestones, milestone, base, 'milestone');
+      await ctx.log(
+        'milestone.updated',
+        milestone.id,
+        `Updated milestone "${milestone.title}" on ${matter.title}`,
+      );
+      return milestone;
+    },
+  },
+  'milestone.delete': {
+    permission: managerOnly,
+    handler: async (ctx, p) => {
+      const { record, matter } = await visibleChild(ctx, milestones, p.id, 'milestone');
+      await write(ctx.db, ctx.now, [remove(ctx.db, milestones, record.id)]);
+      await ctx.log('milestone.deleted', record.id, `Deleted milestone "${record.title}" on ${matter.title}`);
+      return true;
+    },
+  },
+};
+
+// For approvals (module agents): one task the caller can see, as a short summary.
+export async function taskSummary(ctx: ModuleContext, id: unknown) {
+  const { task, matter } = await findTask(ctx, id);
+  return {
+    id: task.id,
+    title: task.title,
+    matterId: matter.id,
+    matterTitle: matter.title,
+    status: task.status,
+    dueDate: task.dueDate,
+    assignee: task.assignee,
+  };
+}
+
+// Changes a task's status, due date or assignee as the caller, with every rule of task.update
+// (who may edit, sign-off, ethical walls). Used when a member approves an agent's proposal.
+export async function changeTask(
+  ctx: ModuleContext,
+  id: unknown,
+  changes: { status?: Task['status']; dueDate?: string | null; assignee?: string | null },
+) {
+  const { task } = await findTask(ctx, id);
+  return (await taskActions['task.update'].handler(ctx, {
+    id: task.id,
+    task: { ...task, ...changes },
+    baseRevision: task.revision,
+  })) as Task;
+}

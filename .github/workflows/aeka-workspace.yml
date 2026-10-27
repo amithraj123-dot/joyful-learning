@@ -1,0 +1,144 @@
+name: Aeka Workspace
+
+on:
+  push:
+    paths: ["aeka-workspace/**", ".github/workflows/aeka-workspace.yml"]
+  pull_request:
+    paths: ["aeka-workspace/**", ".github/workflows/aeka-workspace.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: aeka-workspace
+
+jobs:
+  checks:
+    name: Web and shared checks (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+      - run: npm --prefix desktop ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: node node_modules/typescript/bin/tsc --noEmit
+      - run: npm test
+      - run: npm --prefix desktop run build:ui
+      - run: npm --prefix desktop test
+      - run: pnpm build
+
+  windows:
+    name: Windows desktop (tests, smoke launch, package)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+      - run: npm --prefix desktop ci
+      # Electron 44 downloads its binary on first use rather than at install time.
+      - name: Download the Electron binary
+        run: node desktop/node_modules/electron/install.js
+      - name: Desktop unit tests, including the real PowerShell helper
+        run: npm --prefix desktop test
+      - run: npm --prefix desktop run build:ui
+      - name: Smoke launch (starts, opens the vault and window, then quits)
+        shell: pwsh
+        run: |
+          $env:AEKA_SCRIBE_SMOKE_TEST = '1'
+          $root = (Get-Location).Path
+          $electron = node -e "process.stdout.write(require('./desktop/node_modules/electron'))"
+          if (-not (Test-Path $electron)) { throw "Electron binary not found at $electron" }
+          $p = Start-Process -FilePath $electron -ArgumentList (Join-Path $root 'desktop') -WorkingDirectory $root -PassThru -NoNewWindow -RedirectStandardOutput smoke.out -RedirectStandardError smoke.err
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw 'Aeka Scribe did not finish its smoke launch within 120 s.' }
+          Get-Content smoke.out, smoke.err
+          if ($p.ExitCode -ne 0) { throw "Smoke launch failed with exit code $($p.ExitCode)." }
+          if (-not (Select-String -Path smoke.out -Pattern 'AEKA_SCRIBE_SMOKE_OK' -Quiet)) { throw 'Smoke marker missing.' }
+      - name: Package unsigned ZIP and NSIS installer
+        run: npm --prefix desktop run package:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aeka-scribe-windows-unsigned
+          path: |
+            aeka-workspace/desktop/release/*.zip
+            aeka-workspace/desktop/release/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  android:
+    name: Android app (tests and APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: aeka-workspace/android
+    env:
+      # Secrets cannot be read in a step's `if`; this flag can.
+      HAS_RELEASE_KEY: ${{ secrets.AEKA_ANDROID_KEYSTORE != '' && secrets.AEKA_ANDROID_KEYSTORE_PASSWORD != '' && secrets.AEKA_ANDROID_KEY_ALIAS != '' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            aeka-workspace/android/**/*.gradle.kts
+            aeka-workspace/android/gradle/wrapper/gradle-wrapper.properties
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+      # The Android SDK is preinstalled on ubuntu-latest ($ANDROID_HOME).
+      - name: Core unit tests, debug APK and lint
+        run: ./gradlew --no-daemon --stacktrace :core:test :app:assembleDebug :app:lintDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aeka-android-debug
+          path: aeka-workspace/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload test and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeka-android-reports
+          path: |
+            aeka-workspace/android/app/build/reports/
+            aeka-workspace/android/core/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Signed release APK (only when the signing secrets are set)
+        if: env.HAS_RELEASE_KEY == 'true'
+        env:
+          AEKA_ANDROID_KEYSTORE: ${{ secrets.AEKA_ANDROID_KEYSTORE }}
+          AEKA_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.AEKA_ANDROID_KEYSTORE_PASSWORD }}
+          AEKA_ANDROID_KEY_ALIAS: ${{ secrets.AEKA_ANDROID_KEY_ALIAS }}
+          AEKA_ANDROID_KEY_PASSWORD: ${{ secrets.AEKA_ANDROID_KEY_PASSWORD }}
+        run: |
+          export AEKA_ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/aeka-release.keystore"
+          printf '%s' "$AEKA_ANDROID_KEYSTORE" | base64 --decode > "$AEKA_ANDROID_KEYSTORE_PATH"
+          ./gradlew --no-daemon :app:assembleRelease
+          rm -f "$AEKA_ANDROID_KEYSTORE_PATH"
+      - if: env.HAS_RELEASE_KEY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeka-android-release
+          path: aeka-workspace/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 30
